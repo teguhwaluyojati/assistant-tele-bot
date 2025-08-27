@@ -75,7 +75,7 @@ class TelegramController extends Controller
             }
         }
 
-        return 'ok';
+        return 'tes';
     }
 
     private function logUserActivity($update)
