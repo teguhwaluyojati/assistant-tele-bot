@@ -38,6 +38,12 @@ class TelegramController extends Controller
             $chatId = $update->getMessage()->getChat()->getId();
             $text = $update->getMessage()->getText();
 
+    // Catat SEMUA pesan user ke database
+    \App\Models\TelegramUserCommand::create([
+        'user_id' => $chatId,
+        'command' => $text,
+    ]);
+
             if ($text === '/start' || $text === '/menu') {
                 $this->showMainMenu($chatId);
             } else {
