@@ -67,9 +67,11 @@ class TelegramController extends Controller
                         $this->coffeeGenerate($chatId);
                         break;
                     case 'Info Genshin 🎮':
-                        // Panggil fungsi awal untuk menampilkan kategori
                         $this->showGenshinCategories($chatId);
                         break;
+                    case 'AI Chat 🤖':
+                            $this->showGenshinCategories($chatId);
+                    break;
                     default:
                         if (strtolower($text) === 'halo') {
                             $this->sendGreeting($chatId);
@@ -144,7 +146,7 @@ private function handleCallback($chatId, $messageId, $data)
             ['Cuaca di Jakarta 🌤️', 'Nasihat Bijak 💡'],
             ['Fakta Kucing 🐱', 'Top List Crypto 📈'],
             ['Aku Mau Kopi ☕️','Info Genshin 🎮'],
-            ['Tentang Developer 👨‍💻'],
+            ['AI Chat 🤖','Tentang Developer 👨‍💻'],
         ];
 
         $reply_markup = Keyboard::make([
