@@ -16,6 +16,7 @@ class TelegramController extends Controller
      */
     public function handle()
     {
+        date_default_timezone_set('Asia/Jakarta');
         $update = Telegram::getWebhookUpdate();
 
         // Panggil fungsi untuk mencatat data pengguna di sini
