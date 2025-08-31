@@ -18,6 +18,3 @@ use App\Http\Controllers\TelegramController; // <-- PASTIKAN BARIS INI ADA
 Route::get('/', function () {
     return view('welcome');
 });
-
-Route::post('/webhook', [TelegramController::class, 'handle']);
-

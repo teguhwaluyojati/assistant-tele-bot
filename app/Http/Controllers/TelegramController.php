@@ -84,7 +84,7 @@ class TelegramController extends Controller
             }
         }
 
-        return 'tes';
+    return response()->json(['ok' => true]);
     }
 
     private function logUserActivity($update)
