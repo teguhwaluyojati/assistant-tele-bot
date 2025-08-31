@@ -163,7 +163,7 @@ class TelegramController extends Controller
             }
         } catch (\Exception $e) {
             Log::error('Exception during Gemini API call: ' . $e->getMessage());
-            Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, terjadi kesalahan teknis.']);
+            Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Halo, ada yang bisa saya bantu?']);
         }
     }
 
