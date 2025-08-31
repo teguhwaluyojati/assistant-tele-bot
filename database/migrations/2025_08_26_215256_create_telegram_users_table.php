@@ -11,14 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('telegram_users', function (Blueprint $table) {
-             $table->id(); // ID internal database Anda
-        $table->bigInteger('user_id')->unique(); // ID unik dari Telegram
-        $table->string('username')->nullable();
-        $table->string('first_name')->nullable();
-        $table->string('last_name')->nullable();
-        $table->timestamp('last_interaction_at')->nullable();
-        $table->timestamps(); // created_at dan updated_at
+        // Schema::create('telegram_users', function (Blueprint $table) {
+        //      $table->id(); // ID internal database Anda
+        // $table->bigInteger('user_id')->unique(); // ID unik dari Telegram
+        // $table->string('username')->nullable();
+        // $table->string('first_name')->nullable();
+        // $table->string('last_name')->nullable();
+        // $table->timestamp('last_interaction_at')->nullable();
+        // $table->timestamps(); // created_at dan updated_at
+                Schema::table('telegram_users', function (Blueprint $table) {
+            // Menambahkan kolom state setelah kolom username (bisa disesuaikan)
+            $table->string('state')->default('normal')->after('username')->nullable();
     });
     }
 
@@ -27,6 +30,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('telegram_users');
+        // Schema::dropIfExists('telegram_users');
+                Schema::table('telegram_users', function (Blueprint $table) {
+            $table->dropColumn('state');
+        });
     }
 };

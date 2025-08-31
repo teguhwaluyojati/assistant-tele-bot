@@ -8,6 +8,7 @@ use Telegram\Bot\Laravel\Facades\Telegram;
 use Telegram\Bot\Keyboard\Keyboard;
 use Stichoza\GoogleTranslate\GoogleTranslate;
 use Telegram\Bot\FileUpload\InputFile;
+use App\Models\TelegramUserCommand;
 
 class TelegramController extends Controller
 {
@@ -16,127 +17,219 @@ class TelegramController extends Controller
      */
     public function handle()
     {
-        date_default_timezone_set('Asia/Jakarta');
-        $update = Telegram::getWebhookUpdate();
+    date_default_timezone_set('Asia/Jakarta');
+    $update = Telegram::getWebhookUpdate();
 
-        // Panggil fungsi untuk mencatat data pengguna di sini
-        $this->logUserActivity($update);
+    $user = $this->logUserActivity($update);
 
-        // 1. MENANGANI CALLBACK QUERY (Saat tombol inline ditekan)
-        if ($update->isType('callback_query')) {
-            $callbackQuery = $update->getCallbackQuery();
-            $chatId = $callbackQuery->getMessage()->getChat()->getId();
-            $messageId = $callbackQuery->getMessage()->getMessageId();
-            $data = $callbackQuery->getData();
+    if ($update->isType('callback_query')) {
+        $callbackQuery = $update->getCallbackQuery();
+        $chatId = $callbackQuery->getMessage()->getChat()->getId();
+        $messageId = $callbackQuery->getMessage()->getMessageId();
+        $data = $callbackQuery->getData();
 
-            // Memberi tahu Telegram bahwa kita sudah menerima callback
-            Telegram::answerCallbackQuery(['callback_query_id' => $callbackQuery->getId()]);
+        Telegram::answerCallbackQuery(['callback_query_id' => $callbackQuery->getId()]);
 
-            $this->handleCallback($chatId, $messageId, $data);
-        
-        // 2. MENANGANI PESAN TEKS (Logika Anda yang sudah ada)
-        } else if ($update->getMessage() && $update->getMessage()->has('text')) {
-            $chatId = $update->getMessage()->getChat()->getId();
-            $text = $update->getMessage()->getText();
+        if (str_starts_with($data, 'category_')) {
+            $category = substr($data, 9);
+            $this->showGenshinItems($chatId, $category);
+        }
+    
+    } else if ($update->getMessage() && $update->getMessage()->has('text')) {
+        $chatId = $update->getMessage()->getChat()->getId();
+        $text = $update->getMessage()->getText();
 
-    // Catat SEMUA pesan user ke database
+        if ($user && $user->state === 'gemini_chat') {
     \App\Models\TelegramUserCommand::create([
         'user_id' => $chatId,
-        'command' => $text,
-    ]);
-
-            if ($text === '/start' || $text === '/menu') {
-                $this->showMainMenu($chatId);
+        'command' => "AI_CHAT: " . $text,
+    ]);            if (strtolower($text) === '/selesai') {
+                $this->exitGeminiChatMode($user);
             } else {
-                switch ($text) {
-                    case 'Cuaca di Jakarta 🌤️':
-                        $this->sendWeatherInfo($chatId);
-                        break;
-                    case 'Nasihat Bijak 💡':
-                        $this->sendAdvice($chatId);
-                        break;
-                    case 'Fakta Kucing 🐱':
-                        $this->sendCatFact($chatId);
-                        break;
-                    case 'Tentang Developer 👨‍💻':
-                        $this->sendDeveloperInfo($chatId);
-                        break;
-                    case 'Top List Crypto 📈':
-                        $this->topListCrypto($chatId);
-                        break;
-                    case 'Aku Mau Kopi ☕️':
-                        $this->coffeeGenerate($chatId);
-                        break;
-                    case 'Info Genshin 🎮':
-                        $this->showGenshinCategories($chatId);
-                        break;
-                    case 'AI Chat 🤖':
-                            $this->showGenshinCategories($chatId);
+                $this->askGemini($chatId, $text);
+            }
+            return response()->json(['ok' => true]);
+        }
+
+        \App\Models\TelegramUserCommand::create([
+            'user_id' => $chatId,
+            'command' => $text,
+        ]);
+
+        if ($text === '/start' || $text === '/menu') {
+            $this->showMainMenu($chatId);
+        } else {
+            switch ($text) {
+                // ... (semua case Anda yang lain tetap sama)
+                case 'Cuaca di Jakarta 🌤️': $this->sendWeatherInfo($chatId); break;
+                case 'Nasihat Bijak 💡': $this->sendAdvice($chatId); break;
+                case 'Fakta Kucing 🐱': $this->sendCatFact($chatId); break;
+                case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
+                case 'Top List Crypto 📈': $this->topListCrypto($chatId); break;
+                case 'Aku Mau Kopi ☕️': $this->coffeeGenerate($chatId); break;
+                case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
+                
+                // --- PERUBAHAN 3: Ubah aksi untuk tombol AI Chat ---
+                case 'AI Chat 🤖':
+                    $this->enterGeminiChatMode($user);
                     break;
-                    default:
-                        if (strtolower($text) === 'halo') {
-                            $this->sendGreeting($chatId);
-                        } else {
-                            $this->sendUnknownCommand($chatId);
-                        }
-                        break;
-                }
+                
+                default:
+                    if (strtolower($text) === 'halo') {
+                        $this->sendGreeting($chatId);
+                    } else {
+                        $this->sendUnknownCommand($chatId);
+                    }
+                    break;
             }
         }
+    }
 
     return response()->json(['ok' => true]);
     }
 
-    private function logUserActivity($update)
-{
-    try {
-        $user = null;
-        if ($update->isType('callback_query')) {
-            $user = $update->getCallbackQuery()->getFrom();
-        } else if ($update->getMessage()) {
-            $user = $update->getMessage()->getFrom();
+    /**
+     * Fungsi untuk masuk ke mode chat Gemini.
+     */
+    private function enterGeminiChatMode(\App\Models\TelegramUser $user)
+    {
+        $user->state = 'gemini_chat';
+        $user->save();
+
+        Telegram::sendMessage([
+            'chat_id' => $user->id,
+            'text' => "🤖 Anda sekarang dalam mode chat dengan AI Gemini.\n\nSilakan ajukan pertanyaan apa pun.\nKetik `/selesai` untuk keluar dari mode ini."
+        ]);
+    }
+
+    /**
+     * Fungsi untuk keluar dari mode chat Gemini.
+     */
+    private function exitGeminiChatMode(\App\Models\TelegramUser $user)
+    {
+        $user->state = 'normal';
+        $user->save();
+
+        Telegram::sendMessage([
+            'chat_id' => $user->id,
+            'text' => "✅ Anda telah keluar dari mode chat AI. Kembali ke menu utama."
+        ]);
+
+        $this->showMainMenu($user->id);
+    }
+
+    /**
+     * Mengirim pertanyaan ke Gemini.
+     */
+    private function askGemini($chatId, $question)
+    {
+        $apiKey = env('GEMINI_API_KEY');
+        if (!$apiKey) {
+            Log::error('GEMINI_API_KEY is not set in .env');
+            Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, layanan AI sedang tidak terkonfigurasi.']);
+            return;
         }
 
-        if ($user) {
-            \App\Models\TelegramUser::updateOrCreate(
-                ['user_id' => $user->getId()], // Kondisi pencarian
+        Telegram::sendChatAction(['chat_id' => $chatId, 'action' => 'typing']);
+
+        $apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=' . $apiKey;
+
+        try {
+            $response = Http::timeout(60)->post($apiUrl, [
+                'contents' => [
+                    [
+                        'parts' => [
+                            ['text' => $question]
+                        ]
+                    ]
+                ]
+            ]);
+
+            if ($response->successful()) {
+                if (!empty($response->json()['candidates'])) {
+                    $reply = $response->json()['candidates'][0]['content']['parts'][0]['text'];
+                    Telegram::sendMessage([
+                        'chat_id' => $chatId, 
+                        'text' => $reply,
+                        'parse_mode' => 'Markdown'
+                    ]);
+                } else {
+                    Log::warning('Gemini API call successful but no candidates returned. Prompt may be blocked.');
+                    Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, pertanyaan Anda tidak dapat diproses saat ini. Coba dengan pertanyaan lain.']);
+                }
+            } else {
+                Log::error('Gemini API Error: ' . $response->body());
+                Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, terjadi kesalahan saat menghubungi layanan AI.']);
+            }
+        } catch (\Exception $e) {
+            Log::error('Exception during Gemini API call: ' . $e->getMessage());
+            Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, terjadi kesalahan teknis.']);
+        }
+    }
+
+    /**
+     * Mencatat/memperbarui data pengguna dan MENGEMBALIKAN model User.
+     * @param \Telegram\Bot\Objects\Update $update
+     * @return \App\Models\TelegramUser|null
+     */
+    private function logUserActivity($update)
+    {
+        try {
+            $from = null;
+            if ($update->isType('callback_query')) {
+                $from = $update->getCallbackQuery()->getFrom();
+            } else if ($update->getMessage()) {
+                $from = $update->getMessage()->getFrom();
+            }
+
+            if (!$from) {
+                Log::warning('Tidak bisa mendapatkan data user dari update Telegram.');
+                return null;
+            }
+
+            // =================================================================
+            // ==> INI BAGIAN TERPENTING: Gunakan 'return' <==
+            // updateOrCreate akan mencari user, jika tidak ada maka akan dibuat.
+            // Fungsi ini juga langsung mengembalikan model User yang bisa kita gunakan.
+            // =================================================================
+            return \App\Models\TelegramUser::updateOrCreate(
+                ['user_id' => $from->getId()], 
                 [
-                    'username' => $user->getUsername(),
-                    'first_name' => $user->getFirstName(),
-                    'last_name' => $user->getLastName(),
+                    'username'   => $from->getUsername(),
+                    'first_name' => $from->getFirstName(),
+                    'last_name'  => $from->getLastName(),
                     'last_interaction_at' => now(),
+
                 ]
             );
-        }
-    } catch (\Exception $e) {
-        Log::error('Gagal mencatat pengguna Telegram: ' . $e->getMessage());
-    }
-}
 
-        /**
+        } catch (\Exception $e) {
+            Log::error('Gagal mencatat pengguna Telegram: ' . $e->getMessage(), ['exception' => $e]);
+            return null;
+        }
+    }
+
+    /**
      * Router untuk semua callback_data dari inline keyboard.
      */
-private function handleCallback($chatId, $messageId, $data)
-{
-    // Pola baru: genshin_page_{category}_{page}
-    if (str_starts_with($data, 'genshin_page_')) {
-        list($_, $_, $category, $page) = explode('_', $data, 4);
-        $this->showItemsInCategory($chatId, $messageId, $category, (int)$page);
+    private function handleCallback($chatId, $messageId, $data)
+    {
+        if (str_starts_with($data, 'genshin_page_')) {
+            list($_, $_, $category, $page) = explode('_', $data, 4);
+            $this->showItemsInCategory($chatId, $messageId, $category, (int)$page);
+        }
+        else if (str_starts_with($data, 'category_')) {
+            $category = substr($data, 9);
+            $this->showItemsInCategory($chatId, $messageId, $category, 1); 
+        }
+        else if (str_starts_with($data, 'item_')) {
+            list($_, $category, $itemName) = explode('_', $data, 3);
+            $this->showItemDetails($chatId, $messageId, $category, $itemName);
+        }
+        else if ($data === 'back_to_categories') {
+            $this->showGenshinCategories($chatId, $messageId);
+        }
     }
-    // Saat pertama kali memilih kategori, selalu mulai dari halaman 1
-    else if (str_starts_with($data, 'category_')) {
-        $category = substr($data, 9);
-        $this->showItemsInCategory($chatId, $messageId, $category, 1); // Mulai dari page 1
-    }
-    else if (str_starts_with($data, 'item_')) {
-        list($_, $category, $itemName) = explode('_', $data, 3);
-        $this->showItemDetails($chatId, $messageId, $category, $itemName);
-    }
-    else if ($data === 'back_to_categories') {
-        $this->showGenshinCategories($chatId, $messageId);
-    }
-}
-
 
     /**
      * Menampilkan menu utama dengan keyboard.
@@ -163,7 +256,7 @@ private function handleCallback($chatId, $messageId, $data)
         ]);
     }
 
-        /**
+    /**
      * Mengambil kategori dari API dan menampilkannya sebagai tombol inline.
      */
     private function showGenshinCategories($chatId, $messageId = null)
@@ -190,11 +283,9 @@ private function handleCallback($chatId, $messageId, $data)
                 ];
 
                 if ($messageId) {
-                    // Jika ada messageId, EDIT pesan yang ada
                     $messageData['message_id'] = $messageId;
                     Telegram::editMessageText($messageData);
                 } else {
-                    // Jika tidak, KIRIM pesan baru
                     Telegram::sendMessage($messageData);
                 }
             } else {
@@ -206,152 +297,127 @@ private function handleCallback($chatId, $messageId, $data)
         }
     }
 
-/**
- * Menampilkan daftar item dalam sebuah kategori dengan pagination.
- */
-private function showItemsInCategory($chatId, $messageId, $category, $page = 1)
-{
-    // Tentukan berapa item yang ingin ditampilkan per halaman
-    define('ITEMS_PER_PAGE', 20);
+    /**
+     * Menampilkan daftar item dalam sebuah kategori dengan pagination.
+     */
+    private function showItemsInCategory($chatId, $messageId, $category, $page = 1)
+    {
+        define('ITEMS_PER_PAGE', 20);
 
-    try {
-        $response = Http::get('https://genshin.jmp.blue/' . $category);
+        try {
+            $response = Http::get('https://genshin.jmp.blue/' . $category);
 
-        if ($response->successful()) {
-            $allItems = $response->json();
-            
-            // --- Logika Pagination ---
-            $totalItems = count($allItems);
-            $totalPages = ceil($totalItems / ITEMS_PER_PAGE);
-            $offset = ($page - 1) * ITEMS_PER_PAGE;
-            
-            // Ambil hanya data untuk halaman saat ini
-            $itemsForCurrentPage = array_slice($allItems, $offset, ITEMS_PER_PAGE);
-            // --- Akhir Logika Pagination ---
+            if ($response->successful()) {
+                $allItems = $response->json();
+                $totalItems = count($allItems);
+                $totalPages = ceil($totalItems / ITEMS_PER_PAGE);
+                $offset = ($page - 1) * ITEMS_PER_PAGE;
+                $itemsForCurrentPage = array_slice($allItems, $offset, ITEMS_PER_PAGE);
+                $inlineKeyboard = [];
+                $row = [];
 
-            $inlineKeyboard = [];
-            $row = [];
-
-            // Buat tombol hanya untuk item di halaman ini
-            foreach ($itemsForCurrentPage as $item) {
-                $button = Keyboard::inlineButton([
-                    'text' => ucwords(str_replace('-', ' ', $item)),
-                    'callback_data' => 'item_' . $category . '_' . $item
-                ]);
-                $row[] = $button;
-                if (count($row) == 2) {
-                    $inlineKeyboard[] = $row;
-                    $row = [];
+                foreach ($itemsForCurrentPage as $item) {
+                    $button = Keyboard::inlineButton([
+                        'text' => ucwords(str_replace('-', ' ', $item)),
+                        'callback_data' => 'item_' . $category . '_' . $item
+                    ]);
+                    $row[] = $button;
+                    if (count($row) == 2) {
+                        $inlineKeyboard[] = $row;
+                        $row = [];
+                    }
                 }
-            }
-            if (!empty($row)) {
-                $inlineKeyboard[] = $row;
-            }
+                if (!empty($row)) {
+                    $inlineKeyboard[] = $row;
+                }
 
-            // --- Membuat Tombol Navigasi ---
-            $navKeyboard = [];
-            if ($page > 1) { // Jika bukan halaman pertama, tampilkan tombol PREV
-                $navKeyboard[] = Keyboard::inlineButton([
-                    'text' => '⬅️ Prev', 
-                    'callback_data' => 'genshin_page_' . $category . '_' . ($page - 1)
+                $navKeyboard = [];
+                if ($page > 1) { 
+                    $navKeyboard[] = Keyboard::inlineButton([
+                        'text' => '⬅️ Prev', 
+                        'callback_data' => 'genshin_page_' . $category . '_' . ($page - 1)
+                    ]);
+                }
+
+                $navKeyboard[] = Keyboard::inlineButton(['text' => "Page {$page}/{$totalPages}", 'callback_data' => 'no_action']);
+
+                if ($page < $totalPages) {
+                    $navKeyboard[] = Keyboard::inlineButton([
+                        'text' => 'Next ➡️', 
+                        'callback_data' => 'genshin_page_' . $category . '_' . ($page + 1)
+                    ]);
+                }
+                
+                if (!empty($navKeyboard)) {
+                    $inlineKeyboard[] = $navKeyboard;
+                }
+
+                $inlineKeyboard[] = [Keyboard::inlineButton(['text' => '⬅️ Kembali ke Kategori', 'callback_data' => 'back_to_categories'])];
+
+                Telegram::editMessageText([
+                    'chat_id' => $chatId,
+                    'message_id' => $messageId,
+                    'text' => 'Silakan pilih item dari kategori *' . ucwords($category) . '* (Halaman ' . $page . '):',
+                    'parse_mode' => 'Markdown',
+                    'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard])
                 ]);
             }
-
-            // Tombol penunjuk halaman
-            $navKeyboard[] = Keyboard::inlineButton(['text' => "Page {$page}/{$totalPages}", 'callback_data' => 'no_action']);
-
-            if ($page < $totalPages) { // Jika bukan halaman terakhir, tampilkan tombol NEXT
-                $navKeyboard[] = Keyboard::inlineButton([
-                    'text' => 'Next ➡️', 
-                    'callback_data' => 'genshin_page_' . $category . '_' . ($page + 1)
-                ]);
-            }
-            
-            // Tambahkan baris tombol navigasi ke keyboard utama
-            if (!empty($navKeyboard)) {
-                $inlineKeyboard[] = $navKeyboard;
-            }
-            // --- Akhir Tombol Navigasi ---
-
-            // Tambahkan tombol "Kembali" ke menu utama
-            $inlineKeyboard[] = [Keyboard::inlineButton(['text' => '⬅️ Kembali ke Kategori', 'callback_data' => 'back_to_categories'])];
-
-            Telegram::editMessageText([
-                'chat_id' => $chatId,
-                'message_id' => $messageId,
-                'text' => 'Silakan pilih item dari kategori *' . ucwords($category) . '* (Halaman ' . $page . '):',
-                'parse_mode' => 'Markdown',
-                'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard])
-            ]);
+        } catch (\Exception $e) {
+            Log::error("Error ambil item Genshin ($category): " . $e->getMessage());
         }
-    } catch (\Exception $e) {
-        Log::error("Error ambil item Genshin ($category): " . $e->getMessage());
     }
-}
 
     /**
      * Menampilkan detail dari item yang dipilih.
      */
-private function showItemDetails($chatId, $messageId, $category, $itemName)
-{
-    try {
-        $response = Http::get("https://genshin.jmp.blue/{$category}/{$itemName}");
+    private function showItemDetails($chatId, $messageId, $category, $itemName)
+    {
+        try {
+            $response = Http::get("https://genshin.jmp.blue/{$category}/{$itemName}");
 
-        if ($response->successful()) {
-            $details = $response->json();
-            
-            if (empty($details)) {
-                Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, detail untuk item ini tidak ditemukan.']);
-                return;
-            }
-
-            // --- Logika Dinamis Dimulai Di Sini ---
-
-            // Gunakan 'name' sebagai judul utama
-            $text = "✨ *" . ($details['name'] ?? 'Detail Item') . "* ✨\n\n";
-
-            // Daftar field yang tidak perlu ditampilkan dalam loop (karena sudah dipakai atau tidak relevan)
-            $ignoreKeys = ['name', 'id', 'images', 'slug'];
-
-            // Lakukan perulangan pada setiap data (key => value) yang diterima dari API
-            foreach ($details as $key => $value) {
-                // Lewati field yang ada di dalam daftar $ignoreKeys
-                if (in_array($key, $ignoreKeys)) {
-                    continue;
+            if ($response->successful()) {
+                $details = $response->json();
+                
+                if (empty($details)) {
+                    Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, detail untuk item ini tidak ditemukan.']);
+                    return;
                 }
 
-                // Hanya tampilkan data yang bukan array atau object (data sederhana)
-                if (is_scalar($value) && !empty($value)) {
-                    // Ubah key menjadi lebih mudah dibaca (contoh: 'rarity' -> 'Rarity')
-                    $formattedKey = ucwords(str_replace(['-', '_'], ' ', $key));
-                    
-                    // Tambahkan baris baru ke pesan
-                    $text .= "🔹 *" . $formattedKey . ":* " . $value . "\n";
+                $text = "✨ *" . ($details['name'] ?? 'Detail Item') . "* ✨\n\n";
+
+                $ignoreKeys = ['name', 'id', 'images', 'slug'];
+
+                foreach ($details as $key => $value) {
+                    if (in_array($key, $ignoreKeys)) {
+                        continue;
+                    }
+                    if (is_scalar($value) && !empty($value)) {
+                        $formattedKey = ucwords(str_replace(['-', '_'], ' ', $key));
+                        $text .= "🔹 *" . $formattedKey . ":* " . $value . "\n";
+                    }
                 }
+
+                $inlineKeyboard = [[
+                    Keyboard::inlineButton([
+                        'text' => '⬅️ Kembali ke ' . ucwords($category),
+                        'callback_data' => 'category_' . $category
+                    ])
+                ]];
+
+                Telegram::editMessageText([
+                    'chat_id' => $chatId,
+                    'message_id' => $messageId,
+                    'text' => rtrim($text),
+                    'parse_mode' => 'Markdown',
+                    'disable_web_page_preview' => true, 
+                    'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard])
+                ]);
             }
-            // --- Akhir Logika Dinamis ---
-
-            $inlineKeyboard = [[
-                Keyboard::inlineButton([
-                    'text' => '⬅️ Kembali ke ' . ucwords($category),
-                    'callback_data' => 'category_' . $category
-                ])
-            ]];
-
-            Telegram::editMessageText([
-                'chat_id' => $chatId,
-                'message_id' => $messageId,
-                'text' => rtrim($text), // Menghapus spasi atau baris baru terakhir
-                'parse_mode' => 'Markdown',
-                'disable_web_page_preview' => true, // Mencegah preview link jika ada
-                'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard])
-            ]);
+        } catch (\Exception $e) {
+            Log::error("Error ambil detail Genshin ({$itemName}): " . $e->getMessage());
+            Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Terjadi kesalahan saat mengambil detail item.']);
         }
-    } catch (\Exception $e) {
-        Log::error("Error ambil detail Genshin ({$itemName}): " . $e->getMessage());
-        Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Terjadi kesalahan saat mengambil detail item.']);
     }
-}
 
     private function topListCrypto($chatId)
     {
@@ -404,7 +470,7 @@ private function showItemDetails($chatId, $messageId, $category, $itemName)
     {
         try {
             $response = Http::get('https://api.open-meteo.com/v1/forecast', [
-                'latitude' => -6.2, // Koordinat Jakarta
+                'latitude' => -6.2, 
                 'longitude' => 106.8,
                 'current_weather' => true,
             ]);
@@ -474,7 +540,6 @@ private function showItemDetails($chatId, $messageId, $category, $itemName)
     private function sendDeveloperInfo($chatId)
     {
         $responses = [
-            // "Teguh Waluyojati adalah Developer Bot ini.\nhttps://teguhwaluyojati.github.io/",
             "Teguh Waluyojati adalah seorang yang berprofesi sebagai professional Full-Stack Developer.\nhttps://teguhwaluyojati.github.io/"
         ];
         $randomResponse = $responses[array_rand($responses)];
@@ -501,7 +566,6 @@ private function showItemDetails($chatId, $messageId, $category, $itemName)
     private function sendUnknownCommand($chatId)
     {
         $text = 'Maaf, saya tidak mengerti perintah itu. Silakan gunakan tombol menu di bawah atau ketik /menu untuk memulai.';
-        // Panggil lagi menu utama agar pengguna tidak bingung
         $this->showMainMenu($chatId);
     }
 }
