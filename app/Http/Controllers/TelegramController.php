@@ -9,6 +9,7 @@ use Telegram\Bot\Keyboard\Keyboard;
 use Stichoza\GoogleTranslate\GoogleTranslate;
 use Telegram\Bot\FileUpload\InputFile;
 use App\Models\TelegramUserCommand;
+use App\Models\TelegramUser;
 
 class TelegramController extends Controller
 {
@@ -38,6 +39,11 @@ class TelegramController extends Controller
     } else if ($update->getMessage() && $update->getMessage()->has('text')) {
         $chatId = $update->getMessage()->getChat()->getId();
         $text = $update->getMessage()->getText();
+
+        if (str_starts_with($text, '/')) {
+            $this->handleAdminCommands($chatId, $text);
+            return response()->json(['ok' => true]);
+        }
 
     if ($user && $user->state === 'gemini_chat') {
     \App\Models\TelegramUserCommand::create([
@@ -92,6 +98,97 @@ class TelegramController extends Controller
     }
 
     return response()->json(['ok' => true]);
+    }
+
+    private function isUserAdmin($chatId)
+    {
+        return $chatId == env('TELEGRAM_ADMIN_ID');
+    }
+
+    /**
+     * Membersihkan teks dari karakter khusus MarkdownV2 agar aman dikirim.
+     *
+     * @param string $text Teks yang akan dibersihkan.
+     * @return string Teks yang sudah aman.
+     */
+    private function escapeMarkdown($text)
+    {
+        $escapeChars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'];
+        
+        return str_replace($escapeChars, array_map(function($char) {
+            return '\\'.$char;
+        }, $escapeChars), $text);
+    }
+
+    private function handleAdminCommands($chatId, $text)
+    {
+        // Pengecekan keamanan: Hanya admin yang boleh melanjutkan
+        if (!$this->isUserAdmin($chatId)) {
+            $this->sendMessageSafely([
+                'chat_id' => $chatId,
+                'text' => '🚫 Anda tidak memiliki izin untuk menggunakan perintah ini.'
+            ]);
+            return;
+        }
+
+        // --- Logika untuk perintah /listusers ---
+        if ($text === '/listusers') {
+            // Ambil 10 user terbaru dari database
+            $users = TelegramUser::latest()->take(10)->get();
+            
+            if ($users->isEmpty()) {
+                $this->sendMessageSafely(['chat_id' => $chatId, 'text' => 'Belum ada pengguna yang tercatat.']);
+                return;
+            }
+
+            $message = "👥 *10 Pengguna Terakhir:*\n\n";
+            foreach ($users as $user) {
+                $username = $user->username ? "@" . $user->username : "N/A";
+                $message .= "ID: `{$user->id}`\n";
+                $message .= "Nama: {$user->first_name}\n";
+                $message .= "Username: {$username}\n";
+                $message .= "User ID: {$user->user_id}\n";
+                $message .= "--------------------\n";
+            }
+
+            $this->sendMessageSafely(['chat_id' => $chatId, 'text' => $message, 'parse_mode' => 'Markdown']);
+        }
+        else if (str_starts_with($text, '/usercommands ')) {
+            $targetUserId = substr($text, 14); 
+
+            if (!is_numeric($targetUserId)) {
+                $this->sendMessageSafely(['chat_id' => $chatId, 'text' => 'Format salah. Gunakan: `/usercommands [user_id]`']);
+                return;
+            }
+
+            $commands = TelegramUserCommand::where('user_id', $targetUserId)
+                ->latest()
+                ->take(10)
+                ->get();
+
+            if ($commands->isEmpty()) {
+                $this->sendMessageSafely(['chat_id' => $chatId, 'text' => "Tidak ditemukan perintah untuk User ID: `{$targetUserId}`"]);
+                return;
+            }
+
+            $message = "📜 *10 Perintah Terakhir dari User ID `{$targetUserId}`:*\n\n";
+            foreach ($commands as $command) {
+                $rawCommandText = $command->command;
+
+                $safeCommandText = $this->escapeMarkdown($rawCommandText);
+
+                $message .= "`" . $command->created_at->format('Y-m-d H:i') . "`\n";
+                $message .= "> {$safeCommandText}\n\n"; 
+            }
+            
+        $this->sendMessageSafely(['chat_id' => $chatId, 'text' => $message, 'parse_mode' => 'Markdown']);
+        }
+        else {
+            $this->sendMessageSafely([
+                'chat_id' => $chatId,
+                'text' => "Perintah admin tidak dikenal. Gunakan:\n`/listusers`\n`/usercommands [user_id]`"
+            ]);
+        }
     }
 
     /**
