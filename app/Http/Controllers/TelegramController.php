@@ -39,12 +39,13 @@ class TelegramController extends Controller
         $chatId = $update->getMessage()->getChat()->getId();
         $text = $update->getMessage()->getText();
 
-        if ($user && $user->state === 'gemini_chat') {
+    if ($user && $user->state === 'gemini_chat') {
     \App\Models\TelegramUserCommand::create([
         'user_id' => $chatId,
         'command' => "AI_CHAT: " . $text,
-    ]);            if (strtolower($text) === '/selesai') {
-                $this->exitGeminiChatMode($user);
+    ]);            
+    if (strtolower($text) === '/selesai') {
+                $this->exitGeminiChatMode($user, $chatId);
             } else {
                 $this->askGemini($chatId, $text);
             }
@@ -60,7 +61,6 @@ class TelegramController extends Controller
             $this->showMainMenu($chatId);
         } else {
             switch ($text) {
-                // ... (semua case Anda yang lain tetap sama)
                 case 'Cuaca di Jakarta 🌤️': $this->sendWeatherInfo($chatId); break;
                 case 'Nasihat Bijak 💡': $this->sendAdvice($chatId); break;
                 case 'Fakta Kucing 🐱': $this->sendCatFact($chatId); break;
@@ -71,8 +71,14 @@ class TelegramController extends Controller
                 
                 // --- PERUBAHAN 3: Ubah aksi untuk tombol AI Chat ---
                 case 'AI Chat 🤖':
-                    $this->enterGeminiChatMode($user);
+                    $this->enterGeminiChatMode($user, $chatId);
                     break;
+                // case 'AI Chat 🤖':
+                // $this->sendMessageSafely([
+                //     'chat_id' => $update->getMessage()->getChat()->getId(),
+                //     'text' => '🚧 Maaf, layanan AI Chat sedang sibuk karena telah mencapai limit. Silakan coba lagi nanti. 🙏'
+                // ]);
+                // break;
                 
                 default:
                     if (strtolower($text) === 'halo') {
@@ -91,13 +97,13 @@ class TelegramController extends Controller
     /**
      * Fungsi untuk masuk ke mode chat Gemini.
      */
-    private function enterGeminiChatMode(\App\Models\TelegramUser $user)
+    private function enterGeminiChatMode(\App\Models\TelegramUser $user, $chatId)
     {
         $user->state = 'gemini_chat';
         $user->save();
 
         Telegram::sendMessage([
-            'chat_id' => $user->id,
+            'chat_id' => $chatId,
             'text' => "🤖 Anda sekarang dalam mode chat dengan AI Gemini.\n\nSilakan ajukan pertanyaan apa pun.\nKetik `/selesai` untuk keluar dari mode ini."
         ]);
     }
@@ -105,13 +111,13 @@ class TelegramController extends Controller
     /**
      * Fungsi untuk keluar dari mode chat Gemini.
      */
-    private function exitGeminiChatMode(\App\Models\TelegramUser $user)
+    private function exitGeminiChatMode(\App\Models\TelegramUser $user, $chatId)
     {
         $user->state = 'normal';
         $user->save();
 
         Telegram::sendMessage([
-            'chat_id' => $user->id,
+            'chat_id' => $chatId,
             'text' => "✅ Anda telah keluar dari mode chat AI. Kembali ke menu utama."
         ]);
 
@@ -419,6 +425,9 @@ class TelegramController extends Controller
         }
     }
 
+    /**
+     * Mengambil dan mengirim daftar 10 cryptocurrency teratas.
+     */
     private function topListCrypto($chatId)
     {
         try{
@@ -442,6 +451,9 @@ class TelegramController extends Controller
         }
     }
 
+    /**
+     * Menghasilkan dan mengirim gambar kopi acak.
+     */
     private function coffeeGenerate($chatId)
     {
         try {
@@ -567,5 +579,58 @@ class TelegramController extends Controller
     {
         $text = 'Maaf, saya tidak mengerti perintah itu. Silakan gunakan tombol menu di bawah atau ketik /menu untuk memulai.';
         $this->showMainMenu($chatId);
+    }
+
+    /**
+     * Helper untuk mengirim pesan dengan aman dan menangani error umum.
+     * Terutama error "chat not found" saat pengguna memblokir bot.
+     *
+     * @param array $params Parameter untuk fungsi sendMessage
+     * @return void
+     */
+    private function sendMessageSafely(array $params)
+    {
+        try {
+            // Mencoba mengirim pesan seperti biasa
+            Telegram::sendMessage($params);
+        } catch (\Telegram\Bot\Exceptions\TelegramOtherException $e) {
+            // Menangkap error spesifik dari Telegram
+            if (str_contains($e->getMessage(), 'chat not found')) {
+                $chatId = $params['chat_id'] ?? 'N/A';
+                Log::warning("Gagal kirim pesan: Chat not found untuk chatId: {$chatId}. Kemungkinan user memblokir bot.");
+                
+                // Opsional: Anda bisa menandai user ini sebagai tidak aktif di database Anda
+                // if ($chatId !== 'N/A') {
+                //     \App\Models\TelegramUser::where('id', $chatId)->update(['is_active' => false]);
+                // }
+            } else {
+                // Jika errornya bukan "chat not found", tetap log sebagai error serius
+                $chatId = $params['chat_id'] ?? 'N/A';
+                Log::error("Telegram API Error ke chatId {$chatId}: " . $e->getMessage());
+            }
+        } catch (\Exception $e) {
+            // Menangkap error umum lainnya (misal: masalah jaringan, dll)
+            $chatId = $params['chat_id'] ?? 'N/A';
+            Log::error("Terjadi error umum saat mengirim pesan ke chatId: {$chatId}", ['exception' => $e]);
+        }
+    }
+
+    /**
+     * Helper untuk mendapatkan Chat ID dari berbagai jenis update.
+     *
+     * @param \Telegram\Bot\Objects\Update $update
+     * @return int|null
+     */
+    private function getChatId($update)
+    {
+        if ($update->isType('callback_query')) {
+            return $update->getCallbackQuery()->getMessage()->getChat()->getId();
+        }
+        
+        if ($update->getMessage()) {
+            return $update->getMessage()->getChat()->getId();
+        }
+
+        return null;
     }
 }
