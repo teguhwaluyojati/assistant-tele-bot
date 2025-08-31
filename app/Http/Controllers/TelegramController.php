@@ -165,7 +165,11 @@ class TelegramController extends Controller
                 }
             } else {
                 Log::error('Gemini API Error: ' . $response->body());
-                Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, terjadi kesalahan saat menghubungi layanan AI.']);
+                if ($response->status() == 429) {
+                    Telegram::sendMessage(['chat_id' => $chatId, 'text' => '🚧 Maaf, layanan AI Chat sedang sibuk karena telah mencapai limit. Silakan coba lagi nanti. 🙏']);
+                } else {
+                    Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, terjadi kesalahan saat menghubungi layanan AI.']);
+                }
             }
         } catch (\Exception $e) {
             Log::error('Exception during Gemini API call: ' . $e->getMessage());
