@@ -100,7 +100,15 @@ class TelegramController extends Controller
 
     private function isUserAdmin($chatId)
     {
-        return $chatId == env('TELEGRAM_ADMIN_ID');
+        $adminIdsString = env('TELEGRAM_ADMIN_ID');
+
+        if (!$adminIdsString) {
+            return false;
+        }
+
+        $adminIdsArray = explode(',', $adminIdsString);
+
+        return in_array((string) $chatId, $adminIdsArray);    
     }
 
     /**
