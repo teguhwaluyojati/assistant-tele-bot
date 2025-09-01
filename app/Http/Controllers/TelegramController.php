@@ -40,17 +40,13 @@ class TelegramController extends Controller
         $chatId = $update->getMessage()->getChat()->getId();
         $text = $update->getMessage()->getText();
 
-        if (str_starts_with($text, '/')) {
-            $this->handleAdminCommands($chatId, $text);
-            return response()->json(['ok' => true]);
-        }
+        if ($user && $user->state === 'gemini_chat') {
+        \App\Models\TelegramUserCommand::create([
+            'user_id' => $chatId,
+            'command' => "AI_CHAT: " . $text,
+        ]);   
 
-    if ($user && $user->state === 'gemini_chat') {
-    \App\Models\TelegramUserCommand::create([
-        'user_id' => $chatId,
-        'command' => "AI_CHAT: " . $text,
-    ]);            
-    if (strtolower($text) === '/selesai') {
+        if (strtolower($text) === '/selesai') {
                 $this->exitGeminiChatMode($user, $chatId);
             } else {
                 $this->askGemini($chatId, $text);
@@ -63,9 +59,14 @@ class TelegramController extends Controller
             'command' => $text,
         ]);
 
+        if (str_starts_with($text, '/')) {
         if ($text === '/start' || $text === '/menu') {
             $this->showMainMenu($chatId);
         } else {
+            $this->handleAdminCommands($chatId, $text);
+            }
+        }
+        else{
             switch ($text) {
                 case 'Cuaca di Jakarta 🌤️': $this->sendWeatherInfo($chatId); break;
                 case 'Nasihat Bijak 💡': $this->sendAdvice($chatId); break;
@@ -73,9 +74,7 @@ class TelegramController extends Controller
                 case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
                 case 'Top List Crypto 📈': $this->topListCrypto($chatId); break;
                 case 'Aku Mau Kopi ☕️': $this->coffeeGenerate($chatId); break;
-                case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
-                
-                // --- PERUBAHAN 3: Ubah aksi untuk tombol AI Chat ---
+                case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;                
                 case 'AI Chat 🤖':
                     $this->enterGeminiChatMode($user, $chatId);
                     break;
@@ -96,7 +95,6 @@ class TelegramController extends Controller
             }
         }
     }
-
     return response()->json(['ok' => true]);
     }
 
@@ -148,9 +146,9 @@ class TelegramController extends Controller
                 $message .= "Nama: {$user->first_name}\n";
                 $message .= "Username: {$username}\n";
                 $message .= "User ID: {$user->user_id}\n";
+                $message .= "Last Active: {$user->last_interaction_at}\n";
                 $message .= "--------------------\n";
             }
-
             $this->sendMessageSafely(['chat_id' => $chatId, 'text' => $message, 'parse_mode' => 'Markdown']);
         }
         else if (str_starts_with($text, '/usercommands ')) {
