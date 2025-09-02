@@ -36,7 +36,40 @@ class TelegramController extends Controller
             $category = substr($data, 9);
             $this->showGenshinItems($chatId, $category);
         }
-    
+            // --- BLOK BARU UNTUK HAPUS TRANSAKSI ---
+        else if (str_starts_with($data, 'delete_trx_')) {
+            $transactionId = substr($data, 11); // Ambil ID setelah 'delete_trx_'
+
+            // PENTING: Cari transaksi & pastikan itu milik pengguna yang benar
+            $transaction = \App\Models\Transaction::where('id', $transactionId)
+                ->where('user_id', $chatId)
+                ->first();
+
+            if ($transaction) {
+                $deletedDescription = $transaction->description;
+                $transaction->delete(); // Hapus data dari database
+
+                // Edit pesan asli untuk memberikan konfirmasi
+                Telegram::editMessageText([
+                    'chat_id'      => $chatId,
+                    'message_id'   => $messageId,
+                    'text'         => "✅ Transaksi '{$deletedDescription}' (ID: {$transactionId}) berhasil dihapus.",
+                    'reply_markup' => null // Menghilangkan semua tombol
+                ]);
+            } else {
+                // Jika transaksi tidak ditemukan (mungkin sudah dihapus sebelumnya)
+                Telegram::editMessageText([
+                    'chat_id'      => $chatId,
+                    'message_id'   => $messageId,
+                    'text'         => "⚠️ Transaksi tidak ditemukan atau sudah dihapus.",
+                    'reply_markup' => null
+                ]);
+            }
+        }
+            else if (str_starts_with($data, 'summary_')) {
+            $period = substr($data, 8); // Ambil periode (daily, weekly, monthly)
+            $this->generateSummary($chatId, $messageId, $period);
+        }
     } else if ($update->getMessage() && $update->getMessage()->has('text')) {
         $chatId = $update->getMessage()->getChat()->getId();
         $text = $update->getMessage()->getText();
@@ -61,10 +94,14 @@ class TelegramController extends Controller
         ]);
 
         if (str_starts_with($text, '/')) {
-        if ($text === '/start' || $text === '/menu') {
-            $this->showMainMenu($chatId);
-        } else {
-            $this->handleAdminCommands($chatId, $text);
+            if ($text === '/start' || $text === '/menu') {
+                $this->showMainMenu($chatId);
+            } else if ($text === '/summary' || $text === '/laporan') {
+                $this->showSummaryOptions($chatId);
+            } else if ($text === '/hapus') {
+                $this->showRecentTransactionsForDeletion($chatId);
+            } else {
+                $this->handleAdminCommands($chatId, $text);
             }
         }
         else if (str_starts_with($text, '+') || str_starts_with($text, '-')) {
@@ -115,6 +152,86 @@ class TelegramController extends Controller
         return in_array((string) $chatId, $adminIdsArray);    
     }
 
+    /**
+     * Menampilkan pilihan periode untuk laporan summary.
+     */
+    private function showSummaryOptions($chatId)
+    {
+        $inlineKeyboard = [
+            [
+                Keyboard::inlineButton(['text' => 'Harian (Hari Ini)', 'callback_data' => 'summary_daily']),
+            ],
+            [
+                Keyboard::inlineButton(['text' => 'Mingguan (Minggu Ini)', 'callback_data' => 'summary_weekly']),
+            ],
+            [
+                Keyboard::inlineButton(['text' => 'Bulanan (Bulan Ini)', 'callback_data' => 'summary_monthly']),
+            ]
+        ];
+
+        $this->sendMessageSafely([
+            'chat_id' => $chatId,
+            'text' => 'Silakan pilih periode laporan keuangan yang ingin Anda lihat:',
+            'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard])
+        ]);
+    }
+
+    /**
+     * Menghitung dan menampilkan summary transaksi berdasarkan periode.
+     */
+    private function generateSummary($chatId, $messageId, $period)
+    {
+        $startDate = now()->startOfDay();
+        $endDate = now()->endOfDay();
+        $periodText = "Hari Ini";
+
+        switch ($period) {
+            case 'weekly':
+                $startDate = now()->startOfWeek();
+                $endDate = now()->endOfWeek();
+                $periodText = "Minggu Ini";
+                break;
+            case 'monthly':
+                $startDate = now()->startOfMonth();
+                $endDate = now()->endOfMonth();
+                $periodText = "Bulan Ini";
+                break;
+        }
+
+        $totalIncome = \App\Models\Transaction::where('user_id', $chatId)
+            ->where('type', 'income')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->sum('amount');
+
+        $totalExpense = \App\Models\Transaction::where('user_id', $chatId)
+            ->where('type', 'expense')
+            ->whereBetween('created_at', [$startDate, $endDate])
+            ->sum('amount');
+
+        $balance = $totalIncome - $totalExpense;
+        $balanceSign = $balance >= 0 ? '+' : '-';
+        $balanceColor = $balance >= 0 ? '🟢' : '🔴';
+
+        $message = "📊 *Laporan Keuangan - {$periodText}*\n";
+        $message .= "🗓️ Periode: " . $startDate->format('d M Y') . " - " . $endDate->format('d M Y') . "\n";
+        $message .= "---------------------------------------\n";
+        $message .= "✅ *Total Pemasukan:*\n`Rp " . number_format($totalIncome) . "`\n\n";
+        $message .= "❌ *Total Pengeluaran:*\n`Rp " . number_format($totalExpense) . "`\n\n";
+        $message .= "---------------------------------------\n";
+        $message .= "{$balanceColor} *Sisa Saldo:*\n`{$balanceSign} Rp " . number_format(abs($balance)) . "`";
+
+        try {
+            Telegram::editMessageText([
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'text' => $message,
+                'parse_mode' => 'Markdown'
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Gagal edit pesan summary: ' . $e->getMessage());
+        }
+    }
+
     /** Menampilkan menu Money Tracker dengan instruksi.
      */
     private function showMoneyTrackerMenu($chatId)
@@ -127,8 +244,54 @@ class TelegramController extends Controller
 
         $this->sendMessageSafely([
             'chat_id' => $chatId,
+            // 'text' => $message,
+            'text'=> "Selamat datang di Money Tracker! 💸\n\nGunakan format berikut untuk mencatat transaksi:\n\nPemasukan:\n`+ [jumlah] [deskripsi]`\nContoh: `+ 500000 Gaji`\n\nPengeluaran:\n`- [jumlah] [deskripsi]`\nContoh: `- 15000 Makan siang`\n\nUntuk melihat laporan, ketik `/summary` atau `/laporan`\nUntuk menghapus laporan, ketik `/hapus`",
+            // 'parse_mode' => 'Markdown'
+        ]);
+    }
+
+    /**
+     * Menampilkan 5 transaksi terakhir pengguna dengan tombol hapus inline.
+     */
+    private function showRecentTransactionsForDeletion($chatId)
+    {
+        $transactions = \App\Models\Transaction::where('user_id', $chatId)
+            ->latest()
+            // ->take(5)
+            ->get();
+
+        if ($transactions->isEmpty()) {
+            $this->sendMessageSafely([
+                'chat_id' => $chatId,
+                'text' => 'Anda belum memiliki transaksi untuk dihapus.'
+            ]);
+            return;
+        }
+
+        $message = "Klik tombol di bawah untuk menghapus transaksi:\n\n";
+        $inlineKeyboard = [];
+
+        foreach ($transactions as $transaction) {
+            $type = $transaction->type === 'income' ? 'Pemasukan' : 'Pengeluaran';
+            $amount = number_format($transaction->amount);
+            $date = $transaction->created_at->format('d M');
+
+            $message .= "🆔 *{$transaction->id}* | {$date} | {$type}\n";
+            $message .= "`Rp {$amount}` - _{$transaction->description}_\n\n";
+
+            $inlineKeyboard[] = [
+                Keyboard::inlineButton([
+                    'text' => "❌ Hapus Transaksi ID: {$transaction->id}",
+                    'callback_data' => 'delete_trx_' . $transaction->id 
+                ])
+            ];
+        }
+
+        $this->sendMessageSafely([
+            'chat_id' => $chatId,
             'text' => $message,
-            'parse_mode' => 'Markdown'
+            'parse_mode' => 'Markdown',
+            'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard])
         ]);
     }
 
@@ -191,7 +354,6 @@ class TelegramController extends Controller
 
     private function handleAdminCommands($chatId, $text)
     {
-        // Pengecekan keamanan: Hanya admin yang boleh melanjutkan
         if (!$this->isUserAdmin($chatId)) {
             $this->sendMessageSafely([
                 'chat_id' => $chatId,
@@ -200,9 +362,7 @@ class TelegramController extends Controller
             return;
         }
 
-        // --- Logika untuk perintah /listusers ---
         if ($text === '/listusers') {
-            // Ambil 10 user terbaru dari database
             $users = TelegramUser::latest()->take(10)->get();
             
             if ($users->isEmpty()) {
@@ -761,25 +921,16 @@ class TelegramController extends Controller
     private function sendMessageSafely(array $params)
     {
         try {
-            // Mencoba mengirim pesan seperti biasa
             Telegram::sendMessage($params);
         } catch (\Telegram\Bot\Exceptions\TelegramOtherException $e) {
-            // Menangkap error spesifik dari Telegram
             if (str_contains($e->getMessage(), 'chat not found')) {
                 $chatId = $params['chat_id'] ?? 'N/A';
                 Log::warning("Gagal kirim pesan: Chat not found untuk chatId: {$chatId}. Kemungkinan user memblokir bot.");
-                
-                // Opsional: Anda bisa menandai user ini sebagai tidak aktif di database Anda
-                // if ($chatId !== 'N/A') {
-                //     \App\Models\TelegramUser::where('id', $chatId)->update(['is_active' => false]);
-                // }
             } else {
-                // Jika errornya bukan "chat not found", tetap log sebagai error serius
                 $chatId = $params['chat_id'] ?? 'N/A';
                 Log::error("Telegram API Error ke chatId {$chatId}: " . $e->getMessage());
             }
         } catch (\Exception $e) {
-            // Menangkap error umum lainnya (misal: masalah jaringan, dll)
             $chatId = $params['chat_id'] ?? 'N/A';
             Log::error("Terjadi error umum saat mengirim pesan ke chatId: {$chatId}", ['exception' => $e]);
         }
