@@ -72,7 +72,7 @@ class TelegramController extends Controller
                 case 'Nasihat Bijak 💡': $this->sendAdvice($chatId); break;
                 case 'Fakta Kucing 🐱': $this->sendCatFact($chatId); break;
                 case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
-                case 'Top List Crypto 📈': $this->topListCrypto($chatId); break;
+                case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
                 case 'Aku Mau Kopi ☕️': $this->coffeeGenerate($chatId); break;
                 case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;                
                 case 'AI Chat 🤖':
@@ -109,6 +109,23 @@ class TelegramController extends Controller
         $adminIdsArray = explode(',', $adminIdsString);
 
         return in_array((string) $chatId, $adminIdsArray);    
+    }
+
+    /** Menampilkan menu Money Tracker dengan instruksi.
+     */
+    private function showMoneyTrackerMenu($chatId)
+    {
+        $message = "Selamat datang di Money Tracker! 💸\n\n";
+        $message .= "Gunakan format berikut untuk mencatat transaksi:\n\n";
+        $message .= "Pemasukan:\n`+ [jumlah] [deskripsi]`\nContoh: `+ 50000 Gaji`\n\n";
+        $message .= "Pengeluaran:\n`- [jumlah] [deskripsi]`\nContoh: `- 15000 Makan siang`\n\n";
+        $message .= "Untuk melihat laporan, ketik `/summary`";
+
+        $this->sendMessageSafely([
+            'chat_id' => $chatId,
+            'text' => $message,
+            'parse_mode' => 'Markdown'
+        ]);
     }
 
     /**
@@ -351,7 +368,7 @@ class TelegramController extends Controller
     {
         $keyboard = [
             ['Cuaca di Jakarta 🌤️', 'Nasihat Bijak 💡'],
-            ['Fakta Kucing 🐱', 'Top List Crypto 📈'],
+            ['Fakta Kucing 🐱', 'Money Tracker 💸'],
             ['Aku Mau Kopi ☕️','Info Genshin 🎮'],
             ['AI Chat 🤖','Tentang Developer 👨‍💻'],
         ];
