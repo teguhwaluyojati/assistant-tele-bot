@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('transactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->constrained('telegram_users')->onDelete('cascade');
+            $table->unsignedBigInteger('user_id');
+            $table->foreign('user_id')->references('user_id')->on('telegram_users')->onDelete('cascade');
             $table->enum('type', ['income', 'expense']);
             $table->unsignedBigInteger('amount');
             $table->string('description');

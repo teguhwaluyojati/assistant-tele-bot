@@ -10,6 +10,7 @@ use Stichoza\GoogleTranslate\GoogleTranslate;
 use Telegram\Bot\FileUpload\InputFile;
 use App\Models\TelegramUserCommand;
 use App\Models\TelegramUser;
+use App\Models\Transaction;
 
 class TelegramController extends Controller
 {
@@ -65,6 +66,9 @@ class TelegramController extends Controller
         } else {
             $this->handleAdminCommands($chatId, $text);
             }
+        }
+        else if (str_starts_with($text, '+') || str_starts_with($text, '-')) {
+        $this->recordTransaction($chatId, $text);
         }
         else{
             switch ($text) {
@@ -126,6 +130,48 @@ class TelegramController extends Controller
             'text' => $message,
             'parse_mode' => 'Markdown'
         ]);
+    }
+
+    private function recordTransaction($chatId, $text)
+    {
+        $pattern = '/^([+\-])\s*(\d+)\s*(.*)$/';
+
+        if (preg_match($pattern, $text, $matches)) {
+            $symbol = $matches[1];
+            $amount = (int) $matches[2];
+            $description = trim($matches[3]);
+
+            $type = ($symbol === '+') ? 'income' : 'expense';
+
+            if (empty($description)) {
+                $this->sendMessageSafely([
+                    'chat_id' => $chatId,
+                    'text' => '⚠️ Deskripsi tidak boleh kosong. Contoh: `+ 50000 Gaji`',
+                    'parse_mode' => 'Markdown'
+                ]);
+                return;
+            }
+
+            Transaction::create([
+                'user_id' => $chatId,
+                'type' => $type,
+                'amount' => $amount,
+                'description' => $description
+            ]);
+
+            $this->sendMessageSafely([
+                'chat_id' => $chatId,
+                'text' => "✅ Transaksi berhasil dicatat:\n*{$type}* - Rp " . number_format($amount) . " - {$description}",
+                'parse_mode' => 'Markdown'
+            ]);
+
+        } else {
+            $this->sendMessageSafely([
+                'chat_id' => $chatId,
+                'text' => 'Format salah. Gunakan `+` untuk pemasukan atau `-` untuk pengeluaran.' . "\nContoh: `- 15000 Kopi`",
+                'parse_mode' => 'Markdown'
+            ]);
+        }
     }
 
     /**
