@@ -36,28 +36,24 @@ class TelegramController extends Controller
             $category = substr($data, 9);
             $this->showGenshinItems($chatId, $category);
         }
-            // --- BLOK BARU UNTUK HAPUS TRANSAKSI ---
         else if (str_starts_with($data, 'delete_trx_')) {
-            $transactionId = substr($data, 11); // Ambil ID setelah 'delete_trx_'
+            $transactionId = substr($data, 11);
 
-            // PENTING: Cari transaksi & pastikan itu milik pengguna yang benar
             $transaction = \App\Models\Transaction::where('id', $transactionId)
                 ->where('user_id', $chatId)
                 ->first();
 
             if ($transaction) {
                 $deletedDescription = $transaction->description;
-                $transaction->delete(); // Hapus data dari database
+                $transaction->delete(); 
 
-                // Edit pesan asli untuk memberikan konfirmasi
                 Telegram::editMessageText([
                     'chat_id'      => $chatId,
                     'message_id'   => $messageId,
                     'text'         => "✅ Transaksi '{$deletedDescription}' (ID: {$transactionId}) berhasil dihapus.",
-                    'reply_markup' => null // Menghilangkan semua tombol
+                    'reply_markup' => null
                 ]);
             } else {
-                // Jika transaksi tidak ditemukan (mungkin sudah dihapus sebelumnya)
                 Telegram::editMessageText([
                     'chat_id'      => $chatId,
                     'message_id'   => $messageId,
@@ -67,7 +63,7 @@ class TelegramController extends Controller
             }
         }
             else if (str_starts_with($data, 'summary_')) {
-            $period = substr($data, 8); // Ambil periode (daily, weekly, monthly)
+            $period = substr($data, 8);
             $this->generateSummary($chatId, $messageId, $period);
         }
     } else if ($update->getMessage() && $update->getMessage()->has('text')) {
