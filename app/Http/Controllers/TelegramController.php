@@ -185,39 +185,59 @@ class TelegramController extends Controller
         $endDate = now()->endOfDay();
         $periodText = "Hari Ini";
 
+        $dateFormat = 'H:i';
+
         switch ($period) {
             case 'weekly':
                 $startDate = now()->startOfWeek();
                 $endDate = now()->endOfWeek();
                 $periodText = "Minggu Ini";
+                $dateFormat = 'd M, H:i'; 
                 break;
             case 'monthly':
                 $startDate = now()->startOfMonth();
                 $endDate = now()->endOfMonth();
                 $periodText = "Bulan Ini";
+                $dateFormat = 'd M, H:i';
                 break;
         }
 
-        $totalIncome = \App\Models\Transaction::where('user_id', $chatId)
-            ->where('type', 'income')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->sum('amount');
+        $incomes = \App\Models\Transaction::where('user_id', $chatId)->where('type', 'income')->whereBetween('created_at', [$startDate, $endDate])->latest()->get();
+        $expenses = \App\Models\Transaction::where('user_id', $chatId)->where('type', 'expense')->whereBetween('created_at', [$startDate, $endDate])->latest()->get();
 
-        $totalExpense = \App\Models\Transaction::where('user_id', $chatId)
-            ->where('type', 'expense')
-            ->whereBetween('created_at', [$startDate, $endDate])
-            ->sum('amount');
-
+        $totalIncome = $incomes->sum('amount');
+        $totalExpense = $expenses->sum('amount');
         $balance = $totalIncome - $totalExpense;
         $balanceSign = $balance >= 0 ? '+' : '-';
         $balanceColor = $balance >= 0 ? '🟢' : '🔴';
 
+        $incomeDetails = "";
+        if ($incomes->isNotEmpty()) {
+            $incomeDetails = "\n*Rincian Pemasukan:*\n";
+            foreach ($incomes as $income) {
+                $date = $income->created_at->format($dateFormat);
+                $incomeDetails .= "▫️ `{$date}` `Rp " . number_format($income->amount) . "` - " . $this->escapeMarkdown($income->description) . "\n";
+            }
+        }
+
+        $expenseDetails = "";
+        if ($expenses->isNotEmpty()) {
+            $expenseDetails = "\n*Rincian Pengeluaran:*\n";
+            foreach ($expenses as $expense) {
+        $date = $expense->created_at->format($dateFormat);
+    
+        $expenseDetails .= "▫️ {$date} | Rp " . number_format($expense->amount) . " - " . $expense->description . "\n";
+    }
+        }
+        
         $message = "📊 *Laporan Keuangan - {$periodText}*\n";
         $message .= "🗓️ Periode: " . $startDate->format('d M Y') . " - " . $endDate->format('d M Y') . "\n";
-        $message .= "---------------------------------------\n";
-        $message .= "✅ *Total Pemasukan:*\n`Rp " . number_format($totalIncome) . "`\n\n";
-        $message .= "❌ *Total Pengeluaran:*\n`Rp " . number_format($totalExpense) . "`\n\n";
-        $message .= "---------------------------------------\n";
+        $message .= "──────────────────────────────\n";
+        $message .= "✅ *Total Pemasukan:*\n`Rp " . number_format($totalIncome) . "`\n";
+        $message .= $incomeDetails;
+        $message .= "\n❌ *Total Pengeluaran:*\n`Rp " . number_format($totalExpense) . "`\n";
+        $message .= $expenseDetails;
+        $message .= "\n──────────────────────────────\n";
         $message .= "{$balanceColor} *Sisa Saldo:*\n`{$balanceSign} Rp " . number_format(abs($balance)) . "`";
 
         try {
@@ -244,9 +264,7 @@ class TelegramController extends Controller
 
         $this->sendMessageSafely([
             'chat_id' => $chatId,
-            // 'text' => $message,
             'text'=> "Selamat datang di Money Tracker! 💸\n\nGunakan format berikut untuk mencatat transaksi:\n\nPemasukan:\n`+ [jumlah] [deskripsi]`\nContoh: `+ 500000 Gaji`\n\nPengeluaran:\n`- [jumlah] [deskripsi]`\nContoh: `- 15000 Makan siang`\n\nUntuk melihat laporan, ketik `/summary` atau `/laporan`\nUntuk menghapus laporan, ketik `/hapus`",
-            // 'parse_mode' => 'Markdown'
         ]);
     }
 
