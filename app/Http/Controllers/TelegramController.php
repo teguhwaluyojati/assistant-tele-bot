@@ -224,7 +224,7 @@ class TelegramController extends Controller
             'text' => "✅ Anda telah keluar dari mode chat AI. Kembali ke menu utama."
         ]);
 
-        $this->showMainMenu($user->id);
+        $this->showMainMenu($chatId);
     }
 
     /**
