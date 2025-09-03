@@ -63,9 +63,18 @@ class TelegramController extends Controller
                 'command' => "CALLBACK: " . $data
             ]);
 
-            if (str_starts_with($data, 'category_')) {
-                // ... logika callback Genshin
-            } else if (str_starts_with($data, 'delete_trx_')) {
+            if (str_starts_with($data, 'genshin_page_')) {
+            list($_, $_, $category, $page) = explode('_', $data, 4);
+            $this->showItemsInCategory($chatId, $messageId, $category, (int)$page);
+            }else if (str_starts_with($data, 'category_')) {
+            $category = substr($data, 9);
+            $this->showItemsInCategory($chatId, $messageId, $category, 1);             
+            } else if (str_starts_with($data, 'item_')) {
+            list($_, $category, $itemName) = explode('_', $data, 3);
+            $this->showItemDetails($chatId, $messageId, $category, $itemName);
+            }else if ($data === 'back_to_categories') {
+            $this->showGenshinCategories($chatId, $messageId);
+            }else if (str_starts_with($data, 'delete_trx_')) {
                 $transactionId = substr($data, 11);
                 $transaction = \App\Models\Transaction::where('user_id', $chatId)->where('id', $transactionId)->first();
                 if ($transaction) {
@@ -113,6 +122,7 @@ class TelegramController extends Controller
                     case 'Aku Mau Kopi ☕️': $this->coffeeGenerate($chatId); break;
                     case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
                     case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
+                    case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
                     default:
                         if (strtolower($text) === 'halo') { $this->sendGreeting($chatId); }
                         else { $this->sendUnknownCommand($chatId); }
