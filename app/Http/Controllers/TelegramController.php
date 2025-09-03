@@ -17,122 +17,109 @@ class TelegramController extends Controller
     /**
      * Handle incoming Telegram updates.
      */
-    public function handle()
+     public function handle()
     {
-    date_default_timezone_set('Asia/Jakarta');
-    $update = Telegram::getWebhookUpdate();
+        date_default_timezone_set('Asia/Jakarta');
+        $update = Telegram::getWebhookUpdate();
 
-    $user = $this->logUserActivity($update);
+        $user = $this->logUserActivity($update);
+        if (!$user) return response()->json(['ok' => true]);
 
-    if ($update->isType('callback_query')) {
-        $callbackQuery = $update->getCallbackQuery();
-        $chatId = $callbackQuery->getMessage()->getChat()->getId();
-        $messageId = $callbackQuery->getMessage()->getMessageId();
-        $data = $callbackQuery->getData();
-
-        Telegram::answerCallbackQuery(['callback_query_id' => $callbackQuery->getId()]);
-
-        if (str_starts_with($data, 'category_')) {
-            $category = substr($data, 9);
-            $this->showGenshinItems($chatId, $category);
-        }
-        else if (str_starts_with($data, 'delete_trx_')) {
-            $transactionId = substr($data, 11);
-
-            $transaction = \App\Models\Transaction::where('id', $transactionId)
-                ->where('user_id', $chatId)
-                ->first();
-
-            if ($transaction) {
-                $deletedDescription = $transaction->description;
-                $transaction->delete(); 
-
-                Telegram::editMessageText([
-                    'chat_id'      => $chatId,
-                    'message_id'   => $messageId,
-                    'text'         => "✅ Transaksi '{$deletedDescription}' (ID: {$transactionId}) berhasil dihapus.",
-                    'reply_markup' => null
-                ]);
-            } else {
-                Telegram::editMessageText([
-                    'chat_id'      => $chatId,
-                    'message_id'   => $messageId,
-                    'text'         => "⚠️ Transaksi tidak ditemukan atau sudah dihapus.",
-                    'reply_markup' => null
-                ]);
-            }
-        }
-            else if (str_starts_with($data, 'summary_')) {
-            $period = substr($data, 8);
-            $this->generateSummary($chatId, $messageId, $period);
-        }
-    } else if ($update->getMessage() && $update->getMessage()->has('text')) {
-        $chatId = $update->getMessage()->getChat()->getId();
-        $text = $update->getMessage()->getText();
-
-        if ($user && $user->state === 'gemini_chat') {
-        \App\Models\TelegramUserCommand::create([
-            'user_id' => $chatId,
-            'command' => "AI_CHAT: " . $text,
-        ]);   
-
-        if (strtolower($text) === '/selesai') {
-                $this->exitGeminiChatMode($user, $chatId);
-            } else {
-                $this->askGemini($chatId, $text);
-            }
-            return response()->json(['ok' => true]);
+        if ($user->state !== 'normal') {
+            $this->handleStatefulInput($user, $update);
+        } else {
+            $this->handleNormalMode($user, $update);
         }
 
-        \App\Models\TelegramUserCommand::create([
-            'user_id' => $chatId,
-            'command' => $text,
-        ]);
-
-        if (str_starts_with($text, '/')) {
-            if ($text === '/start' || $text === '/menu') {
-                $this->showMainMenu($chatId);
-            } else if ($text === '/summary' || $text === '/laporan') {
-                $this->showSummaryOptions($chatId);
-            } else if ($text === '/hapus') {
-                $this->showRecentTransactionsForDeletion($chatId);
-            } else {
-                $this->handleAdminCommands($chatId, $text);
-            }
-        }
-        else if (str_starts_with($text, '+') || str_starts_with($text, '-')) {
-        $this->recordTransaction($chatId, $text);
-        }
-        else{
-            switch ($text) {
-                case 'Cuaca di Jakarta 🌤️': $this->sendWeatherInfo($chatId); break;
-                case 'Nasihat Bijak 💡': $this->sendAdvice($chatId); break;
-                case 'Fakta Kucing 🐱': $this->sendCatFact($chatId); break;
-                case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
-                case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
-                case 'Aku Mau Kopi ☕️': $this->coffeeGenerate($chatId); break;
-                case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;                
-                case 'AI Chat 🤖':
-                    $this->enterGeminiChatMode($user, $chatId);
-                    break;
-                // case 'AI Chat 🤖':
-                // $this->sendMessageSafely([
-                //     'chat_id' => $update->getMessage()->getChat()->getId(),
-                //     'text' => '🚧 Maaf, layanan AI Chat sedang sibuk karena telah mencapai limit. Silakan coba lagi nanti. 🙏'
-                // ]);
-                // break;
-                
-                default:
-                    if (strtolower($text) === 'halo') {
-                        $this->sendGreeting($chatId);
-                    } else {
-                        $this->sendUnknownCommand($chatId);
-                    }
-                    break;
-            }
-        }
+        return response()->json(['ok' => true]);
     }
-    return response()->json(['ok' => true]);
+
+    // ===================================================================
+    // HANDLER UNTUK MODE STATEFUL (Saat User "Sibuk")
+    // ===================================================================
+    private function handleStatefulInput(TelegramUser $user, $update)
+    {
+        if ($user->state === 'gemini_chat') {
+            $this->handleGeminiChatMode($user, $update);
+        }
+        // ... (handler untuk state lain seperti 'editing_' bisa ditambahkan di sini)
+    }
+
+    // ===================================================================
+    // HANDLER UNTUK MODE NORMAL (Menu & Perintah Biasa)
+    // ===================================================================
+    private function handleNormalMode(TelegramUser $user, $update)
+    {
+        $chatId = $user->user_id;
+
+        if ($update->isType('callback_query')) {
+            $callbackQuery = $update->getCallbackQuery();
+            $messageId = $callbackQuery->getMessage()->getMessageId();
+            $data = $callbackQuery->getData();
+
+            Telegram::answerCallbackQuery(['callback_query_id' => $callbackQuery->getId()]);
+            \App\Models\TelegramUserCommand::create([
+                'user_id' => $chatId,
+                'command' => "CALLBACK: " . $data
+            ]);
+
+            if (str_starts_with($data, 'category_')) {
+                // ... logika callback Genshin
+            } else if (str_starts_with($data, 'delete_trx_')) {
+                $transactionId = substr($data, 11);
+                $transaction = \App\Models\Transaction::where('user_id', $chatId)->where('id', $transactionId)->first();
+                if ($transaction) {
+                    $deletedDescription = $transaction->description;
+                    $transaction->delete();
+                     Telegram::editMessageText([
+                        'chat_id' => $chatId,
+                        'message_id' => $messageId,
+                        'text' => "✅ Transaksi '{$deletedDescription}' (ID: {$transactionId}) berhasil dihapus",
+                        'reply_markup'=> null
+                    ]);
+                } else {
+                    Telegram::editMessageText([
+                        'chat_id' => $chatId,
+                        'message_id' => $messageId,
+                        'text' => "⚠️ Transaksi tidak dapat ditemukan atau sudah dihapus.",
+                        'reply_markup' => null
+                    ]);
+                }
+            } else if (str_starts_with($data, 'summary_')) {
+                $period = substr($data, 8); 
+                $this->generateSummary($chatId, $messageId, $period);            
+            }
+
+        } else if ($update->getMessage() && $update->getMessage()->has('text')) {
+            $text = $update->getMessage()->getText();
+            \App\Models\TelegramUserCommand::create([
+                'user_id' => $chatId,
+                'command' => $text
+            ]);
+
+            if (str_starts_with($text, '/')) {
+                if ($text === '/start' || $text === '/menu') { $this->showMainMenu($chatId); }
+                else if ($text === '/summary' || $text === '/laporan') { $this->showSummaryOptions($chatId); }
+                else if ($text === '/hapus') { $this->showRecentTransactionsForDeletion($chatId); }
+                else { $this->handleAdminCommands($chatId, $text); }
+            } else if (str_starts_with($text, '+') || str_starts_with($text, '-')) {
+                $this->recordTransaction($chatId, $text);
+            } else {
+                switch ($text) {
+                    case 'AI Chat 🤖': $this->enterGeminiChatMode($user, $chatId); break;
+                    case 'Cuaca di Jakarta 🌤️': $this->sendWeatherInfo($chatId); break;
+                    case 'Nasihat Bijak 💡': $this->sendAdvice($chatId); break;
+                    case 'Fakta Kucing 🐱': $this->sendCatFact($chatId); break;
+                    case 'Aku Mau Kopi ☕️': $this->coffeeGenerate($chatId); break;
+                    case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
+                    case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
+                    default:
+                        if (strtolower($text) === 'halo') { $this->sendGreeting($chatId); }
+                        else { $this->sendUnknownCommand($chatId); }
+                        break;
+                }
+            }
+        }
     }
 
     private function isUserAdmin($chatId)
@@ -153,6 +140,7 @@ class TelegramController extends Controller
      */
     private function showSummaryOptions($chatId)
     {
+        Log::info("Menampilkan pilihan summary untuk user: {$chatId}");
         $inlineKeyboard = [
             [
                 Keyboard::inlineButton(['text' => 'Harian (Hari Ini)', 'callback_data' => 'summary_daily']),
@@ -269,6 +257,7 @@ class TelegramController extends Controller
      */
     private function showRecentTransactionsForDeletion($chatId)
     {
+        Log::info("Menampilkan transaksi untuk dihapus bagi user: {$chatId}");
         $transactions = \App\Models\Transaction::where('user_id', $chatId)
             ->latest()
             // ->take(5)
