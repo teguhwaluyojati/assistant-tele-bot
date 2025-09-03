@@ -258,7 +258,7 @@ class TelegramController extends Controller
 
         $this->sendMessageSafely([
             'chat_id' => $chatId,
-            'text'=> "Selamat datang di Money Tracker! 💸\n\nGunakan format berikut untuk mencatat transaksi:\n\nPemasukan:\n`+ [jumlah] [deskripsi]`\nContoh: `+ 500000 Gaji`\n\nPengeluaran:\n`- [jumlah] [deskripsi]`\nContoh: `- 15000 Makan siang`\n\nUntuk melihat laporan, ketik `/summary` atau `/laporan`\nUntuk menghapus laporan, ketik `/hapus`",
+            'text'=> "Selamat datang di Money Tracker! 💸\n\nGunakan format berikut untuk mencatat transaksi:\n\nPemasukan:\n+ [jumlah] [deskripsi]\nContoh: + 500000 Gaji\n\nPengeluaran:\n- [jumlah] [deskripsi]\nContoh: - 15000 Makan siang\n\nUntuk melihat laporan, ketik /summary atau /laporan\nUntuk menghapus laporan, ketik /hapus",
         ]);
     }
 
