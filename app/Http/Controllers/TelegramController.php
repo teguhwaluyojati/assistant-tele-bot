@@ -45,6 +45,31 @@ class TelegramController extends Controller
         // ... (handler untuk state lain seperti 'editing_' bisa ditambahkan di sini)
     }
 
+    private function handleGeminiChatMode(TelegramUser $user, $update)
+    {
+        $chatId = $user->user_id;
+
+        if ($update->getMessage() && $update->getMessage()->has('text')) {
+            $text = $update->getMessage()->getText();
+
+            \App\Models\TelegramUserCommand::create([
+                'user_id' => $chatId,
+                'command' => $text
+            ]);
+
+            if ($text === '/selesai' || strtolower($text) === 'selesai') {
+                $this->exitGeminiChatMode($user, $chatId);
+            } else {
+                $this->askGemini($chatId, $text);
+            }
+        } else if ($update->isType('callback_query')) {
+            $callbackQuery = $update->getCallbackQuery();
+            Telegram::answerCallbackQuery(['callback_query_id' => $callbackQuery->getId(), 'text' => 'Anda sedang dalam mode chat AI. Ketik /selesai untuk keluar.']);
+        } else {
+            Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Silakan kirim pesan teks untuk berinteraksi dengan AI. Ketik /selesai untuk keluar dari mode ini.']);
+        }
+    }
+
     // ===================================================================
     // HANDLER UNTUK MODE NORMAL (Menu & Perintah Biasa)
     // ===================================================================
@@ -466,7 +491,7 @@ class TelegramController extends Controller
     /**
      * Mengirim pertanyaan ke Gemini.
      */
-    private function askGemini($chatId, $question)
+    private function askGemini($chatId, $update)
     {
         $apiKey = env('GEMINI_API_KEY');
         if (!$apiKey) {
@@ -484,7 +509,7 @@ class TelegramController extends Controller
                 'contents' => [
                     [
                         'parts' => [
-                            ['text' => $question]
+                            ['text' => $update]
                         ]
                     ]
                 ]
