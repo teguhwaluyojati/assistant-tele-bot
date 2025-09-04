@@ -41,6 +41,8 @@ class TelegramController extends Controller
     {
         if ($user->state === 'gemini_chat') {
             $this->handleGeminiChatMode($user, $update);
+        }else if($user->state === 'editing') {
+            $this->handleEditingMode($user, $update);
         }
         // ... (handler untuk state lain seperti 'editing_' bisa ditambahkan di sini)
     }
@@ -54,7 +56,7 @@ class TelegramController extends Controller
 
             \App\Models\TelegramUserCommand::create([
                 'user_id' => $chatId,
-                'command' => $text
+                'command' => 'AI: '. $text
             ]);
 
             if ($text === '/selesai' || strtolower($text) === 'selesai') {
@@ -583,27 +585,6 @@ class TelegramController extends Controller
         }
     }
 
-    /**
-     * Router untuk semua callback_data dari inline keyboard.
-     */
-    private function handleCallback($chatId, $messageId, $data)
-    {
-        if (str_starts_with($data, 'genshin_page_')) {
-            list($_, $_, $category, $page) = explode('_', $data, 4);
-            $this->showItemsInCategory($chatId, $messageId, $category, (int)$page);
-        }
-        else if (str_starts_with($data, 'category_')) {
-            $category = substr($data, 9);
-            $this->showItemsInCategory($chatId, $messageId, $category, 1); 
-        }
-        else if (str_starts_with($data, 'item_')) {
-            list($_, $category, $itemName) = explode('_', $data, 3);
-            $this->showItemDetails($chatId, $messageId, $category, $itemName);
-        }
-        else if ($data === 'back_to_categories') {
-            $this->showGenshinCategories($chatId, $messageId);
-        }
-    }
 
     /**
      * Menampilkan menu utama dengan keyboard.
@@ -794,32 +775,6 @@ class TelegramController extends Controller
     }
 
     /**
-     * Mengambil dan mengirim daftar 10 cryptocurrency teratas.
-     */
-    private function topListCrypto($chatId)
-    {
-        try{
-            $response = Http::get('https://api.coinlore.net/api/tickers/?start=0&limit=10');
-
-            if($response->successful()){
-                $coins = $response->json()['data'];
-                $msg = "📊 Top 10 Cryptocurrency saat ini:\n\n";
-                foreach($coins as $coin){
-                    $price = number_format($coin['price_usd'], 2);
-                    $change = number_format($coin['percent_change_24h'], 2);
-                    $msg .= "{$coin['rank']}. {$coin['name']} ({$coin['symbol']})\nHarga: \${$price}\nPerubahan 24h: {$change}%\n\n";
-                }
-                Telegram::sendMessage(['chat_id' => $chatId, 'text' => $msg]);
-            } else {
-                Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, tidak bisa mengambil data cryptocurrency sekarang.']);
-            }
-        } catch(\Exception $e){
-            Log::error('Error ambil crypto: ' . $e->getMessage());
-            Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Terjadi kesalahan saat mengambil data cryptocurrency.']);
-        }
-    }
-
-    /**
      * Menghasilkan dan mengirim gambar kopi acak.
      */
     private function coffeeGenerate($chatId)
@@ -972,24 +927,5 @@ class TelegramController extends Controller
             $chatId = $params['chat_id'] ?? 'N/A';
             Log::error("Terjadi error umum saat mengirim pesan ke chatId: {$chatId}", ['exception' => $e]);
         }
-    }
-
-    /**
-     * Helper untuk mendapatkan Chat ID dari berbagai jenis update.
-     *
-     * @param \Telegram\Bot\Objects\Update $update
-     * @return int|null
-     */
-    private function getChatId($update)
-    {
-        if ($update->isType('callback_query')) {
-            return $update->getCallbackQuery()->getMessage()->getChat()->getId();
-        }
-        
-        if ($update->getMessage()) {
-            return $update->getMessage()->getChat()->getId();
-        }
-
-        return null;
     }
 }
