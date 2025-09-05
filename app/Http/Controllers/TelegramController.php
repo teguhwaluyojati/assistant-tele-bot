@@ -403,7 +403,7 @@ class TelegramController extends Controller
         }
 
         if ($text === '/listusers') {
-            $users = TelegramUser::latest()->take(10)->get();
+            $users = TelegramUser::latest('last_interaction_at')->take(10)->get();
             
             if ($users->isEmpty()) {
                 $this->sendMessageSafely(['chat_id' => $chatId, 'text' => 'Belum ada pengguna yang tercatat.']);
@@ -431,9 +431,7 @@ class TelegramController extends Controller
             }
 
             $commands = TelegramUserCommand::where('user_id', $targetUserId)
-                ->latest()
-                ->take(10)
-                ->get();
+                ->latest('created_at')->take(10)->get();
 
             if ($commands->isEmpty()) {
                 $this->sendMessageSafely(['chat_id' => $chatId, 'text' => "Tidak ditemukan perintah untuk User ID: `{$targetUserId}`"]);
