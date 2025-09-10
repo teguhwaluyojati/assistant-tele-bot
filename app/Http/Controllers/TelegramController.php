@@ -41,10 +41,134 @@ class TelegramController extends Controller
     {
         if ($user->state === 'gemini_chat') {
             $this->handleGeminiChatMode($user, $update);
-        }else if($user->state === 'editing') {
-            $this->handleEditingMode($user, $update);
         }
-        // ... (handler untuk state lain seperti 'editing_' bisa ditambahkan di sini)
+        //     else if ($user->state === 'editing_select_trx') {
+        // if ($update->isType('callback_query')) {
+        //     $data = $update->getCallbackQuery()->getData();
+            
+        //     if (str_starts_with($data, 'select_edit_trx_')) {
+        //         $user->state = 'editing_options';
+        //         $user->save();
+        //         $transactionId = substr($data, 16);
+        //         $messageId = $update->getCallbackQuery()->getMessage()->getMessageId();
+        //         $this->showEditOptions($user, $messageId, $transactionId);
+        //     } 
+            // else if ($data === 'cancel_generic') {
+            //     $user->state = 'normal';
+            //     $user->save();
+            //     Telegram::editMessageText([
+            //         'chat_id' => $user->user_id,
+            //         'message_id' => $update->getCallbackQuery()->getMessage()->getMessageId(),
+            //         'text' => 'Proses edit dibatalkan.',
+            //         'reply_markup' => null
+            //     ]);
+            // }
+        // }
+    // }
+    }
+
+    /**
+     * Memulai mode edit dan menampilkan daftar transaksi untuk dipilih.
+     */
+    private function startEditMode(\App\Models\TelegramUser $user)
+    {
+
+        $transactions = \App\Models\Transaction::where('user_id', $user->user_id)
+            ->latest()
+            ->get();
+
+        if ($transactions->isEmpty()) {
+            $this->sendMessageSafely([
+                'chat_id' => $user->user_id,
+                'text' => 'Anda belum memiliki transaksi untuk diedit.'
+            ]);
+            return;
+        }
+
+        $message = "Pilih transaksi yang ingin Anda edit:\n\n";
+        $inlineKeyboard = [];
+
+        foreach ($transactions as $transaction) {
+            $type = $transaction->type === 'income' ? '+' : '-';
+            $amount = number_format($transaction->amount);
+            $date = $transaction->created_at->format('d M');
+
+            $message .= "🆔 *{$transaction->id}* | {$date} | `{$type} Rp {$amount}`\n";
+            $message .= "_{$this->escapeMarkdown($transaction->description)}_\n\n";
+
+            $inlineKeyboard[] = [
+                Keyboard::inlineButton([
+                    'text' => "Pilih Transaksi ID: {$transaction->id}",
+                    'callback_data' => 'select_edit_trx_' . $transaction->id 
+                ])
+            ];
+        }
+        
+        $inlineKeyboard[] = [Keyboard::inlineButton(['text' => 'Batalkan', 'callback_data' => 'cancel_generic'])];
+
+        $this->sendMessageSafely([
+            'chat_id' => $user->user_id,
+            'text' => $message,
+            'parse_mode' => 'Markdown',
+            'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard])
+        ]);
+    }
+
+    /**
+     * Menampilkan pilihan edit (Jumlah, Deskripsi, Tanggal) untuk transaksi yang dipilih.
+     *
+     * @param \App\Models\TelegramUser $user
+     * @param int $messageId ID pesan yang akan diedit
+     * @param int $transactionId ID transaksi yang sedang diedit
+     */
+    private function showEditOptions(\App\Models\TelegramUser $user, $messageId, $transactionId)
+    {
+        $transaction = \App\Models\Transaction::find($transactionId);
+
+        if (!$transaction) {
+            $this->sendMessageSafely([
+                'chat_id' => $user->user_id,
+                'text' => 'Error: Transaksi tidak ditemukan lagi.'
+            ]);
+            return;
+        }
+
+        $inlineKeyboard = [
+            [
+                Keyboard::inlineButton(['text' => '✏️ Ubah Jumlah', 'callback_data' => 'edit_field_amount_' . $transactionId]),
+                Keyboard::inlineButton(['text' => '📝 Ubah Deskripsi', 'callback_data' => 'edit_field_description_' . $transactionId]),
+            ],
+            [
+                Keyboard::inlineButton(['text' => '🗓️ Ubah Tanggal', 'callback_data' => 'edit_field_date_' . $transactionId]),
+            ],
+            [
+                Keyboard::inlineButton(['text' => '⬅️ Batal & Kembali ke Menu', 'callback_data' => 'cancel_edit_full']),
+            ]
+        ];
+        
+        $type = $transaction->type === 'income' ? 'Pemasukan' : 'Pengeluaran';
+        $amount = number_format($transaction->amount);
+        $date = $transaction->created_at->format('d M Y H:i');
+
+        $message = "Anda akan mengedit Transaksi ID: *{$transactionId}*\n\n";
+        $message .= "*Tipe:* {$type}\n";
+        $message .= "*Jumlah:* Rp {$amount}\n";
+        $message .= "*Tanggal:* {$date}\n";
+        $message .= "*Deskripsi:* {$transaction->description}\n\n";
+        $message .= "Apa yang ingin Anda ubah?";
+
+        try {
+            Telegram::editMessageText([
+                'chat_id'      => $user->user_id,
+                'message_id'   => $messageId,
+                'text'         => $message,
+                'parse_mode'   => 'Markdown',
+                'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard])
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Gagal menampilkan opsi edit: ' . $e->getMessage());
+            $this->sendMessageSafely(['chat_id' => $user->user_id, 'text' => 'Silakan pilih field yang ingin diedit:']);
+        }
     }
 
     private function handleGeminiChatMode(TelegramUser $user, $update)
@@ -121,7 +245,23 @@ class TelegramController extends Controller
                         'reply_markup' => null
                     ]);
                 }
-            } else if (str_starts_with($data, 'summary_')) {
+            }else if (str_starts_with($data, 'select_edit_trx_')) {
+        $user->state = 'editing_options'; 
+        $user->save();
+        
+        $transactionId = substr($data, 16);
+        
+        $this->showEditOptions($user, $messageId, $transactionId);
+    }
+    else if ($data === 'cancel_generic') {
+        Telegram::editMessageText([
+            'chat_id' => $chatId,
+            'message_id' => $messageId,
+            'text' => 'Proses dibatalkan.',
+            'reply_markup' => null
+        ]);
+    }
+             else if (str_starts_with($data, 'summary_')) {
                 $period = substr($data, 8); 
                 $this->generateSummary($chatId, $messageId, $period);            
             }
@@ -137,6 +277,7 @@ class TelegramController extends Controller
                 if ($text === '/start' || $text === '/menu') { $this->showMainMenu($chatId); }
                 else if ($text === '/summary' || $text === '/laporan') { $this->showSummaryOptions($chatId); }
                 else if ($text === '/hapus') { $this->showRecentTransactionsForDeletion($chatId); }
+                else if ($text === '/edit') { $this->startEditMode($user); }
                 else { $this->handleAdminCommands($chatId, $text); }
             } else if (str_starts_with($text, '+') || str_starts_with($text, '-')) {
                 $this->recordTransaction($chatId, $text);
@@ -285,7 +426,7 @@ class TelegramController extends Controller
 
         $this->sendMessageSafely([
             'chat_id' => $chatId,
-            'text'=> "Selamat datang di Money Tracker! 💸\n\nGunakan format berikut untuk mencatat transaksi:\n\nPemasukan:\n+ [jumlah] [deskripsi]\nContoh: + 500000 Gaji\n\nPengeluaran:\n- [jumlah] [deskripsi]\nContoh: - 15000 Makan siang\n\nUntuk melihat laporan, ketik /summary atau /laporan\nUntuk menghapus laporan, ketik /hapus",
+            'text'=> "Selamat datang di Money Tracker! 💸\n\nGunakan format berikut untuk mencatat transaksi:\n\nPemasukan:\n+ [jumlah] [deskripsi]\nContoh: + 500000 Gaji\n\nPengeluaran:\n- [jumlah] [deskripsi]\nContoh: - 15000 Makan siang\n\nUntuk melihat laporan, ketik /summary atau /laporan\nUntuk menghapus laporan, ketik /hapus\nUntuk mengedit laporan, ketik /edit",
         ]);
     }
 
@@ -482,7 +623,7 @@ class TelegramController extends Controller
 
         Telegram::sendMessage([
             'chat_id' => $chatId,
-            'text' => "✅ Anda telah keluar dari mode chat AI. Kembali ke menu utama."
+            'text' => "✅ Keluar/selesai berhasil. Kembali ke menu utama."
         ]);
 
         $this->showMainMenu($chatId);
