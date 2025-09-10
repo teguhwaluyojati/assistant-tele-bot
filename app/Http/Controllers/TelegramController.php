@@ -41,7 +41,12 @@ class TelegramController extends Controller
     {
         if ($user->state === 'gemini_chat') {
             $this->handleGeminiChatMode($user, $update);
-        }
+        }else if ($user->state === 'editing_options') {
+            $this->handleEditingChatMode($user, $update);
+        }else if (str_starts_with($user->state, 'editing_')) {
+        // Ini akan menangani input teks SETELAH user memilih field
+        $this->handleEditTransactionInput($user, $update->getMessage()->getText());
+    }
         //     else if ($user->state === 'editing_select_trx') {
         // if ($update->isType('callback_query')) {
         //     $data = $update->getCallbackQuery()->getData();
@@ -171,6 +176,104 @@ class TelegramController extends Controller
         }
     }
 
+    private function handleEditingChatMode(TelegramUser $user, $update)
+    {
+        if (!$update->isType('callback_query')) {
+            return; 
+        }
+
+        $callbackQuery = $update->getCallbackQuery();
+        $data = $callbackQuery->getData();
+        \App\Models\TelegramUserCommand::create([
+            'user_id' => $user->user_id,
+            'command' => "CALLBACK: " . $data
+        ]);
+
+        if (str_starts_with($data, 'edit_field_')) {
+            [, , $field, $transactionId] = explode('_', $data);
+            
+            $this->promptForNewValue($user, $field, $transactionId);
+
+        } else if ($data === 'cancel_edit_full') {
+            $user->state = 'normal';
+            $user->save();
+            Telegram::editMessageText([
+                'chat_id'      => $user->user_id,
+                'message_id'   => $callbackQuery->getMessage()->getMessageId(),
+                'text'         => 'Proses edit dibatalkan.',
+                'reply_markup' => null
+            ]);
+        }
+    }
+
+    /**
+     * Meminta input baru dari pengguna dan mengubah state.
+     * Dipanggil setelah pengguna memilih field (jumlah/deskripsi/tanggal) yang akan diedit.
+     */
+    private function promptForNewValue(\App\Models\TelegramUser $user, $field, $transactionId)
+    {
+        $user->state = "editing_{$field}_{$transactionId}";
+        $user->save();
+
+        $promptMessage = "";
+        switch ($field) {
+            case 'amount':
+                $promptMessage = "Silakan masukkan *jumlah* baru untuk transaksi ini (hanya angka).";
+                break;
+            case 'description':
+                $promptMessage = "Silakan masukkan *deskripsi* baru untuk transaksi ini.";
+                break;
+            case 'date':
+                $promptMessage = "Silakan masukkan *tanggal* baru dengan format YYYY-MM-DD (Contoh: `2025-09-10`).";
+                break;
+        }
+        
+        $promptMessage .= "\n\nKetik `/batal` untuk membatalkan proses edit ini.";
+
+        $this->sendMessageSafely([
+            'chat_id' => $user->user_id,
+            'text' => $promptMessage,
+            'parse_mode' => 'Markdown'
+        ]);
+    }
+
+    /**
+     * Memproses input teks dari pengguna saat dalam mode edit transaksi.
+     */
+    private function handleEditTransactionInput(\App\Models\TelegramUser $user, $newValue)
+    {
+        $chatId = $user->user_id;
+
+        if (strtolower($newValue) === '/batal') {
+            $user->state = 'normal';
+            $user->save();
+            $this->sendMessageSafely(['chat_id' => $chatId, 'text' => '✅ Proses edit dibatalkan.']);
+            return;
+        }
+
+        [, $field, $transactionId] = explode('_', $user->state);
+        
+        $transaction = \App\Models\Transaction::where('id', $transactionId)->where('user_id', $chatId)->first();
+        if (!$transaction) {
+            $this->sendMessageSafely(['chat_id' => $chatId, 'text' => '⚠️ Gagal memperbarui, transaksi tidak ditemukan.']);
+            $user->state = 'normal';
+            $user->save();
+            return;
+        }
+
+        if ($field === 'amount' && !is_numeric($newValue)) {
+            $this->sendMessageSafely(['chat_id' => $chatId, 'text' => '❌ Jumlah harus berupa angka. Silakan coba lagi.']);
+            return;
+        }
+
+        $transaction->{$field} = $newValue;
+        $transaction->save();
+
+        $user->state = 'normal';
+        $user->save();
+        $this->sendMessageSafely(['chat_id' => $chatId, 'text' => "✅ Transaksi ID {$transactionId} berhasil diperbarui!"]);
+    }
+
     private function handleGeminiChatMode(TelegramUser $user, $update)
     {
         $chatId = $user->user_id;
@@ -245,7 +348,8 @@ class TelegramController extends Controller
                         'reply_markup' => null
                     ]);
                 }
-            }else if (str_starts_with($data, 'select_edit_trx_')) {
+            }
+            else if (str_starts_with($data, 'select_edit_trx_')) {
         $user->state = 'editing_options'; 
         $user->save();
         
@@ -389,7 +493,7 @@ class TelegramController extends Controller
         $date = $expense->created_at->format($dateFormat);
     
         $expenseDetails .= "▫️ {$date} | Rp " . number_format($expense->amount) . " - " . $expense->description . "\n";
-    }
+            }
         }
         
         $message = "📊 *Laporan Keuangan - {$periodText}*\n";
