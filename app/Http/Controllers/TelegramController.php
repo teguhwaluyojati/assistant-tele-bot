@@ -46,30 +46,7 @@ class TelegramController extends Controller
         }else if (str_starts_with($user->state, 'editing_')) {
         // Ini akan menangani input teks SETELAH user memilih field
         $this->handleEditTransactionInput($user, $update->getMessage()->getText());
-    }
-        //     else if ($user->state === 'editing_select_trx') {
-        // if ($update->isType('callback_query')) {
-        //     $data = $update->getCallbackQuery()->getData();
-            
-        //     if (str_starts_with($data, 'select_edit_trx_')) {
-        //         $user->state = 'editing_options';
-        //         $user->save();
-        //         $transactionId = substr($data, 16);
-        //         $messageId = $update->getCallbackQuery()->getMessage()->getMessageId();
-        //         $this->showEditOptions($user, $messageId, $transactionId);
-        //     } 
-            // else if ($data === 'cancel_generic') {
-            //     $user->state = 'normal';
-            //     $user->save();
-            //     Telegram::editMessageText([
-            //         'chat_id' => $user->user_id,
-            //         'message_id' => $update->getCallbackQuery()->getMessage()->getMessageId(),
-            //         'text' => 'Proses edit dibatalkan.',
-            //         'reply_markup' => null
-            //     ]);
-            // }
-        // }
-    // }
+        }
     }
 
     /**
