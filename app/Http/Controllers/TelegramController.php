@@ -44,7 +44,6 @@ class TelegramController extends Controller
         }else if ($user->state === 'editing_options') {
             $this->handleEditingChatMode($user, $update);
         }else if (str_starts_with($user->state, 'editing_')) {
-        // Ini akan menangani input teks SETELAH user memilih field
         $this->handleEditTransactionInput($user, $update->getMessage()->getText());
         }
     }
