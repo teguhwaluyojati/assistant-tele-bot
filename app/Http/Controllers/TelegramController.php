@@ -30,17 +30,13 @@ class TelegramController extends Controller
         date_default_timezone_set('Asia/Jakarta');
         $update = Telegram::getWebhookUpdate();
 
-        // 1. Cari atau buat user (TANPA update timestamp dulu)
         $user = $this->findOrCreateUser($update);
-        // $chatId = $this->getChatId($update);
 
         if (!$user) {
             Log::warning('Request diabaikan: Gagal mendapatkan data user/chatId.');
             return response()->json(['ok' => true]);
         }
 
-        // 2. LAKUKAN PENGECEKAN TIMEOUT menggunakan timestamp LAMA dari database
-        // Pastikan $user->last_interaction_at tidak null untuk pengguna baru
         if ($user->state === 'gemini_chat' && $user->last_interaction_at && now()->diffInMinutes($user->last_interaction_at->setTimezone('Asia/Jakarta')) > 5) {
             
             Log::info("User {$user->user_id} di-timeout dari mode Gemini.");
@@ -48,10 +44,8 @@ class TelegramController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        // 3. JIKA TIDAK TIMEOUT, BARU UPDATE TIMESTAMP untuk interaksi saat ini
         $this->updateLastInteraction($user);
 
-        // 4. Lanjutkan ke logika utama seperti biasa
         if ($user->state !== 'normal') {
             $this->handleStatefulInput($user, $update);
         } else {
