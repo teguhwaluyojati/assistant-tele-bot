@@ -4,14 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class Transaction extends Model
 {
     use HasFactory;
 
-    /**
-     * Kolom yang boleh diisi secara massal.
-     */
+    protected $transaction = 'transactions';
+
     protected $fillable = [
         'user_id',
         'type',
@@ -25,5 +25,14 @@ class Transaction extends Model
     public function user()
     {
         return $this->belongsTo(TelegramUser::class, 'user_id', 'id');
+    }
+
+    public function DailyExpenses()
+    {
+        return DB::table($this->transaction)
+            ->select('*')
+            ->where('type', 'expense')
+            ->whereDate('created_at', now()->subDay()->toDateString())
+            ->get();
     }
 }

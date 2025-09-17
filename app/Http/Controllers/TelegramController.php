@@ -11,9 +11,17 @@ use Telegram\Bot\FileUpload\InputFile;
 use App\Models\TelegramUserCommand;
 use App\Models\TelegramUser;
 use App\Models\Transaction;
+use Illuminate\Support\Facades\DB;
+
 
 class TelegramController extends Controller
 {
+    private $transaction;
+
+    public function __construct()
+    {
+        $this->transaction = new Transaction();
+    }
     /**
      * Handle incoming Telegram updates.
      */
@@ -1146,5 +1154,66 @@ class TelegramController extends Controller
             $chatId = $params['chat_id'] ?? 'N/A';
             Log::error("Terjadi error umum saat mengirim pesan ke chatId: {$chatId}", ['exception' => $e]);
         }
+    }
+
+    /**
+     * API untuk broadcast daily pengeluaran ke semua user.
+     */
+    public function broadcastDailyExpenses()
+    {
+        Log::info("Memulai proses broadcast pengeluaran harian...");
+        $yesterday = now()->subDay();
+
+        $targetUserIds = \App\Models\Transaction::distinct()
+            ->pluck('user_id')
+            ->all();
+
+        if (empty($targetUserIds)) {
+            Log::info('Tidak ada pengguna yang pernah bertransaksi. Proses selesai.');
+            return;
+        }
+
+        Log::info("Menyiapkan broadcast untuk " . count($targetUserIds) . " pengguna...");
+
+        foreach ($targetUserIds as $userId) {
+            
+            $userExpenses = \App\Models\Transaction::where('user_id', $userId)
+                ->where('type', 'expense')
+                ->whereDate('created_at', $yesterday)
+                ->get();
+
+            $yesterdayDate = $yesterday->format('d M Y');
+            $message = "📊 *Laporan Pengeluaran Harian Anda*\n\n";
+            $message .= "Berikut adalah rangkuman pengeluaranmu untuk kemarin ({$yesterdayDate}):\n\n";
+
+            if ($userExpenses->isEmpty()) {
+                $message .= "Anda tidak memiliki pengeluaran kemarin. Luar biasa!";
+            } else {
+                $totalExpense = 0;
+                foreach ($userExpenses as $expense) {
+                    $time = $expense->created_at->format('H:i');
+                    $amount = number_format($expense->amount);
+                    $description = $this->escapeMarkdown($expense->description ?? 'Tidak ada deskripsi');
+
+                    $message .= "▫️ `{$time}` | `Rp {$amount}` - {$description}\n";
+                    $totalExpense += $expense->amount;
+                }
+                $message .= "\n──────────────────────────────\n";
+                $message .= "❌ *Total Pengeluaran:* `Rp " . number_format($totalExpense) . "`";
+            }
+
+            try {
+                Telegram::sendMessage([
+                    'chat_id' => $userId,
+                    'text' => $message,
+                    'parse_mode' => 'Markdown'
+                ]);
+                Log::info("Berhasil broadcast ke user_id: {$userId}");
+            } catch (\Exception $e) {
+                Log::error("Gagal kirim broadcast ke user_id: {$userId}. Error: " . $e->getMessage());
+            }
+        }
+
+        Log::info("Proses broadcast harian selesai.");
     }
 }
