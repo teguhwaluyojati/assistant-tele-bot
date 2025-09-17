@@ -25,14 +25,33 @@ class TelegramController extends Controller
     /**
      * Handle incoming Telegram updates.
      */
-     public function handle()
+    public function handle()
     {
         date_default_timezone_set('Asia/Jakarta');
         $update = Telegram::getWebhookUpdate();
 
-        $user = $this->logUserActivity($update);
-        if (!$user) return response()->json(['ok' => true]);
+        // 1. Cari atau buat user (TANPA update timestamp dulu)
+        $user = $this->findOrCreateUser($update);
+        // $chatId = $this->getChatId($update);
 
+        if (!$user) {
+            Log::warning('Request diabaikan: Gagal mendapatkan data user/chatId.');
+            return response()->json(['ok' => true]);
+        }
+
+        // 2. LAKUKAN PENGECEKAN TIMEOUT menggunakan timestamp LAMA dari database
+        // Pastikan $user->last_interaction_at tidak null untuk pengguna baru
+        if ($user->state === 'gemini_chat' && $user->last_interaction_at && now()->diffInMinutes($user->last_interaction_at->setTimezone('Asia/Jakarta')) > 5) {
+            
+            Log::info("User {$user->user_id} di-timeout dari mode Gemini.");
+            $this->exitGeminiChatMode($user, true); 
+            return response()->json(['ok' => true]);
+        }
+
+        // 3. JIKA TIDAK TIMEOUT, BARU UPDATE TIMESTAMP untuk interaksi saat ini
+        $this->updateLastInteraction($user);
+
+        // 4. Lanjutkan ke logika utama seperti biasa
         if ($user->state !== 'normal') {
             $this->handleStatefulInput($user, $update);
         } else {
@@ -40,6 +59,41 @@ class TelegramController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Mencari atau membuat pengguna baru TANPA mengubah timestamp interaksi.
+     * @param \Telegram\Bot\Objects\Update $update
+     * @return \App\Models\TelegramUser|null
+     */
+    private function findOrCreateUser($update)
+    {
+        try {
+            $from = $update->isType('callback_query') ? $update->getCallbackQuery()->getFrom() : $update->getMessage()->getFrom();
+            if (!$from) return null;
+
+            return \App\Models\TelegramUser::firstOrCreate(
+                ['user_id' => $from->getId()], // Gunakan user_id sebagai primary key
+                [
+                    'username'   => $from->getUsername(),
+                    'first_name' => $from->getFirstName(),
+                    'last_name'  => $from->getLastName(),
+                ]
+            );
+        } catch (\Exception $e) {
+            Log::error('Gagal findOrCreateUser: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Memperbarui timestamp interaksi terakhir untuk pengguna.
+     * @param \App\Models\TelegramUser $user
+     */
+    private function updateLastInteraction(\App\Models\TelegramUser $user)
+    {
+        $user->last_interaction_at = now();
+        $user->save();
     }
 
     // ===================================================================

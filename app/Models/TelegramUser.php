@@ -15,4 +15,8 @@ class TelegramUser extends Model
         'last_name',
         'last_interaction_at',
     ];
+
+    protected $casts = [
+        'last_interaction_at' => 'datetime',
+    ];
 }
