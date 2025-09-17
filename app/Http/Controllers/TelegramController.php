@@ -745,7 +745,7 @@ class TelegramController extends Controller
 
         Telegram::sendMessage([
             'chat_id' => $chatId,
-            'text' => "🤖 Anda sekarang dalam mode chat dengan AI Gemini.\n\nSilakan ajukan pertanyaan apa pun.\nKetik `/selesai` untuk keluar dari mode ini."
+            'text' => "🤖 Anda sekarang dalam mode chat dengan AI Gemini.\n\nSilakan ajukan pertanyaan apa pun.\nKetik `/selesai` untuk keluar dari mode ini (Jika tidak ada response dalam 5 menit, maka akan otomatis keluar dari mode AI)."
         ]);
     }
 
