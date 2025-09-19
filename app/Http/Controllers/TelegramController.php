@@ -22,6 +22,7 @@ class TelegramController extends Controller
     {
         $this->transaction = new Transaction();
     }
+
     /**
      * Handle incoming Telegram updates.
      */
@@ -427,6 +428,7 @@ class TelegramController extends Controller
                     case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
                     case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
                     case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
+                    case 'Poop Tracker 💩': $this->sendPoopTrackerInfo($chatId); break;
                     default:
                         if (strtolower($text) === 'halo') { $this->sendGreeting($chatId); }
                         else { $this->sendUnknownCommand($chatId); }
@@ -434,6 +436,24 @@ class TelegramController extends Controller
                 }
             }
         }
+    }
+
+    private function sendPoopTrackerInfo($chatId)
+    {
+        $message = "💩 *Poop Tracker*\n\n";
+        $message .= "Fitur ini akan membantu Anda melacak kebiasaan buang air besar Anda. Anda dapat mencatat waktu, konsistensi, dan catatan tambahan.\n\n";
+        $message .= "Untuk memulai, kirim pesan dengan format berikut:\n";
+        $message .= "`/poop [konsistensi] [catatan]`\n";
+        $message .= "Contoh: `/poop Normal Perasaan baik hari ini`\n\n";
+        $message .= "Konsistensi yang umum digunakan: Cair, Lunak, Normal, Keras, Sangat Keras.\n\n";
+        $message .= "Untuk melihat riwayat poop Anda, ketik `/poophistory`.\n\n";
+        $message .= "Catatan: Fitur ini masih dalam pengembangan. Nantikan pembaruan selanjutnya!";
+
+        $this->sendMessageSafely([
+            'chat_id' => $chatId,
+            'text' => $message,
+            'parse_mode' => 'Markdown'
+        ]);
     }
 
     private function isUserAdmin($chatId)
@@ -871,6 +891,7 @@ class TelegramController extends Controller
             ['Fakta Kucing 🐱', 'Money Tracker 💸'],
             ['Aku Mau Kopi ☕️','Info Genshin 🎮'],
             ['AI Chat 🤖','Tentang Developer 👨‍💻'],
+            ['Poop Tracker 💩'],
         ];
 
         $reply_markup = Keyboard::make([
