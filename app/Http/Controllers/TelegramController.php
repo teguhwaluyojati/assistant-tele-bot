@@ -11,6 +11,7 @@ use Telegram\Bot\FileUpload\InputFile;
 use App\Models\TelegramUserCommand;
 use App\Models\TelegramUser;
 use App\Models\Transaction;
+use App\Models\PoopTracker;
 use Illuminate\Support\Facades\DB;
 
 
@@ -418,6 +419,9 @@ class TelegramController extends Controller
                 else { $this->handleAdminCommands($chatId, $text); }
             } else if (str_starts_with($text, '+') || str_starts_with($text, '-')) {
                 $this->recordTransaction($chatId, $text);
+            }else if(str_starts_with($text, '/poop')) {
+                $this->handlePoopCommand($chatId, $text);
+
             } else {
                 switch ($text) {
                     case 'AI Chat 🤖': $this->enterGeminiChatMode($user, $chatId); break;
@@ -454,6 +458,59 @@ class TelegramController extends Controller
             'text' => $message,
             'parse_mode' => 'Markdown'
         ]);
+    }
+
+    private function handlePoopCommand($chatId, $text){
+        $pattern = '/^\/poop\s+(\w+)(?:\s+(.*))?$/i';
+        $historyPattern = '/^\/poophistory$/i';
+
+        if (preg_match($pattern, $text, $matches)) {
+            $type = $matches[1];
+            $notes = isset($matches[2]) ? trim($matches[2]) : null;
+
+            PoopTracker::create([
+                'user_id' => $chatId,
+                'type' => $type,
+                'notes' => $notes
+            ]);
+
+            $this->sendMessageSafely([
+                'chat_id' => $chatId,
+                'text' => "✅ Catatan poop berhasil disimpan!\nTipe: *{$type}*\nCatatan: " . ($notes ? "*{$notes}*" : "_(tidak ada catatan)_"),
+                'parse_mode' => 'Markdown'
+            ]);
+        } else if (preg_match($historyPattern, $text)) {
+            $records = PoopTracker::where('user_id', $chatId)->latest()->take(10)->get();
+
+            if ($records->isEmpty()) {
+                $this->sendMessageSafely([
+                    'chat_id' => $chatId,
+                    'text' => "Anda belum memiliki catatan poop."
+                ]);
+                return;
+            }
+
+            $message = "📋 *Riwayat Poop Terakhir:*\n\n";
+            foreach ($records as $record) {
+                $date = $record->created_at->format('d M Y H:i');
+                $message .= "▫️ {$date} | Tipe: *{$record->type}*";
+                if ($record->notes) {
+                    $message .= " | Catatan: _{$record->notes}_";
+                }
+                $message .= "\n";
+            }
+
+            $this->sendMessageSafely([
+                'chat_id' => $chatId,
+                'text' => $message,
+                'parse_mode' => 'Markdown'
+            ]);
+        } else {
+            $this->sendMessageSafely([
+                'chat_id' => $chatId,
+                'text' => "Format salah. Gunakan `/poop [konsistensi] [catatan]` untuk mencatat poop atau `/poophistory` untuk melihat riwayat."
+            ]);
+        }
     }
 
     private function isUserAdmin($chatId)
