@@ -651,7 +651,6 @@ class TelegramController extends Controller
         Log::info("Menampilkan transaksi untuk dihapus bagi user: {$chatId}");
         $transactions = \App\Models\Transaction::where('user_id', $chatId)
             ->latest()
-            // ->take(5)
             ->get();
 
         if ($transactions->isEmpty()) {
@@ -666,7 +665,7 @@ class TelegramController extends Controller
         $inlineKeyboard = [];
 
         foreach ($transactions as $transaction) {
-            $type = $transaction->type === 'income' ? 'Pemasukan' : 'Pengeluaran';
+            $type = $transaction->type === 'income' ? '+' : '-';
             $amount = number_format($transaction->amount);
             $date = $transaction->created_at->format('d M');
 
