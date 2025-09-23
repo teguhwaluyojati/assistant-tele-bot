@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('poop_tracker', function (Blueprint $table) {
         $table->id();
-        $table->foreignId('user_id')->constrained('telegram_users');
+        $table->foreignId('user_id')->references('user_id')->on('telegram_users');
         $table->string('type')->nullable(); 
         $table->text('notes')->nullable();
         $table->timestamps();
