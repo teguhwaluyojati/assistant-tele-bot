@@ -416,7 +416,7 @@ class TelegramController extends Controller
                 else if ($text === '/summary' || $text === '/laporan') { $this->showSummaryOptions($chatId); }
                 else if ($text === '/hapus') { $this->showRecentTransactionsForDeletion($chatId); }
                 else if ($text === '/edit') { $this->startEditMode($user); }
-                else if (str_starts_with($text, '/poop')) { $this->handlePoopCommand($chatId, $text); }
+                else if (str_starts_with($text, '/poop') || (str_starts_with($text, '/poophistory'))) { $this->handlePoopCommand($chatId, $text); }
                 else { $this->handleAdminCommands($chatId, $text); }
             } else if (str_starts_with($text, '+') || str_starts_with($text, '-')) {
                 $this->recordTransaction($chatId, $text);
