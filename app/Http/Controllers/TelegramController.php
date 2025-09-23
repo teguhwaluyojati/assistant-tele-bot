@@ -944,8 +944,8 @@ class TelegramController extends Controller
             ['Cuaca di Jakarta 🌤️', 'Nasihat Bijak 💡'],
             ['Fakta Kucing 🐱', 'Money Tracker 💸'],
             ['Aku Mau Kopi ☕️','Info Genshin 🎮'],
-            ['AI Chat 🤖','Tentang Developer 👨‍💻'],
-            ['Poop Tracker 💩'],
+            ['AI Chat 🤖','Poop Tracker 💩'],
+            ['Tentang Developer 👨‍💻'],
         ];
 
         $reply_markup = Keyboard::make([
