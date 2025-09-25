@@ -893,49 +893,6 @@ class TelegramController extends Controller
     }
 
     /**
-     * Mencatat/memperbarui data pengguna dan MENGEMBALIKAN model User.
-     * @param \Telegram\Bot\Objects\Update $update
-     * @return \App\Models\TelegramUser|null
-     */
-    private function logUserActivity($update)
-    {
-        try {
-            $from = null;
-            if ($update->isType('callback_query')) {
-                $from = $update->getCallbackQuery()->getFrom();
-            } else if ($update->getMessage()) {
-                $from = $update->getMessage()->getFrom();
-            }
-
-            if (!$from) {
-                Log::warning('Tidak bisa mendapatkan data user dari update Telegram.');
-                return null;
-            }
-
-            // =================================================================
-            // ==> INI BAGIAN TERPENTING: Gunakan 'return' <==
-            // updateOrCreate akan mencari user, jika tidak ada maka akan dibuat.
-            // Fungsi ini juga langsung mengembalikan model User yang bisa kita gunakan.
-            // =================================================================
-            return \App\Models\TelegramUser::updateOrCreate(
-                ['user_id' => $from->getId()], 
-                [
-                    'username'   => $from->getUsername(),
-                    'first_name' => $from->getFirstName(),
-                    'last_name'  => $from->getLastName(),
-                    'last_interaction_at' => now(),
-
-                ]
-            );
-
-        } catch (\Exception $e) {
-            Log::error('Gagal mencatat pengguna Telegram: ' . $e->getMessage(), ['exception' => $e]);
-            return null;
-        }
-    }
-
-
-    /**
      * Menampilkan menu utama dengan keyboard.
      */
     private function showMainMenu($chatId)
