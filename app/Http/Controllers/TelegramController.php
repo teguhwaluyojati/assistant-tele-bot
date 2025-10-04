@@ -539,6 +539,9 @@ class TelegramController extends Controller
             ],
             [
                 Keyboard::inlineButton(['text' => 'Bulanan (Bulan Ini)', 'callback_data' => 'summary_monthly']),
+            ],
+            [
+                Keyboard::inlineButton(['text' => 'Pilih Hari', 'callback_data' => 'summary_custom']),
             ]
         ];
 
