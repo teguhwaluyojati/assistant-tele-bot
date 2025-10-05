@@ -3,7 +3,9 @@
     <div class="left-pane">
       <div class="welcome-text">
         <h1>Kelola Bot Anda</h1>
-        <p>Akses dasbor admin untuk memonitor aktivitas dan mengelola data bot Anda dengan mudah.</p>
+        <p>Akses dasbor admin untuk memonitor
+            <span class="typing-text">{{ typedText }}</span>
+        </p>
       </div>
       <div class="welcome-illustration">
         <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
@@ -69,7 +71,21 @@ export default {
       },
       loading: false,
       error: null,
-      passwordFieldType: 'password' 
+      passwordFieldType: 'password',
+      phrases: [
+        'bot Telegram Anda',
+        'data pengguna',
+        'laporan harian',
+        'laporan mingguan',
+        'laporan bulanan'
+      ],
+      typedText: '',
+      phraseIndex: 0,
+      charIndex: 0,
+      isDeleting: false,
+      typingSpeed: 100,
+      deletingSpeed: 50,
+      delayBetweenPhrases: 2000 
     };
   },
   computed: {
@@ -77,9 +93,39 @@ export default {
       return this.form.email.length > 0 && this.form.password.length > 0;
     }
   },
+  mounted() {
+    this.typingEffect();
+  },
   methods: {
     togglePasswordVisibility() {
       this.passwordFieldType = this.passwordFieldType === 'password' ? 'text' : 'password';
+    },
+    typingEffect() {
+      const currentPhrase = this.phrases[this.phraseIndex];
+      let timeoutSpeed = this.typingSpeed;
+
+      if (this.isDeleting) {
+        this.typedText = currentPhrase.substring(0, this.charIndex - 1);
+        this.charIndex--;
+        timeoutSpeed = this.deletingSpeed;
+        
+        if (this.typedText === '') {
+          this.isDeleting = false;
+          this.phraseIndex = (this.phraseIndex + 1) % this.phrases.length;
+          timeoutSpeed = 500; 
+        }
+      } 
+      else {
+        this.typedText = currentPhrase.substring(0, this.charIndex + 1);
+        this.charIndex++;
+
+        if (this.typedText === currentPhrase) {
+          this.isDeleting = true;
+          timeoutSpeed = this.delayBetweenPhrases; 
+        }
+      }
+
+      setTimeout(this.typingEffect, timeoutSpeed);
     },
     async handleLogin() {
       this.error = null;
@@ -119,7 +165,7 @@ export default {
   
   background-image:
     linear-gradient(rgba(10, 25, 47, 0.7), rgba(10, 25, 47, 0.7)),
-    url('https://images.unsplash.com/photo-1484807352052-23338990c6c6?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D');
+    url('/images/background-login.jpg');
   
   background-size: cover; 
   background-position: center;
@@ -147,9 +193,22 @@ export default {
   color: white;
   font-size: 1.1rem;
   line-height: 1.6;
-  max-width: 400px;
+  max-width: 450px;
   opacity: 0.9;
   text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+  height: 50px; 
+}
+
+.typing-text {
+  font-weight: bold;
+  color: #f1c40f; 
+  border-right: .15em solid #f1c40f;
+  animation: blink-caret .75s step-end infinite;
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent }
+  50% { border-color: #f1c40f; }
 }
 .welcome-illustration {
   margin-top: 40px;
