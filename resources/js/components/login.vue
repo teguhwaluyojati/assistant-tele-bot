@@ -340,7 +340,15 @@ button[type="submit"] {
   height: 50px;
 }
 button[type="submit"]:hover:not(:disabled) {
-  background-color: var(--primary-color-dark);
+  background-color: #71b5e6;
+
+}
+button[type="submit"].loading {
+  cursor: not-allowed;
+  background-color: #a0ccec;
+}
+button[type="submit"] {
+  background-color: #a0ccec;
 }
 button[type="submit"]:disabled {
   background-color: #a0ccec;
