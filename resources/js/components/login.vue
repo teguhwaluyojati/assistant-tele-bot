@@ -128,21 +128,33 @@ export default {
       setTimeout(this.typingEffect, timeoutSpeed);
     },
     async handleLogin() {
-      this.error = null;
-      this.loading = true;
+    this.error = null;
+    this.loading = true;
+        try {
+            const response = await axios.post('/api/login', {
+            email: this.form.email,
+            password: this.form.password,
+            });
 
-      try {
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        if (this.form.email === 'user@example.com' && this.form.password === 'password') {
-          alert('Login Berhasil!');
-        } else {
-          throw new Error('Email atau password salah.');
+            console.log('Login berhasil:', response.data);
+            alert('Login Berhasil! Mengarahkan ke dashboard...');
+
+            // window.location.href = '/dashboard';
+
+        } catch (error) {
+            if (error.response) {
+            this.error = error.response.data.message || 'Email atau password salah.';
+            console.error('Login error response:', error.response.data);
+            } else if (error.request) {
+            this.error = 'Tidak bisa terhubung ke server. Silakan coba lagi.';
+            console.error('Login error request:', error.request);
+            } else {
+            this.error = 'Terjadi kesalahan. Coba muat ulang halaman.';
+            console.error('Login error:', error.message);
+            }
+        } finally {
+            this.loading = false;
         }
-      } catch (err) {
-        this.error = err.message;
-      } finally {
-        this.loading = false;
-      }
     }
   }
 }
