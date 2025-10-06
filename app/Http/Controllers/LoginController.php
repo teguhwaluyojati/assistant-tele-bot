@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\LoginHistory;
 
 class LoginController extends Controller
 {
@@ -22,6 +23,11 @@ class LoginController extends Controller
 
             $token = $user->createToken('auth-token')->plainTextToken;
 
+            LoginHistory::create([
+                'email' => $request->email,
+                'ip_address' => $request->ip(),
+            ]);
+
             return response()->json([
                 'message'       => 'Login berhasil!',
                 'access_token'  => $token,
@@ -29,15 +35,6 @@ class LoginController extends Controller
                 'user'          => $user
             ]);
             
-        }
-
-        if (Auth::attempt($credentials)) {
-            $request->session()->regenerate();
-
-            return response()->json([
-                'message' => 'Login berhasil!',
-                'user' => Auth::user()
-            ], 200);
         }
 
         return response()->json([
