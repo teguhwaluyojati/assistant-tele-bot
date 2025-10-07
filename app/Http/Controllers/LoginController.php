@@ -21,7 +21,7 @@ class LoginController extends Controller
 
             $user = Auth::user();
 
-            $token = $user->createToken('auth-token')->plainTextToken;
+            $token = $user->createToken('auth-token', ['*'], now()->addHours(2))->plainTextToken;
 
             LoginHistory::create([
                 'email' => $request->email,
