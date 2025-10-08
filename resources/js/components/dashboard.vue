@@ -92,6 +92,7 @@
         }
  
         axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        // --- AKHIR BAGIAN PENTING ---
 
         try {
         this.user = JSON.parse(userDataString);
@@ -122,7 +123,6 @@
         window.location.href = '/';
       }
     },
-    // ----------------------------------------------------
 
     // Anda bisa menambahkan method untuk mengambil data dari API di sini,
     // misalnya di dalam mounted() hook.
@@ -189,7 +189,6 @@
 
 .stats-grid {
   display: grid;
-  /* Membuat kolom responsif, minimal 240px */
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 24px;
 }
