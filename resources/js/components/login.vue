@@ -135,11 +135,16 @@ export default {
             email: this.form.email,
             password: this.form.password,
             });
+          
+            localStorage.setItem('auth_token', response.data.access_token);
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+            axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
+
 
             console.log('Login berhasil:', response.data);
             alert('Login Berhasil! Mengarahkan ke dashboard...');
 
-            // window.location.href = '/dashboard';
+            window.location.href = '/dashboard';
 
         } catch (error) {
             if (error.response) {
