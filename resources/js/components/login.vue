@@ -96,6 +96,14 @@ export default {
   mounted() {
     this.typingEffect();
   },
+  created() {
+    const token = localStorage.getItem('auth_token');
+
+    if (token) {
+      console.log('Token ditemukan, redirect ke dashboard...');
+      window.location.href = '/dashboard';
+    }
+  },
   methods: {
     togglePasswordVisibility() {
       this.passwordFieldType = this.passwordFieldType === 'password' ? 'text' : 'password';
