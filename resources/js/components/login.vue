@@ -140,7 +140,6 @@ export default {
             localStorage.setItem('user', JSON.stringify(response.data.user));
             axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
 
-
             console.log('Login berhasil:', response.data);
             alert('Login Berhasil! Mengarahkan ke dashboard...');
 

@@ -1,8 +1,13 @@
 <template>
   <div class="dashboard-container">
     <header class="dashboard-header">
-      <h1>Dashboard</h1>
+      <div> <h1 v-if="user">Dashboard Admin</h1>
         <p v-if="user">Selamat datang kembali, {{ user.name }}!</p>
+      </div>
+      <button @click="handleLogout" class="logout-button">
+        Logout
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"><path fill="currentColor" d="M5 21q-.825 0-1.412-.587T3 19V5q0-.825.588-1.412T5 3h7v2H5v14h7v2zm11-4l-1.375-1.45l2.55-2.55H9v-2h8.175l-2.55-2.55L16 7l5 5z"/></svg>
+      </button>
     </header>
 
     <div class="stats-grid">
@@ -85,6 +90,8 @@
         window.location.href = '/'; 
         return;
         }
+ 
+        axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
         try {
         this.user = JSON.parse(userDataString);
@@ -94,6 +101,27 @@
         window.location.href = '/';
         }
     },
+
+    methods: {
+    async handleLogout() {
+      if (!confirm('Apakah Anda yakin ingin logout?')) {
+        return;
+      }
+
+      try {
+        await axios.post('/api/logout');
+
+        localStorage.clear();
+
+        window.location.href = '/';
+
+      } catch (error) {
+        console.error('Logout gagal:', error);
+        alert('Gagal untuk logout. Mungkin sesi Anda sudah berakhir.');
+        localStorage.clear();
+        window.location.href = '/';
+      }
+    },
     // ----------------------------------------------------
 
     // Anda bisa menambahkan method untuk mengambil data dari API di sini,
@@ -102,9 +130,40 @@
     //   this.fetchDashboardData();
     // }
     }
+}
 </script>
 
 <style scoped>
+.dashboard-header {
+  margin-bottom: 32px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logout-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background-color: #ef4444; 
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.logout-button:hover {
+  background-color: #b91c1c; 
+}
+
+.logout-button svg {
+  width: 20px;
+  height: 20px;
+}
 .dashboard-container {
   padding: 32px;
   background-color: #f3f4f6;
