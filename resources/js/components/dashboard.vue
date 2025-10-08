@@ -2,7 +2,7 @@
   <div class="dashboard-container">
     <header class="dashboard-header">
       <h1>Dashboard</h1>
-      <p>Ringkasan aktivitas sistem Anda.</p>
+        <p v-if="user">Selamat datang kembali, {{ user.name }}!</p>
     </header>
 
     <div class="stats-grid">
@@ -62,24 +62,46 @@
 </template>
 
 <script>
-export default {
-  name: 'SimpleDashboard',
-  data() {
-    return {
-      stats: {
-        totalUsers: 1472,
-        revenue: 12550000,
-        errorsLast24h: 3,
-        logins: 218,
-      }
-    };
-  },
-  // Anda bisa menambahkan method untuk mengambil data dari API di sini,
-  // misalnya di dalam mounted() hook.
-  // mounted() {
-  //   this.fetchDashboardData();
-  // }
-}
+    export default {
+    name: 'SimpleDashboard',
+    data() {
+        return {
+        user: null,        
+        stats: {
+            totalUsers: 1472,
+            revenue: 12550000,
+            errorsLast24h: 3,
+            logins: 218,
+        }
+        };
+    },
+
+    created() {
+        const userDataString = localStorage.getItem('user');
+        const token = localStorage.getItem('auth_token');
+
+        if (!token || !userDataString) {
+        alert('Anda belum login. Silakan login terlebih dahulu.');
+        window.location.href = '/'; 
+        return;
+        }
+
+        try {
+        this.user = JSON.parse(userDataString);
+        } catch (error) {
+        console.error('Gagal mem-parsing data user dari localStorage:', error);
+        localStorage.clear();
+        window.location.href = '/';
+        }
+    },
+    // ----------------------------------------------------
+
+    // Anda bisa menambahkan method untuk mengambil data dari API di sini,
+    // misalnya di dalam mounted() hook.
+    // mounted() {
+    //   this.fetchDashboardData();
+    // }
+    }
 </script>
 
 <style scoped>
