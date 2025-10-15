@@ -12,13 +12,16 @@ OLD
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Asisstant</title>
     <meta name="csrf-token" content="{{ csrf_token() }}"> 
-    @vite('resources/css/app.css')
+    {{-- @vite('resources/js/css/main.css') --}}
+@vite('resources/js/main.js')
 </head>
 <body>
-    <div id="app">
+    {{-- <div id="app">
         <login-component></login-component>
-    </div>
+    </div> --}}
+        <div id="app"></div>
 
-    @vite('resources/js/app.js')
+
+    {{-- @vite('resources/js/main.js') --}}
 </body>
 </html>
