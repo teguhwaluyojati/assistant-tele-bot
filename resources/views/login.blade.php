@@ -1,4 +1,4 @@
 <div id="app">
-  <dashboard-component></dashboard-component>
+  <login-component></login-component>
 </div>
 @vite('resources/js/main.js')

@@ -77,7 +77,9 @@ const checked = (isChecked, client) => {
     <p>This is sample modal</p>
   </CardBoxModal>
 
-  <table>
+  <!-- <table> -->
+    <table class="min-w-full text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-900">
+
     <thead>
       <tr>
         <th v-if="checkable" />

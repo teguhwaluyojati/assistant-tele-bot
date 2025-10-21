@@ -4,17 +4,17 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { useMainStore } from '@/stores/main.js'
+import { useDarkModeStore } from './stores/darkMode'
 
 import './css/main.css'
-// import '../../css/app.css'; // Impor file CSS utama
-
-// ...sisa kode main.js Anda
 
 // Init Pinia
 const pinia = createPinia()
 
 // Create Vue app
 createApp(App).use(router).use(pinia).mount('#app')
+const darkStore = useDarkModeStore(pinia)
+darkStore.init?.()
 
 // Init main store
 const mainStore = useMainStore(pinia)

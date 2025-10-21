@@ -61,6 +61,8 @@
 </template>
 
 <script>
+import axios from 'axios';
+
 export default {
   name: 'Login',
   data() {
@@ -85,7 +87,8 @@ export default {
       isDeleting: false,
       typingSpeed: 100,
       deletingSpeed: 50,
-      delayBetweenPhrases: 2000 
+      delayBetweenPhrases: 2000,
+      _typingTimer: null,
     };
   },
   computed: {
@@ -102,6 +105,12 @@ export default {
     if (token) {
       console.log('Token ditemukan, redirect ke dashboard...');
       window.location.href = '/dashboard';
+    }
+  },
+    beforeUnmount() {
+    if (this._typingTimer) {
+      clearTimeout(this._typingTimer);
+      this._typingTimer = null;
     }
   },
   methods: {
