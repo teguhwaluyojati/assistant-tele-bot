@@ -23,6 +23,8 @@ import CardBoxClient from '@/components/CardBoxClient.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import SectionBannerStarOnGitHub from '@/components/SectionBannerStarOnGitHub.vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
 
 const chartData = ref(null)
 
@@ -39,13 +41,48 @@ const mainStore = useMainStore()
 const clientBarItems = computed(() => mainStore.clients.slice(0, 4))
 
 const transactionBarItems = computed(() => mainStore.history)
+
+
+  const router = useRouter();
+  const isLoading = ref(true);
+
+  onMounted(async() => {
+    const token = localStorage.getItem('auth_token');
+
+    if(!token){
+      console.log("Token not found");
+      router.push('/');
+      return;
+    }
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+    try{
+      console.log("Verifying token...");
+      await axios.get('/api/users');
+      console.log("Token is valid.");
+
+      fillChartData();
+      isLoading.value = false;
+    }catch(error){
+      if(error.response && error.response.status === 401){
+        console.log("Token is invalid or expired.");
+        localStorage.clear();
+        delete axios.defaults.headers.common['Authorization'];
+        router.push('/login');
+    }else{
+        console.error("An error occurred during token verification:", error);
+        alert("An error occurred. Please try again later.");
+        isLoading.value = false;
+    }
+    }
+  })
 </script>
 
 <template>
   <LayoutAuthenticated>
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiChartTimelineVariant" title="Overview" main>
-        <BaseButton
+        <!-- <BaseButton
           href="https://github.com/justboil/admin-one-vue-tailwind"
           target="_blank"
           :icon="mdiGithub"
@@ -53,7 +90,7 @@ const transactionBarItems = computed(() => mainStore.history)
           color="contrast"
           rounded-full
           small
-        />
+        /> -->
       </SectionTitleLineWithButton>
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
