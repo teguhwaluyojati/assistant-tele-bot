@@ -68,7 +68,7 @@ const transactionBarItems = computed(() => mainStore.history)
         console.log("Token is invalid or expired.");
         localStorage.clear();
         delete axios.defaults.headers.common['Authorization'];
-        router.push('/login');
+        router.push('/');
     }else{
         console.error("An error occurred during token verification:", error);
         alert("An error occurred. Please try again later.");

@@ -1,14 +1,23 @@
 import { createRouter, createWebHistory  } from 'vue-router'
 import Style from '@/views/StyleView.vue'
 import Home from '@/views/HomeView.vue'
+import axios from 'axios'
 
 const routes = [
   {
     meta: {
-      title: 'Select style',
+      title: 'Login',
     },
     path: '/',
-    name: 'style',
+    name: 'login',
+    component: () => import('@/views/Login.vue'),
+  },
+  {
+    meta:{
+      title: 'Select style',
+    },
+    path: '/style',
+    name: 'style-alt',
     component: Style,
   },
   {
@@ -61,14 +70,14 @@ const routes = [
     name: 'responsive',
     component: () => import('@/views/ResponsiveView.vue'),
   },
-  {
-    meta: {
-      title: 'Login',
-    },
-    path: '/login',
-    name: 'login',
-    component: () => import('@/views/Login.vue'),
-  },
+  // {
+  //   meta: {
+  //     title: 'Login',
+  //   },
+  //   path: '/login',
+  //   name: 'login',
+  //   component: () => import('@/views/Login.vue'),
+  // },
   {
     meta: {
       title: 'Error',
