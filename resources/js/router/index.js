@@ -2,7 +2,6 @@ import { createRouter, createWebHistory  } from 'vue-router'
 import Style from '@/views/StyleView.vue'
 import Home from '@/views/HomeView.vue'
 import axios from 'axios'
-import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 
 const routes = [
   //Public route, not needed Auth
