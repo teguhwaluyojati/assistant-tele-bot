@@ -23,6 +23,6 @@ Route::get('/dashboard', function () {
     return view('dashboard');
 });
 
-// Route::get('/login', function () {
-//     return view('login');
-// });
+Route::get('/style', function () {
+    return view('style');
+});
