@@ -8,7 +8,6 @@ import {
   mdiEmail,
   mdiLogout,
   mdiThemeLightDark,
-  mdiReact,
 } from '@mdi/js'
 
 export default [

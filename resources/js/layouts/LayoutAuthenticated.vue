@@ -11,6 +11,7 @@ import NavBar from '@/components/NavBar.vue'
 import NavBarItemPlain from '@/components/NavBarItemPlain.vue'
 import AsideMenu from '@/components/AsideMenu.vue'
 import FooterBar from '@/components/FooterBar.vue'
+import axios from 'axios'
 
 const layoutAsidePadding = 'xl:pl-60'
 
@@ -26,13 +27,32 @@ router.beforeEach(() => {
   isAsideLgActive.value = false
 })
 
+const handleLogout = async () => {
+  if (!confirm('Did you sure want to logout?')) {
+    return
+  }
+  try {
+    await axios.post('/api/logout');
+    localStorage.clear();
+    delete axios.defaults.headers.common['Authorization'];
+    router.push('/');
+  } catch (error) {
+    console.error('Logout failed:', error);
+    localStorage.clear();
+    delete axios.defaults.headers.common['Authorization'];
+    router.push('/');
+  }
+}
+
 const menuClick = (event, item) => {
   if (item.isToggleLightDark) {
     darkModeStore.set()
   }
 
   if (item.isLogout) {
-    //
+    handleLogout()
+  }else if(item.to){
+    router.push(item.to);
   }
 }
 </script>
