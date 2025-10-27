@@ -4,8 +4,9 @@ import axios from 'axios'
 
 export const useMainStore = defineStore('main', () => {
   const storedUser = JSON.parse(localStorage.getItem('user'));
+  const storedEmail = JSON.parse(localStorage.getItem('user'));
   const userName = ref(storedUser?.name || 'John Doe');
-  const userEmail = ref('doe.doe.doe@example.com')
+  const userEmail = ref(storedEmail?.email||'doe.doe.doe@example.com')
 
   const userAvatar = computed(
     () =>
