@@ -10,7 +10,6 @@ import {
   mdiTelevisionGuide,
   mdiResponsive,
   mdiPalette,
-  mdiReact,
 } from '@mdi/js'
 
 export default [
