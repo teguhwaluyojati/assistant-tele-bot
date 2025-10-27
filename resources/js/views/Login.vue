@@ -158,7 +158,6 @@ export default {
             axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
 
             console.log('Login berhasil:', response.data);
-            alert('Login Berhasil! Mengarahkan ke dashboard...');
 
             window.location.href = '/dashboard';
 
