@@ -30,17 +30,13 @@ const passwordForm = reactive({
 })
 
 const submitProfile = async () => {
-  // mainStore.setUser(profileForm)
   try {
     const response =  await axios.post('/api/update-profile', {
       name: profileForm.name,
       email: profileForm.email,
     })
     console.log('Profile updated successfully:', response.data)
-    // mainStore.setUser({
-    //   name: profileForm.name,
-    //   email: profileForm.email,
-    // })
+
     mainStore.setUser(response.data.user);
 
     localStorage.setItem('user', JSON.stringify(response.data.user));

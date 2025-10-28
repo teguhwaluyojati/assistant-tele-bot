@@ -20,4 +20,23 @@ class ProfileController extends Controller
 
         return response()->json(['message' => 'Profile updated successfully', 'user' => $user]);
     }
+
+    public function changePassword(Request $request)
+    {
+        $validatedData = $request->validate([
+            'current_password' => 'required|string',
+            'new_password' => 'required|string|min:8|confirmed',
+        ]);
+
+        $user = $request->user();
+
+        if (!\Hash::check($validatedData['current_password'], $user->password)) {
+            return response()->json(['message' => 'Current password is incorrect'], 400);
+        }
+
+        $user->password = $validatedData['new_password'];
+        $user->save();
+
+        return response()->json(['message' => 'Password changed successfully']);
+    }
 }
