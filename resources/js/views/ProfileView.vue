@@ -14,7 +14,6 @@ import UserCard from '@/components/UserCard.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import axios from 'axios'
-import router from '@/router'
 
 const mainStore = useMainStore()
 
@@ -56,8 +55,29 @@ const submitProfile = async () => {
   }
 }
 
-const submitPass = () => {
-  alert('This feature is not implemented yet.')
+const submitPass = async() => {
+  try{
+    const response = await axios.post('/api/change-password',{
+      current_password: passwordForm.password_current,
+      new_password: passwordForm.password,
+      new_password_confirmation: passwordForm.password_confirmation,
+    })
+
+    console.log('Password changed successfully:', response.data)
+
+    alert('Password changed successfully!')
+  }catch(error){
+    console.error('Error changing password:', error)
+    let errorMessage = 'Something went wrong while changing password.';
+    if(error.response){
+      if(error.response.status === 422){
+        errorMessage = error.response.data.message || 'Data not valid.';
+      }else {
+        errorMessage = error.response.data.message || errorMessage;
+      }
+    }
+    alert(errorMessage);
+  }
 }
 </script>
 
