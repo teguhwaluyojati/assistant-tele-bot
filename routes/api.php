@@ -6,6 +6,7 @@ use App\Http\Controllers\TelegramController;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
 
 
 /*
@@ -29,6 +30,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     Route::get('/users', [DashboardController::class, 'getUsers']);
 
+    Route::post('/update-profile', [ProfileController::class, 'updateProfile']);
 });
 
 
