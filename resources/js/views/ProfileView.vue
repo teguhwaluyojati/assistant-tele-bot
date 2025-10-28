@@ -13,6 +13,8 @@ import BaseButtons from '@/components/BaseButtons.vue'
 import UserCard from '@/components/UserCard.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
+import axios from 'axios'
+import router from '@/router'
 
 const mainStore = useMainStore()
 
@@ -27,12 +29,39 @@ const passwordForm = reactive({
   password_confirmation: '',
 })
 
-const submitProfile = () => {
-  mainStore.setUser(profileForm)
+const submitProfile = async () => {
+  // mainStore.setUser(profileForm)
+  try {
+    const response =  await axios.post('/api/update-profile', {
+      name: profileForm.name,
+      email: profileForm.email,
+    })
+    console.log('Profile updated successfully:', response.data)
+    // mainStore.setUser({
+    //   name: profileForm.name,
+    //   email: profileForm.email,
+    // })
+    mainStore.setUser(response.data.user);
+
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+
+    alert('Profile updated successfully!')
+  } catch (error) {
+    console.error('Error updating profile:', error)
+    let errorMessage = 'Terjadi kesalahan saat memperbarui profil.';
+    if(error.response){
+      if(error.response.status === 422){
+        errorMessage = error.response.data.message || 'Data not valid.';
+      }else {
+        errorMessage = error.response.data.message || errorMessage;
+      }
+    }
+    alert(errorMessage);
+  }
 }
 
 const submitPass = () => {
-  //
+  alert('This feature is not implemented yet.')
 }
 </script>
 
@@ -40,15 +69,6 @@ const submitPass = () => {
   <LayoutAuthenticated>
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiAccount" title="Profile" main>
-        <BaseButton
-          href="https://github.com/justboil/admin-one-vue-tailwind"
-          target="_blank"
-          :icon="mdiGithub"
-          label="Star on GitHub"
-          color="contrast"
-          rounded-full
-          small
-        />
       </SectionTitleLineWithButton>
 
       <UserCard class="mb-6" />
