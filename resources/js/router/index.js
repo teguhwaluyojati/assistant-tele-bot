@@ -6,17 +6,13 @@ import axios from 'axios'
 const routes = [
   //Public route, not needed Auth
   {
-    meta: {
-      title: 'Login',
-    },
+    meta: {title: 'Login'},
     path: '/',
     name: 'login',
     component: () => import('@/views/Login.vue'),
   },
   {
-    meta: {
-      title: 'Error',
-    },
+    meta: {title: 'Error'},
     path: '/error',
     name: 'error',
     component: () => import('@/views/ErrorView.vue'),
