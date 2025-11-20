@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Intervention\Image\Laravel\Facades\Image;
+use Illuminate\Support\Str;
 
 class ProfileController extends Controller
 {
@@ -11,15 +14,44 @@ class ProfileController extends Controller
         $validatedData = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $request->user()->id,
+            'avatar' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
         $user = $request->user();
-        $user->name = $validatedData['name'];
-        $user->email = $validatedData['email'];
+
+        if (isset($validatedData['name'])) {
+            $user->name = $validatedData['name'];
+        }
+        if (isset($validatedData['email'])) {
+            $user->email = $validatedData['email'];
+        }
+
+        if ($request->hasFile('avatar')) {
+
+            $file = $request->file('avatar');
+            $filename = Str::uuid() . '.webp';
+
+            $image = Image::read($file)
+                ->cover(300, 300)
+                ->toWebp(80);
+
+            if ($user->avatar && Storage::disk('public')->exists('avatars/' . $user->avatar)) {
+                Storage::disk('public')->delete('avatars/' . $user->avatar);
+            }
+
+            Storage::disk('public')->put('avatars/' . $filename, (string) $image);
+
+            $user->avatar = $filename;
+        }
+
         $user->save();
 
-        return response()->json(['message' => 'Profile updated successfully', 'user' => $user]);
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $user
+        ]);
     }
+
 
     public function changePassword(Request $request)
     {

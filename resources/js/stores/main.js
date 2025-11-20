@@ -1,20 +1,24 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import axios from 'axios'
 
 export const useMainStore = defineStore('main', () => {
-  const storedUser = JSON.parse(localStorage.getItem('user'));
-  const storedEmail = JSON.parse(localStorage.getItem('user'));
-  const userName = ref(storedUser?.name || 'John Doe');
-  const userEmail = ref(storedEmail?.email||'doe.doe.doe@example.com')
+  let storedUser = {};
+  try {
+    const item = localStorage.getItem('user');
+    if (item) {
+      storedUser = JSON.parse(item);
+    }
+  } catch (e) {
+    console.error("Gagal memuat user dari localStorage:", e);
+    localStorage.removeItem('user');
+  }
+  const userName = ref(storedUser.name || 'John Doe');
+  const userEmail = ref(storedUser.email || 'doe.doe.doe@example.com');
 
-  const userAvatar = computed(
-    () =>
-      `https://api.dicebear.com/7.x/avataaars/svg?seed=${userEmail.value.replace(
-        /[^a-z0-9]+/gi,
-        '-',
-      )}`,
-  )
+  const seed = (userEmail.value || 'default').replace(/[^a-z0-9]+/gi, '-');
+  const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}`;  
+  const userAvatar = ref(storedUser?.avatar_url || defaultAvatar);
 
   const isFieldFocusRegistered = ref(false)
 
@@ -27,6 +31,9 @@ export const useMainStore = defineStore('main', () => {
     }
     if (payload.email) {
       userEmail.value = payload.email
+    }
+    if (payload.avatar_url) {
+      userAvatar.value = payload.avatar_url
     }
   }
 

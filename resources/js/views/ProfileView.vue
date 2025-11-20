@@ -1,5 +1,5 @@
 <script setup>
-import { reactive } from 'vue'
+import { reactive, ref } from 'vue'
 import { useMainStore } from '@/stores/main'
 import { mdiAccount, mdiMail, mdiAsterisk, mdiFormTextboxPassword, mdiGithub } from '@mdi/js'
 import SectionMain from '@/components/SectionMain.vue'
@@ -28,30 +28,52 @@ const passwordForm = reactive({
   password_confirmation: '',
 })
 
+const avatarFile = ref(null);
+const handleFileUpload = (event) => {
+  avatarFile.value = event.target.files[0];
+};
+
 const submitProfile = async () => {
   try {
-    const response =  await axios.post('/api/update-profile', {
-      name: profileForm.name,
-      email: profileForm.email,
+    const formData = new FormData()
+    
+    formData.append('name', profileForm.name)
+    formData.append('email', profileForm.email)
+
+    if (avatarFile.value) {
+      formData.append('avatar', avatarFile.value)
+    }
+
+    formData.append('_method', 'PUT')
+
+    const response = await axios.post('/api/update-profile', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
     })
+
     console.log('Profile updated successfully:', response.data)
 
-    mainStore.setUser(response.data.user);
+    mainStore.setUser(response.data.user)
 
-    localStorage.setItem('user', JSON.stringify(response.data.user));
+    localStorage.setItem('user', JSON.stringify(response.data.user))
 
     alert('Profile updated successfully!')
+    
+    avatarFile.value = null
+
   } catch (error) {
     console.error('Error updating profile:', error)
-    let errorMessage = 'Terjadi kesalahan saat memperbarui profil.';
-    if(error.response){
-      if(error.response.status === 422){
-        errorMessage = error.response.data.message || 'Data not valid.';
-      }else {
-        errorMessage = error.response.data.message || errorMessage;
+    let errorMessage = 'Terjadi kesalahan saat memperbarui profil.'
+    
+    if (error.response) {
+      if (error.response.status === 422) {
+        errorMessage = error.response.data.message || 'Data not valid.'
+      } else {
+        errorMessage = error.response.data.message || errorMessage
       }
     }
-    alert(errorMessage);
+    alert(errorMessage)
   }
 }
 
@@ -92,7 +114,11 @@ const submitPass = async() => {
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <CardBox is-form @submit.prevent="submitProfile">
           <FormField label="Avatar" help="Max 500kb">
-            <FormFilePicker label="Upload" />
+            <FormFilePicker 
+            label="Upload" 
+            @change="handleFileUpload"
+            accept="image/*"
+            />
           </FormField>
 
           <FormField label="Name" help="Required. Your name">
