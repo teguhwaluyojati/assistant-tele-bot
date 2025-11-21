@@ -1,12 +1,13 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useMainStore } from '@/stores/main'
-import { mdiCheckDecagram } from '@mdi/js'
+import { mdiCheckDecagram, mdiClose } from '@mdi/js'
 import BaseLevel from '@/components/BaseLevel.vue'
 import UserAvatarCurrentUser from '@/components/UserAvatarCurrentUser.vue'
 import CardBox from '@/components/CardBox.vue'
 import FormCheckRadio from '@/components/FormCheckRadio.vue'
 import PillTag from '@/components/PillTag.vue'
+import BaseIcon from '@/components/BaseIcon.vue'
 
 const mainStore = useMainStore()
 
@@ -19,11 +20,25 @@ const openModal = () => {
   isModalActive.value = true
 }
 
-const closeModal = () => {
+const closeModal = () => {  
   isModalActive.value = false
 }
 
 const userSwitchVal = ref(false)
+
+const handleKeydown = (e) => {
+  if (e.key === 'Escape' && isModalActive.value) {
+    closeModal()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeydown)
+})
 </script>
 
 <template>
