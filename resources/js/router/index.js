@@ -1,53 +1,51 @@
-import { createRouter, createWebHistory  } from 'vue-router'
-import Style from '@/views/StyleView.vue'
-import Home from '@/views/HomeView.vue'
-import axios from 'axios'
+import { createRouter, createWebHistory } from 'vue-router';
+import Home from '@/views/HomeView.vue';
+import Style from '@/views/StyleView.vue';
+import axios from 'axios';
 
 const routes = [
-  //Public route, not needed Auth
+  // Public routes (no auth)
   {
-    meta: {title: 'Login'},
     path: '/',
     name: 'login',
+    meta: { title: 'Login' },
     component: () => import('@/views/Login.vue'),
   },
   {
-    meta: {title: 'Error'},
     path: '/error',
     name: 'error',
+    meta: { title: 'Error' },
     component: () => import('@/views/ErrorView.vue'),
   },
-  //Protected routes, need Auth
+
+  // Protected routes (require auth)
   {
-    //Parent route
-    path: '', 
-    meta: {
-      requiresAuth: true
-    },
+    path: '/',
+    meta: { requiresAuth: true },
     children: [
       {
-        path: 'dashboard', 
+        path: 'dashboard',
         name: 'dashboard',
-        component: Home, 
-        meta: { title: 'Dashboard' }
+        component: Home,
+        meta: { title: 'Dashboard' },
       },
       {
         path: 'profile',
         name: 'profile',
         component: () => import('@/views/ProfileView.vue'),
-        meta: { title: 'Profile' }
+        meta: { title: 'Profile' },
       },
       {
         path: 'tables',
         name: 'tables',
         component: () => import('@/views/TablesView.vue'),
-        meta: { title: 'Tables' }
+        meta: { title: 'Tables' },
       },
       {
         path: 'forms',
         name: 'forms',
         component: () => import('@/views/FormsView.vue'),
-        meta: { title: 'Forms' }
+        meta: { title: 'Forms' },
       },
       {
         path: 'ui',
@@ -63,55 +61,63 @@ const routes = [
         path: 'style',
         name: 'style-alt',
         component: Style,
-        meta: { title: 'Select style' }
-      }
-    ]
+        meta: { title: 'Select style' },
+      },
+    ],
   },
-]
+
+  // Fallback route (404)
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'not-found',
+    component: () => import('@/views/ErrorView.vue'),
+    meta: { title: 'Page Not Found' },
+  },
+];
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
   scrollBehavior(to, from, savedPosition) {
-    return savedPosition || { top: 0 }
+    return savedPosition || { top: 0 };
   },
 });
 
+// Navigation Guard
 router.beforeEach(async (to, from, next) => {
   const token = localStorage.getItem('auth_token');
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
 
-  if( requiresAuth && !token ) {
-    console.log("No token found, redirecting to login.");
+  if (requiresAuth && !token) {
+    console.log('No token found, redirecting to login.');
     next({ name: 'login' });
-  } else if (requiresAuth && token ) {
+  } else if (requiresAuth && token) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    try{  
-      console.log("Verifying token in router...");
+    try {
+      console.log('Verifying token in router...');
       await axios.get('/api/users');
-      console.log("Token is valid, proceeding to route.");
+      console.log('Token is valid, proceeding to route.');
       next();
     } catch (error) {
       if (error.response && error.response.status === 401) {
-        console.log("Token is invalid, redirecting to login.");
+        console.log('Token is invalid, redirecting to login.');
         localStorage.clear();
         delete axios.defaults.headers.common['Authorization'];
         next({ name: 'login' });
-      } else { 
-        console.error("Error verifying token:", error);
+      } else {
+        console.error('Error verifying token:', error);
         next(false);
       }
     }
-  }
-  else{
-    if(to.name === 'login' && token){
-      console.log("Already logged in, redirecting to dashboard.");
+  } else {
+    if (to.name === 'login' && token) {
+      console.log('Already logged in, redirecting to dashboard.');
       next({ name: 'dashboard' });
-  }else{
-    console.log("No auth required, proceeding to route.");
-    next();
+    } else {
+      console.log('No auth required, proceeding to route.');
+      next();
     }
   }
 });
 
-export default router
+export default router;
