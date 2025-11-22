@@ -35,6 +35,28 @@ const handleFileUpload = (event) => {
 
 const isLoading = ref(false);
 
+const alertState = reactive({
+  show: false,
+  message: '',
+  type: 'success', 
+  title: '',
+});
+
+const showAlert = (message, type = 'success', title = '') => {
+  alertState.message = message;
+  alertState.type = type;
+  alertState.title = title;
+  alertState.show = true;
+
+  setTimeout(() => {
+    alertState.show = false;
+  }, 5000); 
+};
+
+const closeAlert = () => {
+  alertState.show = false;
+};
+
 const submitProfile = async () => {
   
   isLoading.value = true;
@@ -65,6 +87,8 @@ const submitProfile = async () => {
     
     avatarFile.value = null
 
+    showAlert('Profile updated successfully.', 'success', 'Success')
+
   } catch (error) {
     console.error('Error updating profile:', error)
     let errorMessage = 'Terjadi kesalahan saat memperbarui profil.'
@@ -76,7 +100,7 @@ const submitProfile = async () => {
         errorMessage = error.response.data.message || errorMessage
       }
     }
-    alert(errorMessage)
+    showAlert(errorMessage, 'error', 'Error')
   } finally {
     isLoading.value = false;
   }
@@ -94,6 +118,7 @@ const submitPass = async() => {
     })
 
     console.log('Password changed successfully:', response.data)
+    showAlert('Password updated successfully.', 'success', 'Success')
 
   }catch(error){
     console.error('Error changing password:', error)
@@ -204,16 +229,32 @@ const submitPass = async() => {
       </div>
     </SectionMain>
   </LayoutAuthenticated>
-  <div v-if="isLoading" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm cursor-wait">
+<div v-if="isLoading" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm cursor-wait">
       <div class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow-xl flex flex-col items-center transform transition-all scale-100">
-        
         <svg class="animate-spin h-10 w-10 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Memproses...</h3>
+      </div>
+    </div>
+
+    <div v-if="alertState.show" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
+      <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl flex flex-col items-center text-center max-w-sm w-full border border-gray-100 dark:border-slate-700">
         
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Processing...</h3>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Please wait</p>
+        <div v-if="alertState.type === 'success'" class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        </div>
+        <div v-else class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+          <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </div>
+
+        <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">{{ alertState.title }}</h3>
+        <p class="text-gray-500 dark:text-gray-400 mb-6">{{ alertState.message }}</p>
+
+        <button @click="closeAlert" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition">
+          Ok, got it!
+        </button>
       </div>
     </div>
 </template>
