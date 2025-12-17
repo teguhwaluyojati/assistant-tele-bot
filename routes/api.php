@@ -28,10 +28,12 @@ Route::middleware('auth:sanctum')->group(function () {
     
     Route::post('/logout', [LoginController::class, 'logout']);
     
-    Route::get('/users', [DashboardController::class, 'historyLogin']);
+    Route::get('/users', [DashboardController::class, 'getUsers']);
 
     Route::put('/update-profile', [ProfileController::class, 'updateProfile']);
     Route::post('/change-password', [ProfileController::class, 'changePassword']);
+
+    Route::get('/history-login', [DashboardController::class, 'historyLogin']);
 });
 
 

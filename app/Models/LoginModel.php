@@ -10,6 +10,7 @@ class LoginModel
 {
     use HasFactory;
 
+    //Table Name
     protected $login_history = 'login_history';
 
     public function historyLogin()
