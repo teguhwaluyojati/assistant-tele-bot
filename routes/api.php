@@ -33,7 +33,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/update-profile', [ProfileController::class, 'updateProfile']);
     Route::post('/change-password', [ProfileController::class, 'changePassword']);
 
-    Route::get('/history-login', [DashboardController::class, 'historyLogin']);
+    Route::get('/history-login', [DashboardController::class, 'lastLogin']);
 });
 
 

@@ -6,11 +6,13 @@ use Illuminate\Http\Request;
 use App\Models\TelegramUser;
 use App\Models\LoginModel;
 use Illuminate\Support\Facades\Log;
+use App\Traits\ApiResponse;
 
 
 class DashboardController extends Controller
 {
     protected $model_login;
+    use ApiResponse;
 
     public function __construct()
     {
@@ -23,13 +25,16 @@ class DashboardController extends Controller
         return response()->json($users);
     }
 
-    public function historyLogin()
+    public function lastLogin()
     {
+        Log::info('Cek: Fungsi lastLogin dipanggil');
        try{
 
         $data = $this->model_login->lastLogin();
         if(!$data){
             return $this->errorResponse('No login history found', 404);
+
+            Log::error('No login history found for user: ' . auth()->user()->email);
         }
 
         return $this->successResponse($data, 'Login history retrieved successfully.');
@@ -41,41 +46,4 @@ class DashboardController extends Controller
        }
     }
 
-    /**
-     * Format respons JSON yang sukses.
-     *
-     * @param  mixed  $data
-     * @param  string $message
-     * @param  int    $statusCode
-     * @return \Illuminate\Http\JsonResponse
-     */
-    private function successResponse($data, $message = 'Success', $statusCode = 200)
-    {
-        return response()->json([
-            'success' => true,
-            'data'    => $data,
-            'message' => $message,
-        ], $statusCode);
-    }
-
-    /**
-     * Format respons JSON yang gagal.
-     *
-     * @param  string $message
-     * @param  int    $statusCode
-     * @return \Illuminate\Http\JsonResponse
-     */
-    private function errorResponse($message, $statusCode = 404, $errors = null)
-    {
-        $response = [
-            'success' => false,
-            'message' => $message,
-        ];
-
-        if($errors !== null){
-            $response['errors'] = $errors;
-        }
-
-        return response()->json($response, $statusCode);
-    }
 }
