@@ -58,6 +58,136 @@ class TelegramController extends Controller
     }
 
     /**
+     * New Feature Bot for Swing Trader
+     */
+    public function analyzeAdvanced($chatId, $code)
+    {
+        $symbol = strtoupper($code) . '.JK';
+        $url = "https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=1d&range=6mo";
+
+        try{
+            $response = Http::get($url);
+            $data = $response->json();
+            $result = $data['chart']['result'][0];
+
+            $closes = $result['indicators']['quote'][0]['close'];
+            $volumes = $result['indicators']['quote'][0]['volume'];
+
+            $closes = array_values(array_filter($closes));
+            $volumes = array_values(array_filter($volumes));
+
+            $currentPrice = end($closes);
+            $currentVolume = end($volumes);
+
+            $ma50 = $this->calculateSMA($closes, 50);
+            $ma20 = $this->calculateSMA($closes, 20);
+
+            $rsi14 = $this->calculateRSI($closes, 14);
+
+            $avgVolume = $this->calculateSMA($volumes, 20);
+
+            $score = 0;
+            $reasons =[];
+
+            if($currentPrice > $ma50){
+                $score += 20;
+                $reasons[] = "✅ Tren Bullish (Harga > MA50)";
+            }else{
+                $reasons[] ="❌ Tren Bearish (Harga < MA50)";
+            }
+            if($currentPrice > $ma20 && $ma20 >$ma50){
+                $score += 10;
+                $reasons[] = "✅ Sinyal Kuat (Harga > MA20 > MA50)";
+            }
+
+            if ($rsi14 < 30) {
+                $score += 40; 
+                $reasons[] = "💎 RSI Oversold ($rsi14) - Diskon!";
+            } elseif ($rsi14 > 70) {
+                $score -= 30; 
+                $reasons[] = "⛔ RSI Overbought ($rsi14) - Rawan Guyur";
+            } elseif ($rsi14 >= 30 && $rsi14 <= 50) {
+                $score += 10; 
+                $reasons[] = "✅ RSI Sehat ($rsi14)";
+            }
+
+            if ($currentVolume > ($avgVolume * 1.5)) {
+                $score += 20;
+                $reasons[] = "🚀 Volume Spike (Ada Big Money masuk)";
+            }
+
+            $recommendation = "NEUTRAL / WAIT 😐";
+            if ($score >= 60) $recommendation = "STRONG BUY 🟢";
+            elseif ($score >= 40) $recommendation = "BUY (Cicil) 🟡";
+            elseif ($score < 0) $recommendation = "STRONG SELL 🔴";
+
+            $msg = "🧠 **AI TECHNICAL ANALYSIS: $code**\n";
+            $msg .= "Harga: " . number_format($currentPrice) . "\n\n";
+            
+            $msg .= "📊 **Indikator:**\n";
+            $msg .= "• MA50: " . number_format($ma50) . "\n";
+            $msg .= "• RSI(14): " . number_format($rsi14, 1) . "\n";
+            $msg .= "• Vol Ratio: " . number_format($currentVolume/$avgVolume, 1) . "x\n\n";
+
+            $msg .= "📝 **Analisa:**\n";
+            foreach ($reasons as $r) {
+                $msg .= "$r\n";
+            }
+            
+            $msg .= "\n🤖 **Score: $score / 100**\n";
+            $msg .= "📢 **Sinyal: $recommendation**";
+
+            Telegram::sendMessage([
+                'chat_id' => $chatId,
+                'text' => $msg,
+                'parse_mode' => 'Markdown'
+            ]);
+
+        } catch (\Exception $e){
+            Log::error("Gagal analisa saham {$code}: " . $e->getMessage());
+            Telegram::sendMessage([
+                'chat_id' => $chatId,
+                'text' => "⚠️ Gagal melakukan analisa untuk kode saham {$code}. Pastikan kode benar dan coba lagi.",
+            ]);
+        }
+    }
+
+    private function calculateSMA($data, $period)
+    {
+        if (count($data) < $period) return 0;
+        
+        $slice = array_slice($data, -$period);
+        return array_sum($slice) / count($slice);
+    }
+
+    private function calculateRSI($data, $period = 14)
+    {
+        if (count($data) < $period + 1) return 50;
+
+        $changes = [];
+        for ($i = 1; $i < count($data); $i++) {
+            $changes[] = $data[$i] - $data[$i - 1];
+        }
+
+
+        $recentChanges = array_slice($changes, -$period);
+        
+        $gains = 0;
+        $losses = 0;
+
+        foreach ($recentChanges as $change) {
+            if ($change > 0) $gains += $change;
+            else $losses += abs($change);
+        }
+
+        if ($losses == 0) return 100;
+        if ($gains == 0) return 0;
+
+        $rs = $gains / $losses;
+        return 100 - (100 / (1 + $rs));
+    }
+
+    /**
      * Mencari atau membuat pengguna baru TANPA mengubah timestamp interaksi.
      * @param \Telegram\Bot\Objects\Update $update
      * @return \App\Models\TelegramUser|null
