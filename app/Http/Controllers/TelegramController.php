@@ -62,80 +62,178 @@ class TelegramController extends Controller
      */
     public function analyzeAdvanced($chatId, $code)
     {
-        $symbol = strtoupper($code) . '.JK';
-        $url = "https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=1d&range=6mo";
+       $symbol = strtoupper($code) . '.JK';
+        // Ambil data 3 bulan (cukup untuk cari Support/Resistance & MA)
+        // Interval 1d = Harian
+        $url = "https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=1d&range=3mo";
 
-        try{
+        try {
+            Telegram::sendChatAction(['chat_id' => $chatId, 'action' => 'typing']);
+
             $response = Http::get($url);
+            
+            if ($response->failed()) {
+                throw new \Exception("Gagal koneksi ke server data.");
+            }
+
             $data = $response->json();
+            
+            // 1. Validasi Data
+            if (empty($data['chart']['result']) || empty($data['chart']['result'][0]['timestamp'])) {
+                 Telegram::sendMessage(['chat_id' => $chatId, 'text' => "⚠️ Data saham $code tidak ditemukan atau belum ada transaksi."]);
+                 return;
+            }
+
             $result = $data['chart']['result'][0];
-
-            $closes = $result['indicators']['quote'][0]['close'];
-            $volumes = $result['indicators']['quote'][0]['volume'];
-
-            $closes = array_values(array_filter($closes));
-            $volumes = array_values(array_filter($volumes));
-
+            $quote = $result['indicators']['quote'][0];
+            
+            // 2. Data Cleaning (Hapus nilai null/kosong dari API)
+            $closes = $this->cleanData($quote['close']);
+            $highs = $this->cleanData($quote['high']);
+            $lows = $this->cleanData($quote['low']);
+            $volumes = $this->cleanData($quote['volume']);
+            
+            // Cek jika data terlalu sedikit untuk dianalisa
+            if (count($closes) < 20) {
+                Telegram::sendMessage(['chat_id' => $chatId, 'text' => "⚠️ Data historis terlalu sedikit untuk analisa teknikal."]);
+                return;
+            }
+            
             $currentPrice = end($closes);
             $currentVolume = end($volumes);
 
+            // --- 3. HITUNG INDIKATOR ---
             $ma50 = $this->calculateSMA($closes, 50);
-            $ma20 = $this->calculateSMA($closes, 20);
-
+            $ma20 = $this->calculateSMA($closes, 20); // Dynamic Support
             $rsi14 = $this->calculateRSI($closes, 14);
-
             $avgVolume = $this->calculateSMA($volumes, 20);
 
+            // Resistance Klasik (High 20 hari terakhir)
+            $recentHighs = array_slice($highs, -20);
+            $resistance = max($recentHighs);
+
+            // --- 4. LOGIKA SKORING & SINYAL ---
             $score = 0;
-            $reasons =[];
+            $reasons = [];
 
-            if($currentPrice > $ma50){
+            // A. Cek Tren (MA)
+            if ($currentPrice > $ma50) {
                 $score += 20;
-                $reasons[] = "✅ Tren Bullish (Harga > MA50)";
-            }else{
-                $reasons[] ="❌ Tren Bearish (Harga < MA50)";
+                $reasons[] = "✅ Tren Bullish (Di atas MA50)";
+            } else {
+                $reasons[] = "⚠️ Tren Bearish (Di bawah MA50)";
             }
-            if($currentPrice > $ma20 && $ma20 >$ma50){
+
+            // B. Cek Kekuatan Tren (MA20 vs MA50)
+            if ($currentPrice > $ma20 && $ma20 > $ma50) {
                 $score += 10;
-                $reasons[] = "✅ Sinyal Kuat (Harga > MA20 > MA50)";
+                $reasons[] = "🚀 Strong Uptrend";
             }
 
+            // C. Cek Momentum (RSI)
             if ($rsi14 < 30) {
-                $score += 40; 
-                $reasons[] = "💎 RSI Oversold ($rsi14) - Diskon!";
+                $score += 40;
+                $reasons[] = "💎 Oversold (Jenuh Jual/Murah)";
             } elseif ($rsi14 > 70) {
-                $score -= 30; 
-                $reasons[] = "⛔ RSI Overbought ($rsi14) - Rawan Guyur";
-            } elseif ($rsi14 >= 30 && $rsi14 <= 50) {
-                $score += 10; 
-                $reasons[] = "✅ RSI Sehat ($rsi14)";
+                $score -= 30; // Kurangi poin drastis
+                $reasons[] = "⛔ Overbought (Jenuh Beli/Mahal)";
+            } elseif ($rsi14 >= 40 && $rsi14 <= 60) {
+                $score += 10;
+                $reasons[] = "⚖️ RSI Stabil";
             }
 
+            // D. Cek Volume
             if ($currentVolume > ($avgVolume * 1.5)) {
                 $score += 20;
-                $reasons[] = "🚀 Volume Spike (Ada Big Money masuk)";
+                $reasons[] = "🔊 Volume Spike (Big Money Flow)";
+            } elseif ($currentVolume < ($avgVolume * 0.5)) {
+                $score -= 10;
+                $reasons[] = "💤 Volume Sepi";
             }
 
-            $recommendation = "NEUTRAL / WAIT 😐";
+            // Tentukan Label Sinyal Akhir
+            $recommendation = "WAIT / NEUTRAL 😐";
             if ($score >= 60) $recommendation = "STRONG BUY 🟢";
-            elseif ($score >= 40) $recommendation = "BUY (Cicil) 🟡";
-            elseif ($score < 0) $recommendation = "STRONG SELL 🔴";
+            elseif ($score >= 30) $recommendation = "BUY ON WEAKNESS 🟡";
+            elseif ($score < 0) $recommendation = "SELL / AVOID 🔴";
 
-            $msg = "🧠 **AI TECHNICAL ANALYSIS: $code**\n";
-            $msg .= "Harga: " . number_format($currentPrice) . "\n\n";
+
+            // --- 5. TRADING PLAN CALCULATOR (REALISTIS) ---
             
-            $msg .= "📊 **Indikator:**\n";
-            $msg .= "• MA50: " . number_format($ma50) . "\n";
-            $msg .= "• RSI(14): " . number_format($rsi14, 1) . "\n";
-            $msg .= "• Vol Ratio: " . number_format($currentVolume/$avgVolume, 1) . "x\n\n";
+            // Logic: Menentukan Area Beli yang masuk akal
+            
+            // Cek Support Pendek (Low 5 hari terakhir)
+            $recentLowsShort = array_slice($lows, -5); 
+            $shortTermSupport = min($recentLowsShort);
 
-            $msg .= "📝 **Analisa:**\n";
-            foreach ($reasons as $r) {
-                $msg .= "$r\n";
+            // LOGIKA DINAMIS:
+            // Jika harga jauh di atas MA20 (>10%), berarti harga sedang 'terbang'.
+            // Jangan tunggu di support bawah (kejauhan), tapi tunggu koreksi di MA20.
+            $isRallying = $currentPrice > ($ma20 * 1.10);
+
+            if ($recommendation == "STRONG BUY 🟢") {
+                // Sinyal kuat: Beli di harga pasar (HAKA)
+                $buyMax = $currentPrice;
+                $buyMin = $currentPrice * 0.98; // Toleransi 2%
+                $planType = "HAKA (Aggressive Buy)";
+            } 
+            elseif ($isRallying) {
+                // Harga lagi terbang tapi sinyal biasa aja/overbought
+                // Tunggu di MA20 (Dynamic Support)
+                $buyMin = $ma20;
+                $buyMax = $ma20 * 1.03; // Range 3% di atas MA20
+                $planType = "Pullback ke MA20 (Dynamic)";
+            } 
+            else {
+                // Kondisi Normal/Sideways
+                // Tunggu di Support Terdekat (Low 5 hari)
+                $buyMin = $shortTermSupport;
+                $buyMax = $shortTermSupport * 1.02;
+                $planType = "Buy On Weakness (Support)";
             }
+
+            // Validasi aneh: Jika buyMin malah lebih besar dari harga skrg (karena volatilitas tinggi)
+            if ($buyMin > $currentPrice) {
+                $buyMin = $currentPrice * 0.95;
+                $buyMax = $currentPrice;
+            }
+
+            // Hitung Rata-rata Entry untuk patokan TP/CL
+            $entryAvg = ($buyMin + $buyMax) / 2;
+
+            // Cut Loss: 4% di bawah harga entry bawah
+            $clPrice = $buyMin * 0.96;
+
+            // Take Profit 1: Resistance Terdekat
+            // Jika resistance < entry (aneh), atau resistance terlalu dekat (<3%), set minimal +5%
+            if ($resistance <= $entryAvg * 1.03) {
+                $tp1 = $entryAvg * 1.05;
+            } else {
+                $tp1 = $resistance;
+            }
+
+            // Take Profit 2: Risk Reward 1:2.5 (Cuan lebar)
+            $risk = $entryAvg - $clPrice;
+            $tp2 = $entryAvg + ($risk * 2.5);
+
+
+            // --- 6. OUTPUT TELEGRAM ---
+            $msg = "🧠 **AI TRADING ANALYST: $code**\n";
+            $msg .= "Harga Skrg: " . number_format($currentPrice) . "\n\n";
+
+            $msg .= "📊 **Sinyal: $recommendation** (Score: $score)\n";
+            $msg .= "• Indikator: " . ($currentPrice > $ma50 ? "Uptrend" : "Downtrend") . " | RSI " . number_format($rsi14, 1) . "\n";
+            $msg .= "• Alasan:\n";
+            foreach ($reasons as $r) $msg .= "  $r\n";
             
-            $msg .= "\n🤖 **Score: $score / 100**\n";
-            $msg .= "📢 **Sinyal: $recommendation**";
+            $msg .= "\n🎯 **STRATEGI: $planType**\n";
+            $msg .= "-----------------------------\n";
+            $msg .= "🛒 **Area Beli:** " . number_format($buyMin) . " - " . number_format($buyMax) . "\n";
+            $msg .= "✅ **TP 1 (Aman):** " . number_format($tp1) . " (" . number_format((($tp1-$entryAvg)/$entryAvg)*100, 1) . "%)\n";
+            $msg .= "🚀 **TP 2 (Lebar):** " . number_format($tp2) . " (" . number_format((($tp2-$entryAvg)/$entryAvg)*100, 1) . "%)\n";
+            $msg .= "🛡️ **Cut Loss:** < " . number_format($clPrice) . " (-4%)\n";
+
+            $msg .= "\n_Disclaimer On. Data Yahoo Finance (Delay)._";
 
             Telegram::sendMessage([
                 'chat_id' => $chatId,
@@ -143,13 +241,14 @@ class TelegramController extends Controller
                 'parse_mode' => 'Markdown'
             ]);
 
-        } catch (\Exception $e){
-            Log::error("Gagal analisa saham {$code}: " . $e->getMessage());
-            Telegram::sendMessage([
-                'chat_id' => $chatId,
-                'text' => "⚠️ Gagal melakukan analisa untuk kode saham {$code}. Pastikan kode benar dan coba lagi.",
-            ]);
+        } catch (\Exception $e) {
+             Log::error("Bot Error: " . $e->getMessage());
+             Telegram::sendMessage(['chat_id' => $chatId, 'text' => "⚠️ Gagal menganalisa saham. Coba kode lain."]);
         }
+    }
+
+    private function cleanData($array) {
+        return array_values(array_filter($array, function($v) { return !is_null($v); }));
     }
 
     private function calculateSMA($data, $period)
@@ -529,12 +628,12 @@ class TelegramController extends Controller
             'reply_markup' => null
         ]);
     }
-             else if (str_starts_with($data, 'summary_')) {
-                $period = substr($data, 8); 
-                $this->generateSummary($chatId, $messageId, $period);            
-            }
+    else if (str_starts_with($data, 'summary_')) {
+        $period = substr($data, 8); 
+        $this->generateSummary($chatId, $messageId, $period);            
+    }
 
-        } else if ($update->getMessage() && $update->getMessage()->has('text')) {
+    } else if ($update->getMessage() && $update->getMessage()->has('text')) {
             $text = $update->getMessage()->getText();
             \App\Models\TelegramUserCommand::create([
                 'user_id' => $chatId,
@@ -547,28 +646,60 @@ class TelegramController extends Controller
                 else if ($text === '/hapus') { $this->showRecentTransactionsForDeletion($chatId); }
                 else if ($text === '/edit') { $this->startEditMode($user); }
                 else if (str_starts_with($text, '/poop') || (str_starts_with($text, '/poophistory'))) { $this->handlePoopCommand($chatId, $text); }
+                else if($text === '/rekomendasi'){
+                    $recommendations = DB::table('stock_recommendations')
+                        ->orderBy('score', 'desc')
+                        ->limit(5)
+                        ->get();
+                    if ($recommendations->isEmpty()) {
+                        Telegram::sendMessage([
+                            'chat_id' => $chatId,
+                            'text' => "Data rekomendasi belum tersedia. Jalankan scanner dulu."
+                        ]);
+                        return;
+                    }
+                    $msg = "💎 **HIDDEN GEMS HARI INI** 💎\n";
+                    $msg .= "_(Hasil scan seluruh market)_\n\n";
+
+                    foreach ($recommendations as $i => $stock) {
+                        $num = $i + 1;
+                        $msg .= "{$num}. **{$stock->code}** (Skor: {$stock->score})\n";
+                        $msg .= "   Sinyal: {$stock->signal}\n";
+                        $msg .= "   🛒 Buy: {$stock->buy_area}\n";
+                        $msg .= "   🎯 TP: " . number_format($stock->tp_target) . "\n\n";
+                    }
+                    
+                    $msg .= "Data diupdate: " . $recommendations[0]->updated_at;
+
+                    Telegram::sendMessage([
+                        'chat_id' => $chatId,
+                        'text' => $msg,
+                        'parse_mode' => 'Markdown'
+                    ]);
+                }
                 else { $this->handleAdminCommands($chatId, $text); }
-            } else if (str_starts_with($text, '+') || str_starts_with($text, '-')) {
-                $this->recordTransaction($chatId, $text);
-            } else {
-                switch ($text) {
-                    case 'AI Chat 🤖': $this->enterGeminiChatMode($user, $chatId); break;
-                    case 'Cuaca di Jakarta 🌤️': $this->sendWeatherInfo($chatId); break;
-                    case 'Nasihat Bijak 💡': $this->sendAdvice($chatId); break;
-                    case 'Fakta Kucing 🐱': $this->sendCatFact($chatId); break;
-                    case 'Aku Mau Kopi ☕️': $this->coffeeGenerate($chatId); break;
-                    case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
-                    case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
-                    case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
-                    case 'Poop Tracker 💩': $this->sendPoopTrackerInfo($chatId); break;
-                    default:
-                        if (strtolower($text) === 'halo') { $this->sendGreeting($chatId); }
-                        else { $this->sendUnknownCommand($chatId); }
-                        break;
+                } else if (str_starts_with($text, '+') || str_starts_with($text, '-')) {
+                    $this->recordTransaction($chatId, $text);
+                } else {
+                    switch ($text) {
+                        case 'AI Chat 🤖': $this->enterGeminiChatMode($user, $chatId); break;
+                        case 'Cuaca di Jakarta 🌤️': $this->sendWeatherInfo($chatId); break;
+                        case 'Nasihat Bijak 💡': $this->sendAdvice($chatId); break;
+                        case 'Fakta Kucing 🐱': $this->sendCatFact($chatId); break;
+                        case 'Aku Mau Kopi ☕️': $this->coffeeGenerate($chatId); break;
+                        case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
+                        case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
+                        case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
+                        case 'Poop Tracker 💩': $this->sendPoopTrackerInfo($chatId); break;
+                        case 'Info Saham 📊': $this->analyzeAdvanced($chatId, 'KIJA'); break;
+                        default:
+                            if (strtolower($text) === 'halo') { $this->sendGreeting($chatId); }
+                            else { $this->sendUnknownCommand($chatId); }
+                            break;
+                    }
                 }
             }
         }
-    }
 
     private function sendPoopTrackerInfo($chatId)
     {
@@ -1035,7 +1166,7 @@ class TelegramController extends Controller
             ['Fakta Kucing 🐱', 'Money Tracker 💸'],
             ['Aku Mau Kopi ☕️','Info Genshin 🎮'],
             ['AI Chat 🤖','Poop Tracker 💩'],
-            ['Tentang Developer 👨‍💻'],
+            ['Tentang Developer 👨‍💻', 'Info Saham 📊'],
         ];
 
         $reply_markup = Keyboard::make([
