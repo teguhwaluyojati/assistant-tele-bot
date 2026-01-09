@@ -7,6 +7,8 @@ use App\Models\TelegramUser;
 use App\Models\LoginModel;
 use Illuminate\Support\Facades\Log;
 use App\Traits\ApiResponse;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Imports\StocksImport;
 
 
 class DashboardController extends Controller
@@ -44,6 +46,22 @@ class DashboardController extends Controller
 
         return $this->errorResponse('An error occurred while retrieving login history.', 500);
        }
+    }
+
+    public function upload(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,csv,xls'
+        ]);
+
+        try {
+            Excel::import(new StocksImport, $request->file('file'));
+            
+            return $this->successResponse(null, 'Data saham berhasil diimport!');
+            
+        } catch (\Exception $e) {
+            return $this->errorResponse('Gagal import: ' . $e->getMessage(), 500);
+        }
     }
 
 }

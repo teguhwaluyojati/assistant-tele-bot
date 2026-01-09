@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
+use App\Models\Stock;
 
 class ScanStocks extends Command
 {
@@ -28,33 +29,38 @@ class ScanStocks extends Command
      */
     public function handle()
     {
-        $this->info("🚀 Memulai Scanning Market IHSG...");
+        $this->info("🚀 Memulai Scanning Market dari Database...");
 
-        $stockList = ['BBCA', 'BBRI', 'BMRI', 'BBNI', 'TLKM', 'ASII', 'UNTR', 'ICBP', 'INDF', 'GOTO', 
-                      'MDKA', 'ADRO', 'PTBA', 'ANTM', 'PGAS', 'INKP', 'TKIM', 'KLBF', 'BRPT', 'TPIA',
-                      'CPIN', 'JPFA', 'MNCN', 'SCMA', 'TOWR', 'EXCL', 'ISAT', 'BUKA', 'EMTK', 'ARTO',
-                      'BUMI', 'BRIS', 'ACES', 'SMGR', 'INTP', 'UNVR', 'HMSP', 'GGRM', 'MEDC', 'AKRA',
-                      'AMRT', 'MAPI', 'ERAA', 'PWON', 'BSDE', 'CTRA', 'SMRA', 'ASRI', 'LPKR', 'SSIA'];
+        $stocks = Stock::where('is_active', true)
+                    ->get();
+
+        if ($stocks->isEmpty()) {
+            $this->error("❌ Tidak ada saham yang ditemukan. Cek filter 'board' di kodingan vs isi database.");
+            return;
+        }
+
+        $total = $stocks->count();
+        $this->info("🔍 Ditemukan $total saham potensial untuk dianalisa.");
 
         DB::table('stock_recommendations')->truncate();
 
-        $bar = $this->output->createProgressBar(count($stockList));
+        $bar = $this->output->createProgressBar($total);
         $found = 0;
 
-        foreach ($stockList as $code) {
-            $result = $this->analyze($code);
+        foreach ($stocks as $stock) {
+            $result = $this->analyze($stock->code);
 
-            if ($result && $result['score'] >= 30) { 
+            if ($result && $result['score'] >= 20) { 
                 DB::table('stock_recommendations')->insert([
-                    'code' => $code,
-                    'price' => $result['price'],
-                    'score' => $result['score'],
-                    'signal' => $result['signal'],
-                    'buy_area' => $result['buy_area'],
+                    'code'      => $stock->code,
+                    'price'     => $result['price'],
+                    'score'     => $result['score'],
+                    'signal'    => $result['signal'],
+                    'buy_area'  => $result['buy_area'],
                     'tp_target' => $result['tp'],
-                    'cl_price' => $result['cl'],
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'cl_price'  => $result['cl'],
+                    'created_at'=> now(),
+                    'updated_at'=> now(),
                 ]);
                 $found++;
             }
@@ -65,7 +71,7 @@ class ScanStocks extends Command
 
         $bar->finish();
         $this->newLine();
-        $this->info("✅ Scan Selesai! Ditemukan $found saham potensial.");
+        $this->info("✅ Scan Selesai! Berhasil menyimpan $found rekomendasi saham.");
     }
 
     private function analyze($code) {

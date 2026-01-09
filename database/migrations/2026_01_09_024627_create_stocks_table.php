@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('code', 10)->unique(); // Kode Saham (BBCA, GOTO)
             $table->string('name')->nullable();   // Nama Perusahaan
             $table->boolean('is_active')->default(true); // Status aktif/delisted
+            $table->string('board')->nullable(); // Isi: 'Utama', 'Pengembangan', dll
             $table->timestamps();
         });
     }

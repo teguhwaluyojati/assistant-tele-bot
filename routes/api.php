@@ -8,7 +8,6 @@ use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 
-
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -46,3 +45,4 @@ Route::get('/daily-expenses', [TelegramController::class, 'broadcastDailyExpense
 Route::post('/register', [RegisterController::class, 'register']);
 Route::post('/login', [LoginController::class, 'login']);
 
+Route::post('/stocks/upload', [DashboardController::class, 'upload']);
