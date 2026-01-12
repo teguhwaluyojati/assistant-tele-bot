@@ -646,7 +646,7 @@ class TelegramController extends Controller
                 else if ($text === '/hapus') { $this->showRecentTransactionsForDeletion($chatId); }
                 else if ($text === '/edit') { $this->startEditMode($user); }
                 else if (str_starts_with($text, '/poop') || (str_starts_with($text, '/poophistory'))) { $this->handlePoopCommand($chatId, $text); }
-                else if($text === '/rekomendasi'){
+                else if($text === '/swingtrade'){
                     $recommendations = DB::table('stock_recommendations')
                         ->orderBy('score', 'desc')
                         ->limit(5)
@@ -666,11 +666,45 @@ class TelegramController extends Controller
                         $msg .= "{$num}. **{$stock->code}** (Skor: {$stock->score})\n";
                         $msg .= "   Sinyal: {$stock->signal}\n";
                         $msg .= "   🛒 Buy: {$stock->buy_area}\n";
-                        $msg .= "   🎯 TP: " . number_format($stock->tp_target) . "\n\n";
+                        $msg .= "   🎯 TP: " . number_format($stock->tp_target);
+                        $msg .= "   🛑 CL: " . number_format($stock->cl_price, 0) . "\n\n";
+
                     }
                     
                     $msg .= "Data diupdate: " . $recommendations[0]->updated_at;
 
+                    Telegram::sendMessage([
+                        'chat_id' => $chatId,
+                        'text' => $msg,
+                        'parse_mode' => 'Markdown'
+                    ]);
+                }
+                else if($text === '/bsjp'){
+                    $stocks = DB::table('day_trade_recommendations')
+                    ->orderBy('change_pct', 'desc')
+                    ->limit(5)
+                    ->get();
+                    if($stocks->isEmpty()) {
+                        Telegram::sendMessage([
+                            'chat_id' => $chatId,
+                            'text' => "Data rekomendasi belum tersedia. Jalankan scanner dulu."
+                        ]);
+                        return;
+                    }
+                    $msg = "📈 **REKOMENDASI BUY ON STRONG JUMP\n";
+                    $msg .= "_(Saham dengan lonjakan volume & harga signifikan)_\n\n";
+                    foreach ($stocks as $i => $stock) {
+                                $num = $i + 1;
+                                $msg .= "{$num}. **{$stock->code}** (+{$stock->change_pct}%)\n";
+                                $msg .= "   💰 Close: " . number_format($stock->price) . "\n";
+                                $msg .= "   🛒 Area Beli: {$stock->buy_area}\n";
+                                $msg .= "   🎯 TP: " . number_format($stock->tp_target) . " (3-5%)\n";
+                                $msg .= "   🛡 CL: " . number_format($stock->cl_price) . " (Ketata!)\n\n";
+                            }
+                    
+                    $msg .= "🕒 Data: " . \Carbon\Carbon::parse($stocks[0]->created_at)->format('d M H:i') . "\n";
+                    $msg .= "_Disclaimer On._";
+                    
                     Telegram::sendMessage([
                         'chat_id' => $chatId,
                         'text' => $msg,
@@ -691,7 +725,7 @@ class TelegramController extends Controller
                         case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
                         case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
                         case 'Poop Tracker 💩': $this->sendPoopTrackerInfo($chatId); break;
-                        case 'Info Saham 📊': $this->analyzeAdvanced($chatId, 'KIJA'); break;
+                        case 'Info Saham 📊': $this->analyzeAdvanced($chatId, 'cent'); break;
                         default:
                             if (strtolower($text) === 'halo') { $this->sendGreeting($chatId); }
                             else { $this->sendUnknownCommand($chatId); }
