@@ -133,7 +133,28 @@ class ScanStocks extends Command
         return array_sum(array_slice($data, -$p)) / $p;
     }
     
-    private function rsi($data, $p=14) {
-        return 50; 
-    }
+    private function rsi($data, $period = 14) {
+            if (count($data) < $period + 1) return 50; 
+
+            $changes = [];
+            for ($i = 1; $i < count($data); $i++) {
+                $changes[] = $data[$i] - $data[$i - 1];
+            }
+
+            $recentChanges = array_slice($changes, -$period);
+            
+            $gains = 0;
+            $losses = 0;
+
+            foreach ($recentChanges as $change) {
+                if ($change > 0) $gains += $change;
+                else $losses += abs($change);
+            }
+
+            if ($losses == 0) return 100; 
+            if ($gains == 0) return 0;
+
+            $rs = $gains / $losses;
+            return 100 - (100 / (1 + $rs));
+        }
 }
