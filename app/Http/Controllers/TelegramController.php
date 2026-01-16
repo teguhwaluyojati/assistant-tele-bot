@@ -505,7 +505,7 @@ class TelegramController extends Controller
      */
     private function handleEditTransactionInput(\App\Models\TelegramUser $user, $newValue)
     {
-        $chatId = $user->user_id;
+        $chatId = $update['message']['chat']['id'];;
 
         if (strtolower($newValue) === '/batal') {
             $user->state = 'normal';
@@ -539,7 +539,7 @@ class TelegramController extends Controller
 
     private function handleGeminiChatMode(TelegramUser $user, $update)
     {
-        $chatId = $user->user_id;
+        $chatId = $update['message']['chat']['id'];;
 
         if ($update->getMessage() && $update->getMessage()->has('text')) {
             $text = $update->getMessage()->getText();
@@ -567,7 +567,7 @@ class TelegramController extends Controller
     // ===================================================================
     private function handleNormalMode(TelegramUser $user, $update)
     {
-        $chatId = $user->user_id;
+        $chatId = $update['message']['chat']['id'];;
 
         if ($update->isType('callback_query')) {
             $callbackQuery = $update->getCallbackQuery();
@@ -725,7 +725,7 @@ class TelegramController extends Controller
                         case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
                         case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
                         case 'Poop Tracker 💩': $this->sendPoopTrackerInfo($chatId); break;
-                        case 'Info Saham 📊': $this->analyzeAdvanced($chatId, 'cent'); break;
+                        case 'Info Saham 📊': $this->analyzeAdvanced($chatId, 'mina'); break;
                         default:
                             if (strtolower($text) === 'halo') { $this->sendGreeting($chatId); }
                             else { $this->sendUnknownCommand($chatId); }
