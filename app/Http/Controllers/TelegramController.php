@@ -29,32 +29,42 @@ class TelegramController extends Controller
      */
     public function handle()
     {
-        date_default_timezone_set('Asia/Jakarta');
-        $update = Telegram::getWebhookUpdate();
+        try{
+            date_default_timezone_set('Asia/Jakarta');
+            $update = Telegram::getWebhookUpdate();
 
-        $user = $this->findOrCreateUser($update);
+            $user = $this->findOrCreateUser($update);
 
-        if (!$user) {
-            Log::warning('Request diabaikan: Gagal mendapatkan data user/chatId.');
-            return response()->json(['ok' => true]);
+            if (!$user) {
+                Log::warning('Request diabaikan: Gagal mendapatkan data user/chatId.');
+                return response()->json(['ok' => true]);
+            }
+
+            if ($user->state === 'gemini_chat' && $user->last_interaction_at && now()->diffInMinutes($user->last_interaction_at->setTimezone('Asia/Jakarta')) > 5) {
+                
+                Log::info("User {$user->user_id} di-timeout dari mode Gemini.");
+                $this->exitGeminiChatMode($user, true); 
+                return response()->json(['ok' => true]);
+            }
+
+            $this->updateLastInteraction($user);
+
+            if ($user->state !== 'normal') {
+                $this->handleStatefulInput($user, $update);
+            } else {
+                $this->handleNormalMode($user, $update);
+            }
+
+            // return response()->json(['ok' => true]);
+        }catch(\Exception $e){
+            Log::error("Webhook Error: " . $e->getMessage());
+            Log::error($e->getTraceAsString());
+
+            if(isset($update['message']['chat']['id'])){
+                $chatId = $update['message']['chat']['id'];
+                Telegram::sendMessage(['chat_id' => $chatId, 'text' => "⚠️ Terjadi kesalahan pada bot. Coba lagi nanti."]);
+            }
         }
-
-        if ($user->state === 'gemini_chat' && $user->last_interaction_at && now()->diffInMinutes($user->last_interaction_at->setTimezone('Asia/Jakarta')) > 5) {
-            
-            Log::info("User {$user->user_id} di-timeout dari mode Gemini.");
-            $this->exitGeminiChatMode($user, true); 
-            return response()->json(['ok' => true]);
-        }
-
-        $this->updateLastInteraction($user);
-
-        if ($user->state !== 'normal') {
-            $this->handleStatefulInput($user, $update);
-        } else {
-            $this->handleNormalMode($user, $update);
-        }
-
-        return response()->json(['ok' => true]);
     }
 
     /**
