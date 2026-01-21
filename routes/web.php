@@ -1,7 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\TelegramController; // <-- PASTIKAN BARIS INI ADA
+use App\Http\Controllers\TelegramController;
+use App\Http\Controllers\UserController;
 
 
 /*
@@ -18,6 +19,10 @@ use App\Http\Controllers\TelegramController; // <-- PASTIKAN BARIS INI ADA
 Route::get('/', function () {
     return view('login');
 });
+
+Route::get('/avatar/{filename}', [UserController::class, 'showAvatar'])
+    ->middleware('signed')
+    ->name('avatar.show');
 
 Route::get('/login', function () {
     return view('login');

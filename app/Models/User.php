@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Illuminate\Support\Facades\URL;
 
 class User extends Authenticatable
 {
@@ -28,8 +29,11 @@ class User extends Authenticatable
     public function getAvatarUrlAttribute()
     {
         if ($this->avatar) {
-            return asset('storage/avatars/' . $this->avatar);
+
+            return URL::signedRoute('avatar.show', ['filename' => $this->avatar]);
         } 
+        
+        return 'https://ui-avatars.com/api/?name=' . urlencode($this->name);
     }
 
     /**

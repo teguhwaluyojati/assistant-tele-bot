@@ -28,18 +28,17 @@ class ProfileController extends Controller
 
         if ($request->hasFile('avatar')) {
 
-            $file = $request->file('avatar');
             $filename = Str::uuid() . '.webp';
 
-            $image = Image::read($file)
+            $image = Image::read($request->file('avatar'))
                 ->cover(300, 300)
                 ->toWebp(80);
 
-            if ($user->avatar && Storage::disk('public')->exists('avatars/' . $user->avatar)) {
-                Storage::disk('public')->delete('avatars/' . $user->avatar);
+            if ($user->avatar && Storage::disk('local')->exists('avatars/' . $user->avatar)) {
+                Storage::disk('local')->delete('avatars/' . $user->avatar);
             }
 
-            Storage::disk('public')->put('avatars/' . $filename, (string) $image);
+            Storage::disk('local')->put('avatars/' . $filename, (string) $image);
 
             $user->avatar = $filename;
         }
