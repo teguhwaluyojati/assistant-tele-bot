@@ -11,20 +11,18 @@ class RegisterController extends Controller
 {
     public function register(Request $request)
     {
-        $validatedData = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
-            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()],
-        ]);
-
         try {
+            $validatedData = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'string', 'email', 'max:255', 'unique:users'],
+                'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()],
+            ]);
+            
             $user = User::create([
                 'name' => $validatedData['name'],
                 'email' => $validatedData['email'],
                 'password' => Hash::make($validatedData['password']), 
             ]);
-
-            // Auth::login($user);
 
             return response()->json([
                 'message' => 'Registrasi berhasil!',
