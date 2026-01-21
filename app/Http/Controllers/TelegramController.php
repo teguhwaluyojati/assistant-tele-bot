@@ -73,8 +73,6 @@ class TelegramController extends Controller
     public function analyzeAdvanced($chatId, $code)
     {
        $symbol = strtoupper($code) . '.JK';
-        // Ambil data 3 bulan (cukup untuk cari Support/Resistance & MA)
-        // Interval 1d = Harian
         $url = "https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=1d&range=3mo";
 
         try {
@@ -88,7 +86,6 @@ class TelegramController extends Controller
 
             $data = $response->json();
             
-            // 1. Validasi Data
             if (empty($data['chart']['result']) || empty($data['chart']['result'][0]['timestamp'])) {
                  Telegram::sendMessage(['chat_id' => $chatId, 'text' => "⚠️ Data saham $code tidak ditemukan atau belum ada transaksi."]);
                  return;
@@ -97,13 +94,11 @@ class TelegramController extends Controller
             $result = $data['chart']['result'][0];
             $quote = $result['indicators']['quote'][0];
             
-            // 2. Data Cleaning (Hapus nilai null/kosong dari API)
             $closes = $this->cleanData($quote['close']);
             $highs = $this->cleanData($quote['high']);
             $lows = $this->cleanData($quote['low']);
             $volumes = $this->cleanData($quote['volume']);
             
-            // Cek jika data terlalu sedikit untuk dianalisa
             if (count($closes) < 20) {
                 Telegram::sendMessage(['chat_id' => $chatId, 'text' => "⚠️ Data historis terlalu sedikit untuk analisa teknikal."]);
                 return;
@@ -112,21 +107,17 @@ class TelegramController extends Controller
             $currentPrice = end($closes);
             $currentVolume = end($volumes);
 
-            // --- 3. HITUNG INDIKATOR ---
             $ma50 = $this->calculateSMA($closes, 50);
-            $ma20 = $this->calculateSMA($closes, 20); // Dynamic Support
+            $ma20 = $this->calculateSMA($closes, 20); 
             $rsi14 = $this->calculateRSI($closes, 14);
             $avgVolume = $this->calculateSMA($volumes, 20);
 
-            // Resistance Klasik (High 20 hari terakhir)
             $recentHighs = array_slice($highs, -20);
             $resistance = max($recentHighs);
 
-            // --- 4. LOGIKA SKORING & SINYAL ---
             $score = 0;
             $reasons = [];
 
-            // A. Cek Tren (MA)
             if ($currentPrice > $ma50) {
                 $score += 20;
                 $reasons[] = "✅ Tren Bullish (Di atas MA50)";
@@ -134,25 +125,22 @@ class TelegramController extends Controller
                 $reasons[] = "⚠️ Tren Bearish (Di bawah MA50)";
             }
 
-            // B. Cek Kekuatan Tren (MA20 vs MA50)
             if ($currentPrice > $ma20 && $ma20 > $ma50) {
                 $score += 10;
                 $reasons[] = "🚀 Strong Uptrend";
             }
 
-            // C. Cek Momentum (RSI)
             if ($rsi14 < 30) {
                 $score += 40;
                 $reasons[] = "💎 Oversold (Jenuh Jual/Murah)";
             } elseif ($rsi14 > 70) {
-                $score -= 30; // Kurangi poin drastis
+                $score -= 30; 
                 $reasons[] = "⛔ Overbought (Jenuh Beli/Mahal)";
             } elseif ($rsi14 >= 40 && $rsi14 <= 60) {
                 $score += 10;
                 $reasons[] = "⚖️ RSI Stabil";
             }
 
-            // D. Cek Volume
             if ($currentVolume > ($avgVolume * 1.5)) {
                 $score += 20;
                 $reasons[] = "🔊 Volume Spike (Big Money Flow)";
@@ -161,73 +149,53 @@ class TelegramController extends Controller
                 $reasons[] = "💤 Volume Sepi";
             }
 
-            // Tentukan Label Sinyal Akhir
             $recommendation = "WAIT / NEUTRAL 😐";
             if ($score >= 60) $recommendation = "STRONG BUY 🟢";
             elseif ($score >= 30) $recommendation = "BUY ON WEAKNESS 🟡";
             elseif ($score < 0) $recommendation = "SELL / AVOID 🔴";
 
 
-            // --- 5. TRADING PLAN CALCULATOR (REALISTIS) ---
-            
-            // Logic: Menentukan Area Beli yang masuk akal
-            
-            // Cek Support Pendek (Low 5 hari terakhir)
+       
             $recentLowsShort = array_slice($lows, -5); 
             $shortTermSupport = min($recentLowsShort);
 
-            // LOGIKA DINAMIS:
-            // Jika harga jauh di atas MA20 (>10%), berarti harga sedang 'terbang'.
-            // Jangan tunggu di support bawah (kejauhan), tapi tunggu koreksi di MA20.
             $isRallying = $currentPrice > ($ma20 * 1.10);
 
             if ($recommendation == "STRONG BUY 🟢") {
-                // Sinyal kuat: Beli di harga pasar (HAKA)
                 $buyMax = $currentPrice;
-                $buyMin = $currentPrice * 0.98; // Toleransi 2%
+                $buyMin = $currentPrice * 0.98;
                 $planType = "HAKA (Aggressive Buy)";
             } 
             elseif ($isRallying) {
-                // Harga lagi terbang tapi sinyal biasa aja/overbought
-                // Tunggu di MA20 (Dynamic Support)
                 $buyMin = $ma20;
-                $buyMax = $ma20 * 1.03; // Range 3% di atas MA20
+                $buyMax = $ma20 * 1.03; 
                 $planType = "Pullback ke MA20 (Dynamic)";
             } 
             else {
-                // Kondisi Normal/Sideways
-                // Tunggu di Support Terdekat (Low 5 hari)
                 $buyMin = $shortTermSupport;
                 $buyMax = $shortTermSupport * 1.02;
                 $planType = "Buy On Weakness (Support)";
             }
 
-            // Validasi aneh: Jika buyMin malah lebih besar dari harga skrg (karena volatilitas tinggi)
             if ($buyMin > $currentPrice) {
                 $buyMin = $currentPrice * 0.95;
                 $buyMax = $currentPrice;
             }
 
-            // Hitung Rata-rata Entry untuk patokan TP/CL
             $entryAvg = ($buyMin + $buyMax) / 2;
 
-            // Cut Loss: 4% di bawah harga entry bawah
             $clPrice = $buyMin * 0.96;
 
-            // Take Profit 1: Resistance Terdekat
-            // Jika resistance < entry (aneh), atau resistance terlalu dekat (<3%), set minimal +5%
             if ($resistance <= $entryAvg * 1.03) {
                 $tp1 = $entryAvg * 1.05;
             } else {
                 $tp1 = $resistance;
             }
 
-            // Take Profit 2: Risk Reward 1:2.5 (Cuan lebar)
             $risk = $entryAvg - $clPrice;
             $tp2 = $entryAvg + ($risk * 2.5);
 
 
-            // --- 6. OUTPUT TELEGRAM ---
             $msg = "🧠 **AI TRADING ANALYST: $code**\n";
             $msg .= "Harga Skrg: " . number_format($currentPrice) . "\n\n";
 
@@ -277,7 +245,6 @@ class TelegramController extends Controller
         for ($i = 1; $i < count($data); $i++) {
             $changes[] = $data[$i] - $data[$i - 1];
         }
-
 
         $recentChanges = array_slice($changes, -$period);
         
@@ -331,17 +298,31 @@ class TelegramController extends Controller
         $user->save();
     }
 
-    // ===================================================================
-    // HANDLER UNTUK MODE STATEFUL (Saat User "Sibuk")
-    // ===================================================================
+
+    /**
+     * Memproses input berdasarkan state pengguna saat ini.
+     */
     private function handleStatefulInput(TelegramUser $user, $update)
     {
-        if ($user->state === 'gemini_chat') {
-            $this->handleGeminiChatMode($user, $update);
-        }else if ($user->state === 'editing_options') {
-            $this->handleEditingChatMode($user, $update);
-        }else if (str_starts_with($user->state, 'editing_')) {
-        $this->handleEditTransactionInput($user, $update->getMessage()->getText());
+        try {
+            if ($user->state === 'gemini_chat') {
+                $this->handleGeminiChatMode($user, $update);
+            } else if ($user->state === 'editing_options') {
+                $this->handleEditingChatMode($user, $update);
+            } else if (str_starts_with($user->state, 'editing_')) {
+                $this->handleEditTransactionInput($user, $update->getMessage()->getText());
+            }
+        } catch (\Throwable $e) {
+            Log::error("Error di Stateful Input (State: {$user->state}): " . $e->getMessage());
+
+            $user->state = 'normal';
+            $user->context_data = null; 
+            $user->save();
+
+            Telegram::sendMessage([
+                'chat_id' => $user->chat_id,
+                'text' => "⚠️ Terjadi kesalahan saat memproses permintaan Anda.\nStatus Anda telah dikembalikan ke menu utama (Normal Mode)."
+            ]);
         }
     }
 
