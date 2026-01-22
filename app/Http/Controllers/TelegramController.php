@@ -67,6 +67,76 @@ class TelegramController extends Controller
         }
     }
 
+    public function bsjp($chatId)
+    {
+        $stocks = DB::table('day_trade_recommendations')
+        ->orderBy('change_pct', 'desc')
+        ->limit(5)
+        ->get();
+        if($stocks->isEmpty()) {
+            Telegram::sendMessage([
+                'chat_id' => $chatId,
+                'text' => "Data rekomendasi belum tersedia. Jalankan scanner dulu."
+            ]);
+            return;
+        }
+        $msg = "📈 **REKOMENDASI BUY ON STRONG JUMP\n";
+        $msg .= "_(Saham dengan lonjakan volume & harga signifikan)_\n\n";
+        foreach ($stocks as $i => $stock) {
+                    $num = $i + 1;
+                    $msg .= "{$num}. **{$stock->code}** (+{$stock->change_pct}%)\n";
+                    $msg .= "   💰 Close: " . number_format($stock->price) . "\n";
+                    $msg .= "   🛒 Area Beli: {$stock->buy_area}\n";
+                    $msg .= "   🎯 TP: " . number_format($stock->tp_target) . " (3-5%)\n";
+                    $msg .= "   🛡 CL: " . number_format($stock->cl_price) . " (Ketata!)\n\n";
+                   }
+        
+        $msg .= "🕒 Data: " . \Carbon\Carbon::parse($stocks[0]->created_at)->format('d M H:i') . "\n";
+        $msg .= "_Disclaimer On._";
+        
+        Telegram::sendMessage([
+            'chat_id' => $chatId,
+            'text' => $msg,
+            'parse_mode' => 'Markdown'
+        ]);
+    }
+
+    public function swingTrade($chatId)
+    {
+        $recommendations = DB::table('stock_recommendations')
+            ->orderBy('score', 'desc')
+            ->limit(5)
+            ->get();
+        if ($recommendations->isEmpty()) {
+            Telegram::sendMessage([
+                'chat_id' => $chatId,
+                'text' => "Data rekomendasi belum tersedia. Jalankan scanner dulu."
+            ]);
+            return;
+        }
+        $msg = "💎 **HIDDEN GEMS HARI INI** 💎\n";
+        $msg .= "_(Hasil scan seluruh market)_\n\n";
+
+        foreach ($recommendations as $i => $stock) {
+            $num = $i + 1;
+            $msg .= "{$num}. **{$stock->code}** (Skor: {$stock->score})\n";
+            $msg .= "   Sinyal: {$stock->signal}\n";
+            $msg .= "   🛒 Buy: {$stock->buy_area}\n";
+            $msg .= "   🎯 TP: " . number_format($stock->tp_target);
+            $msg .= "   🛑 CL: " . number_format($stock->cl_price, 0) . "\n\n";
+
+        }
+        
+        $msg .= "Data diupdate: " . $recommendations[0]->updated_at;
+
+        Telegram::sendMessage([
+            'chat_id' => $chatId,
+            'text' => $msg,
+            'parse_mode' => 'Markdown'
+        ]);
+                
+    }
+
     /**
      * New Feature Bot for Swing Trader
      */
@@ -275,7 +345,7 @@ class TelegramController extends Controller
             if (!$from) return null;
 
             return \App\Models\TelegramUser::firstOrCreate(
-                ['user_id' => $from->getId()], // Gunakan user_id sebagai primary key
+                ['user_id' => $from->getId()],
                 [
                     'username'   => $from->getUsername(),
                     'first_name' => $from->getFirstName(),
@@ -298,7 +368,6 @@ class TelegramController extends Controller
         $user->save();
     }
 
-
     /**
      * Memproses input berdasarkan state pengguna saat ini.
      */
@@ -316,7 +385,6 @@ class TelegramController extends Controller
             Log::error("Error di Stateful Input (State: {$user->state}): " . $e->getMessage());
 
             $user->state = 'normal';
-            $user->context_data = null; 
             $user->save();
 
             Telegram::sendMessage([
@@ -334,6 +402,7 @@ class TelegramController extends Controller
 
         $transactions = \App\Models\Transaction::where('user_id', $user->user_id)
             ->latest()
+            ->limit(10)
             ->get();
 
         if ($transactions->isEmpty()) {
@@ -491,12 +560,10 @@ class TelegramController extends Controller
         ]);
     }
 
-    /**
-     * Memproses input teks dari pengguna saat dalam mode edit transaksi.
-     */
-    private function handleEditTransactionInput(\App\Models\TelegramUser $user, $newValue)
+    private function handleEditTransactionInput(\App\Models\TelegramUser $user, $newValue) 
     {
-        $chatId = $update['message']['chat']['id'];;
+
+        $chatId = $user->user_id; 
 
         if (strtolower($newValue) === '/batal') {
             $user->state = 'normal';
@@ -507,7 +574,10 @@ class TelegramController extends Controller
 
         [, $field, $transactionId] = explode('_', $user->state);
         
-        $transaction = \App\Models\Transaction::where('id', $transactionId)->where('user_id', $chatId)->first();
+        $transaction = \App\Models\Transaction::where('id', $transactionId)
+                        ->where('user_id', $chatId)
+                        ->first();
+
         if (!$transaction) {
             $this->sendMessageSafely(['chat_id' => $chatId, 'text' => '⚠️ Gagal memperbarui, transaksi tidak ditemukan.']);
             $user->state = 'normal';
@@ -515,9 +585,14 @@ class TelegramController extends Controller
             return;
         }
 
-        if ($field === 'amount' && !is_numeric($newValue)) {
-            $this->sendMessageSafely(['chat_id' => $chatId, 'text' => '❌ Jumlah harus berupa angka. Silakan coba lagi.']);
-            return;
+        if ($field === 'amount') {
+            $cleanValue = preg_replace('/[^0-9]/', '', $newValue); 
+
+            if (!is_numeric($cleanValue)) {
+                $this->sendMessageSafely(['chat_id' => $chatId, 'text' => '❌ Jumlah harus berupa angka. Silakan coba lagi.']);
+                return;
+            }
+            $newValue = $cleanValue; 
         }
 
         $transaction->{$field} = $newValue;
@@ -525,7 +600,10 @@ class TelegramController extends Controller
 
         $user->state = 'normal';
         $user->save();
-        $this->sendMessageSafely(['chat_id' => $chatId, 'text' => "✅ Transaksi ID {$transactionId} berhasil diperbarui!"]);
+        
+        $displayValue = ($field === 'amount') ? number_format($newValue, 0, ',', '.') : $newValue;
+
+        $this->sendMessageSafely(['chat_id' => $chatId, 'text' => "✅ Transaksi ID {$transactionId} berhasil diperbarui!\nData baru: {$displayValue}"]);
     }
 
     private function handleGeminiChatMode(TelegramUser $user, $update)
@@ -553,15 +631,14 @@ class TelegramController extends Controller
         }
     }
 
-    // ===================================================================
-    // HANDLER UNTUK MODE NORMAL (Menu & Perintah Biasa)
-    // ===================================================================
+    /**
+     * Memproses input dalam mode normal.
+     */
     private function handleNormalMode(TelegramUser $user, $update)
     {
-        $chatId = $update['message']['chat']['id'];;
-
         if ($update->isType('callback_query')) {
             $callbackQuery = $update->getCallbackQuery();
+            $chatId = $callbackQuery->getFrom()->getId();
             $messageId = $callbackQuery->getMessage()->getMessageId();
             $data = $callbackQuery->getData();
 
@@ -625,6 +702,7 @@ class TelegramController extends Controller
     }
 
     } else if ($update->getMessage() && $update->getMessage()->has('text')) {
+            $chatId = $update->getMessage()->getChat()->getId();
             $text = $update->getMessage()->getText();
             \App\Models\TelegramUserCommand::create([
                 'user_id' => $chatId,
@@ -714,9 +792,12 @@ class TelegramController extends Controller
                         case 'Aku Mau Kopi ☕️': $this->coffeeGenerate($chatId); break;
                         case 'Tentang Developer 👨‍💻': $this->sendDeveloperInfo($chatId); break;
                         case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
-                        case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
-                        case 'Poop Tracker 💩': $this->sendPoopTrackerInfo($chatId); break;
+                        // case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
+                        // case 'Poop Tracker 💩': $this->sendPoopTrackerInfo($chatId); break;
                         case 'Info Saham 📊': $this->analyzeAdvanced($chatId, 'mina'); break;
+                        case 'Swing Trade Saham 📊': $this->swingTrade($chatId); break;
+                        case 'BSJP Saham 📊': $this->bsjp($chatId); break;
+
                         default:
                             if (strtolower($text) === 'halo') { $this->sendGreeting($chatId); }
                             else { $this->sendUnknownCommand($chatId); }
@@ -1189,8 +1270,8 @@ class TelegramController extends Controller
         $keyboard = [
             ['Cuaca di Jakarta 🌤️', 'Nasihat Bijak 💡'],
             ['Fakta Kucing 🐱', 'Money Tracker 💸'],
-            ['Aku Mau Kopi ☕️','Info Genshin 🎮'],
-            ['AI Chat 🤖','Poop Tracker 💩'],
+            ['Aku Mau Kopi ☕️','BSJP Saham 📊'],
+            ['AI Chat 🤖','Swing Trade Saham 📊'],
             ['Tentang Developer 👨‍💻', 'Info Saham 📊'],
         ];
 
