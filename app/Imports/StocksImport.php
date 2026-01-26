@@ -23,11 +23,16 @@ class StocksImport implements ToModel, WithHeadingRow
             return null;
         }
 
+        if (isset($row['papan_pencatatan']) && $row['papan_pencatatan'] === 'Pemantauan Khusus') {
+            Log::info('Data dengan kode ' . $row['kode'] . ' dilewati karena status Pemantauan Khusus');
+            return null;
+        }
+
         return Stock::updateOrCreate(
             ['code' => strtoupper($row['kode'])], 
             [
                 'name'      => $row['nama'] ?? null,
-                'board'     => $row['papan_pencatatan'],
+                'status'     => $row['papan_pencatatan'],
                 'is_active' => true,
             ]
         );
