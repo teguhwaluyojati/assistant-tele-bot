@@ -143,20 +143,18 @@ class TelegramController extends Controller
      */
     private function adjustToFraksi($price)
     {
-        // Pastikan tidak negatif
         if ($price <= 0) return 0;
 
-        // Aturan Fraksi BEI
         if ($price < 200) {
-            return round($price); // Fraksi 1
+            return round($price); 
         } elseif ($price < 500) {
-            return round($price / 2) * 2; // Fraksi 2
+            return round($price / 2) * 2; 
         } elseif ($price < 2000) {
-            return round($price / 5) * 5; // Fraksi 5
+            return round($price / 5) * 5;
         } elseif ($price < 5000) {
-            return round($price / 10) * 10; // Fraksi 10
+            return round($price / 10) * 10;
         } else {
-            return round($price / 25) * 25; // Fraksi 25
+            return round($price / 25) * 25;
         }
     }
 
@@ -170,21 +168,26 @@ class TelegramController extends Controller
 
         try {
             Telegram::sendChatAction(['chat_id' => $chatId, 'action' => 'typing']);
+
             $response = Http::get($url);
             
             if ($response->failed()) throw new \Exception("Gagal koneksi data.");
 
             $data = $response->json();
+
             if (empty($data['chart']['result']) || empty($data['chart']['result'][0]['timestamp'])) {
                 Telegram::sendMessage(['chat_id' => $chatId, 'text' => "⚠️ Data saham $code tidak ditemukan."]);
                 return;
             }
 
             $result = $data['chart']['result'][0];
+
             $meta = $result['meta'];
             $lastUpdateUnix = $meta ['regularMarketTime'] ?? time();
             $wibTime = \Carbon\Carbon::createFromTimestamp($lastUpdateUnix)->setTimezone('Asia/Jakarta')->format('d M Y H:i');
+            
             $quote = $result['indicators']['quote'][0];
+
             $closes = $this->cleanData($quote['close']);
             $highs = $this->cleanData($quote['high']);
             $lows = $this->cleanData($quote['low']);
@@ -204,6 +207,7 @@ class TelegramController extends Controller
             $avgVolume = $this->calculateSMA($volumes, 20);
 
             $score = 0;
+
             if ($currentPrice > $ma50) $score += 20;
             if ($currentPrice > $ma20 && $ma20 > $ma50) $score += 10;
             
@@ -219,7 +223,7 @@ class TelegramController extends Controller
             elseif ($score >= 30) $recommendation = "BUY ON WEAKNESS 🟡";
             elseif ($score < 0) $recommendation = "SELL / AVOID 🔴";
         
-            $recentLowsShort = array_slice($lows, -5); 
+            $recentLowsShort = array_slice($lows, -20); 
             $shortTermSupport = min($recentLowsShort);
             $isRallying = $currentPrice > ($ma20 * 1.05);
 
@@ -253,48 +257,70 @@ class TelegramController extends Controller
                 $buyMax = $shortTermSupport * 1.03;
             }
 
+            $buyAreaStr = "-"; $tp1Str = "-"; $tp2Str = "-"; $clStr = "-";
            
             if ($buyMin > 0) {
+                $buyMin = $this->adjustToFraksi($buyMin);
+                $buyMax = $this->adjustToFraksi($buyMax);
+
                 $entryAvg = ($buyMin + $buyMax) / 2;
-                $clPrice = $buyMin * 0.96; 
+
+                $clPriceRaw = $buyMin * 0.96; 
+                $clPrice = $this->adjustToFraksi($clPriceRaw);
                 
                 $risk = $entryAvg - $clPrice;
-                $tp1 = $entryAvg + ($risk * 1.5); 
-                $tp2 = $entryAvg + ($risk * 2.5); 
+                
+                $mathTP1 = $entryAvg + ($risk * 1.5);
+                $mathTP2 = $entryAvg + ($risk * 2.5);
+
+                $resistanceHigh = max($highs);
+
+                $tp1Note = "";
+                $tp2Note = "";
+
+                if ($mathTP1 > $resistanceHigh && $currentPrice < $resistanceHigh) {
+                    $realTP1 = $resistanceHigh; 
+                    $tp1Note = "(Resist)";
+                    
+                    $realTP2 = $mathTP2;
+                    $tp2Note = "(Breakout)";
+                } else {
+                    $realTP1 = $mathTP1;
+                    $realTP2 = $mathTP2;
+                }
+
+                $realTP1 = $this->adjustToFraksi($realTP1);
+                $realTP2 = $this->adjustToFraksi($realTP2);
 
                 $buyAreaStr = number_format($buyMin) . " - " . number_format($buyMax);
-                $tp1Str = number_format($tp1);
-                $tp2Str = number_format($tp2);
-                $clStr = "&lt; " . number_format($clPrice);
-            } else {
-                $buyAreaStr = "-";
-                $tp1Str = "-";
-                $tp2Str = "-";
-                $clStr = "-";
-            }
+                $tp1Str = number_format($realTP1) . " " . $tp1Note;
+                $tp2Str = number_format($realTP2) . " " . $tp2Note;
+                
+                $clStr = "&lt; " . number_format($clPrice); 
+                }
 
-            $msg = "🧠 <b>AI TRADING ANALYST: " . htmlspecialchars($code) . "</b>\n";
-            $msg .= "Harga: " . number_format($currentPrice) . "\n\n";
+                $msg = "🧠 <b>AI TRADING ANALYST: " . htmlspecialchars(strtoupper($code)) . "</b>\n";
+                $msg .= "Harga: " . number_format($currentPrice) . "\n\n";
 
-            $msg .= "📊 <b>Sinyal: $recommendation</b> (Score: $score)\n";
-            $msg .= "• Trend: " . ($currentPrice > $ma50 ? "Bullish 🐂" : "Bearish 🐻") . "\n";
-            $msg .= "• RSI: " . number_format($rsi14, 1) . "\n";
-            $msg .= "• Vol: " . ($currentVolume > $avgVolume ? "High 🔊" : "Low 🔇") . "\n";
-            
-            $msg .= "\n🎯 <b>STRATEGI: $planType</b>\n";
-            $msg .= "-----------------------------\n";
-            $msg .= "🛒 <b>Buy Area:</b> " . $buyAreaStr . "\n";
-            $msg .= "✅ <b>TP 1:</b> " . $tp1Str . "\n";
-            $msg .= "🚀 <b>TP 2:</b> " . $tp2Str . "\n";
-            $msg .= "🛡️ <b>Cut Loss:</b> " . $clStr . "\n";
+                $msg .= "📊 <b>Sinyal: $recommendation</b> (Score: $score)\n";
+                $msg .= "• Trend: " . ($currentPrice > $ma50 ? "Bullish 🐂" : "Bearish 🐻") . "\n";
+                $msg .= "• RSI: " . number_format($rsi14, 1) . "\n";
+                $msg .= "• Vol: " . ($currentVolume > $avgVolume ? "High 🔊" : "Low 🔇") . "\n";
+                
+                $msg .= "\n🎯 <b>STRATEGI: $planType</b>\n";
+                $msg .= "-----------------------------\n";
+                $msg .= "🛒 <b>Buy Area:</b> " . $buyAreaStr . "\n";
+                $msg .= "✅ <b>TP 1:</b> " . $tp1Str . "\n";
+                $msg .= "🚀 <b>TP 2:</b> " . $tp2Str . "\n";
+                $msg .= "🛡️ <b>Cut Loss:</b> " . $clStr . "\n";
 
-            $msg .= "\n<i>Disclaimer On. Data: $wibTime WIB.</i>";
+                $msg .= "\n<i>Disclaimer On. Data: $wibTime WIB.</i>";
 
-            Telegram::sendMessage([
-                'chat_id' => $chatId,
-                'text' => $msg,
-                'parse_mode' => 'HTML'
-            ]);
+                Telegram::sendMessage([
+                    'chat_id' => $chatId,
+                    'text' => $msg,
+                    'parse_mode' => 'HTML'
+                ]);
 
         } catch (\Exception $e) {
             Log::error("Bot Error: " . $e->getMessage());
