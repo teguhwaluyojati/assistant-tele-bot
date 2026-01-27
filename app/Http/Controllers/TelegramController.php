@@ -366,26 +366,6 @@ class TelegramController extends Controller
         return 100 - (100 / (1 + $rs));
     }
 
-    private function calculateRSIScalping($data, $period = 14)
-    {
-        if (count($data) < $period + 1) return 50;
-
-        $gains = 0;
-        $losses = 0;
-
-        for ($i = count($data) - $period; $i < count($data); $i++) {
-            $change = $data[$i] - $data[$i - 1];
-            if ($change > 0) $gains += $change;
-            else $losses += abs($change);
-        }
-
-        if ($losses == 0) return 100;
-        if ($gains == 0) return 0;
-
-        $rs = $gains / $losses;
-        return 100 - (100 / (1 + $rs));
-    }
-
     private function calculateEMA($data, $period)
     {
         if (count($data) < $period) return 0;
@@ -400,6 +380,54 @@ class TelegramController extends Controller
         return $ema;
     }
 
+    /* ================================
+    * EMA – FAST & RESPONSIVE
+    * ================================ */
+    private function calculateEMAScalping($data, $period)
+    {
+        $slice = array_slice($data, -50); // fokus candle terbaru
+        if (count($slice) < $period) return end($slice);
+
+        $k = 2 / ($period + 1);
+        $ema = array_sum(array_slice($slice, 0, $period)) / $period;
+
+        for ($i = $period; $i < count($slice); $i++) {
+            $ema = ($slice[$i] * $k) + ($ema * (1 - $k));
+        }
+
+        return $ema;
+    }
+
+
+    /* ================================
+    * RSI – SCALPING FRIENDLY
+    * ================================ */
+    private function calculateRSIScalping($data, $period = 7)
+    {
+        if (count($data) < $period + 1) return 50;
+
+        $gains = 0;
+        $losses = 0;
+
+        $start = count($data) - $period;
+
+        for ($i = $start + 1; $i < count($data); $i++) {
+            $change = $data[$i] - $data[$i - 1];
+            if ($change > 0) $gains += $change;
+            else $losses += abs($change);
+        }
+
+        if ($losses == 0) return 100;
+        if ($gains == 0) return 0;
+
+        $rs = $gains / $losses;
+        return 100 - (100 / (1 + $rs));
+    }
+
+
+    /* ================================
+    * MAIN SCALPING FUNCTION
+    * ================================ */
     public function analyzeScalpingV2($chatId, $code)
     {
         $symbol = strtoupper($code) . '.JK';
@@ -408,21 +436,21 @@ class TelegramController extends Controller
         try {
             Telegram::sendChatAction(['chat_id' => $chatId, 'action' => 'typing']);
 
-            $now = \Carbon\Carbon::now('Asia/Jakarta');
+            $now  = \Carbon\Carbon::now('Asia/Jakarta');
             $time = $now->format('H:i');
 
             $validSession =
                 ($time >= '09:00' && $time <= '11:00') ||
                 ($time >= '13:30' && $time <= '14:30');
 
-            if (!$validSession) {
-                Telegram::sendMessage([
-                    'chat_id' => $chatId,
-                    'text' => "⏰ <b>SCALPING MODE</b>\nDi luar jam efektif. NO TRADE.",
-                    'parse_mode' => 'HTML'
-                ]);
-                return;
-            }
+            // if (!$validSession) {
+            //     Telegram::sendMessage([
+            //         'chat_id' => $chatId,
+            //         'text' => "⏰ <b>SCALPING MODE</b>\nDi luar jam efektif. NO TRADE.",
+            //         'parse_mode' => 'HTML'
+            //     ]);
+            //     return;
+            // }
 
             $response = Http::get($url);
             if ($response->failed()) throw new \Exception("Koneksi gagal");
@@ -440,7 +468,7 @@ class TelegramController extends Controller
             $lows    = $this->cleanData($quote['low']);
             $volumes = $this->cleanData($quote['volume']);
 
-            if (count($closes) < 30) {
+            if (count($closes) < 50) {
                 Telegram::sendMessage(['chat_id'=>$chatId,'text'=>"⚠️ Data belum cukup"]);
                 return;
             }
@@ -448,16 +476,25 @@ class TelegramController extends Controller
             $price = end($closes);
             $vol   = end($volumes);
 
-            $ema9  = $this->calculateEMA($closes, 9);
-            $ema21 = $this->calculateEMA($closes, 21);
+            $ema9  = $this->calculateEMAScalping($closes, 9);
+            $ema21 = $this->calculateEMAScalping($closes, 21);
             $rsi7  = $this->calculateRSIScalping($closes, 7);
 
             $avgVol = array_sum(array_slice($volumes, -20)) / 20;
 
-            $vwap = array_sum(array_map(
-                fn($h,$l,$c,$v) => (($h+$l+$c)/3)*$v,
-                $highs,$lows,$closes,$volumes
-            )) / array_sum($volumes);
+            $volSlice   = array_slice($volumes, -78);
+            $highSlice  = array_slice($highs, -78);
+            $lowSlice   = array_slice($lows, -78);
+            $closeSlice = array_slice($closes, -78);
+
+            $totalVolume = array_sum($volSlice);
+            if ($totalVolume <= 0) return;
+
+            $vwapValue = 0;
+            foreach ($volSlice as $i => $v) {
+                $vwapValue += (($highSlice[$i] + $lowSlice[$i] + $closeSlice[$i]) / 3) * $v;
+            }
+            $vwap = $vwapValue / $totalVolume;
 
             if ($avgVol < 5000) {
                 Telegram::sendMessage([
@@ -478,10 +515,10 @@ class TelegramController extends Controller
             }
 
             $recentHigh = max(array_slice($highs, -5));
-            if ($price <= $recentHigh) {
+            if ($price < $recentHigh * 0.998 && $vol < $avgVol * 1.3) {
                 Telegram::sendMessage([
                     'chat_id'=>$chatId,
-                    'text'=>"⚠️ <b>WAIT</b>\nBelum breakout high mikro.",
+                    'text'=>"⚠️ <b>WAIT</b>\nBelum ada konfirmasi breakout.",
                     'parse_mode'=>'HTML'
                 ]);
                 return;
@@ -489,24 +526,25 @@ class TelegramController extends Controller
 
             $score = 0;
             if ($price > $vwap) $score += 25;
-            if ($ema9 > $ema21) $score += 20;
-            if ($rsi7 >= 55 && $rsi7 <= 70) $score += 25;
-            if ($vol > $avgVol * 1.5) $score += 30;
+            if ($ema9 > $ema21) $score += 25;
+            if ($rsi7 >= 58 && $rsi7 <= 72) $score += 25;
+            if ($vol > $avgVol * 1.3) $score += 25;
 
-            if ($score < 70) {
+            if ($score < 75) {
                 Telegram::sendMessage([
                     'chat_id'=>$chatId,
-                    'text'=>"⛔ <b>NO TRADE</b>\nScore belum layak ($score).",
+                    'text'=>"⛔ <b>NO TRADE</b>\nSetup belum clean ($score).",
                     'parse_mode'=>'HTML'
                 ]);
                 return;
             }
 
-            $buyMin = $this->adjustToFraksi($price * 0.998);
+            $buyMin = $this->adjustToFraksi($price * 0.999);
             $buyMax = $this->adjustToFraksi($price * 1.002);
             $entry  = ($buyMin + $buyMax) / 2;
 
-            $cl  = $this->adjustToFraksi($entry * 0.992);
+            $swingLow = min(array_slice($lows, -5));
+            $cl  = $this->adjustToFraksi($swingLow * 0.997);
             $tp1 = $this->adjustToFraksi($entry * 1.006);
             $tp2 = $this->adjustToFraksi($entry * 1.010);
 
@@ -516,8 +554,7 @@ class TelegramController extends Controller
             $msg .= "📊 <b>VALID SCALP BUY 🟢</b> (Score: $score)\n";
             $msg .= "• EMA9 > EMA21\n";
             $msg .= "• RSI(7): ".number_format($rsi7,1)."\n";
-            $msg .= "• VWAP: ".number_format($vwap)."\n";
-            $msg .= "• Breakout High Mikro\n\n";
+            $msg .= "• VWAP: ".number_format($vwap)."\n\n";
 
             $msg .= "🎯 <b>PLAN</b>\n";
             $msg .= "🛒 Buy: ".number_format($buyMin)." - ".number_format($buyMax)."\n";
@@ -535,7 +572,10 @@ class TelegramController extends Controller
 
         } catch (\Exception $e) {
             Log::error("ScalpV2 Error: ".$e->getMessage());
-            Telegram::sendMessage(['chat_id'=>$chatId,'text'=>"⚠️ Error analisa scalping."]);
+            Telegram::sendMessage([
+                'chat_id'=>$chatId,
+                'text'=>"⚠️ Error analisa scalping."
+            ]);
         }
     }
 
