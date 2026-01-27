@@ -139,6 +139,28 @@ class TelegramController extends Controller
     }
 
     /**
+     * Helper untuk membulatkan harga sesuai Fraksi Harga BEI.
+     */
+    private function adjustToFraksi($price)
+    {
+        // Pastikan tidak negatif
+        if ($price <= 0) return 0;
+
+        // Aturan Fraksi BEI
+        if ($price < 200) {
+            return round($price); // Fraksi 1
+        } elseif ($price < 500) {
+            return round($price / 2) * 2; // Fraksi 2
+        } elseif ($price < 2000) {
+            return round($price / 5) * 5; // Fraksi 5
+        } elseif ($price < 5000) {
+            return round($price / 10) * 10; // Fraksi 10
+        } else {
+            return round($price / 25) * 25; // Fraksi 25
+        }
+    }
+
+    /**
      * New Feature Bot for Swing Trader
      */
     public function analyzeAdvanced($chatId, $code)
