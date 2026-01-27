@@ -794,7 +794,7 @@ class TelegramController extends Controller
                         case 'Money Tracker 💸': $this->showMoneyTrackerMenu($chatId); break;
                         // case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
                         // case 'Poop Tracker 💩': $this->sendPoopTrackerInfo($chatId); break;
-                        case 'Info Saham 📊': $this->analyzeAdvanced($chatId, 'mina'); break;
+                        case 'Info Saham 📊': $this->analyzeAdvanced($chatId, 'TINS'); break;
                         case 'Swing Trade Saham 📊': $this->swingTrade($chatId); break;
                         case 'BSJP Saham 📊': $this->bsjp($chatId); break;
 

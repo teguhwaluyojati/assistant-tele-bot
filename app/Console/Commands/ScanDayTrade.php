@@ -5,122 +5,174 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use App\Models\Stock;
 
 class ScanDayTrade extends Command
 {
-    protected $signature = 'stock:daytrade';
-    protected $description = 'Scan Saham BSJP (Daily Momentum – Safe Version)';
+    protected $signature = 'stock:overnight';
+    protected $description = 'Fast & Accurate Overnight Stock Scanner (Buy Close Sell Open)';
 
     public function handle()
     {
-        $this->info("🚀 Scanning Saham BSJP (Safe Daily Version)...");
+        $this->info("⚡ Overnight Scan Started...");
 
-        $stocks = Stock::where('is_active', true)->get();
+        $stocks = Stock::where('is_active', true)->pluck('code');
+
         if ($stocks->isEmpty()) {
-            $this->error("❌ Tidak ada saham aktif.");
+            $this->error("❌ No active stocks.");
             return;
         }
 
-        DB::table('day_trade_recommendations')->truncate();
+        DB::table('day_trade_recommendations')
+            ->whereDate('created_at', today())
+            ->delete();
 
-        $bar = $this->output->createProgressBar($stocks->count());
+        $symbols = $stocks->map(fn ($c) => $c . '.JK')->values();
+
+        $responses = Http::pool(fn ($pool) =>
+            $symbols->map(fn ($symbol) =>
+                $pool->as($symbol)
+                    ->timeout(6)
+                    ->get("https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=1h&range=5d")
+            )->toArray()
+        );
+
         $found = 0;
 
-        foreach ($stocks as $stock) {
-            $result = $this->analyze($stock->code);
+        foreach ($responses as $symbol => $response) {
+            $code = str_replace('.JK', '', $symbol);
 
-            if ($result) {
+            try {
+                if (!$response->ok()) continue;
+
+                $result = Cache::remember(
+                    "overnight_scan_{$code}",
+                    now()->addMinutes(3),
+                    fn () => $this->analyze($response->json())
+                );
+
+                if (!$result) continue;
+
                 DB::table('day_trade_recommendations')->insert([
-                    'code'       => $stock->code,
-                    'price'      => $result['price'],
-                    'change_pct' => $result['change_pct'],
-                    'signal'     => '🔥 BSJP',
-                    'buy_area'   => $result['buy_area'],
+                    'code'       => $code,
+                    'price'      => $result['entry'],
+                    'change_pct' => $result['momentum'],
+                    'signal'     => '🌙 OVERNIGHT',
+                    'buy_area'   => $result['entry'],
                     'tp_target'  => $result['tp'],
-                    'cl_price'   => $result['cl'],
+                    'cl_price'   => $result['sl'],
+                    'notes'      => $result['notes'],
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+
                 $found++;
+
+            } catch (\Throwable $e) {
+                Log::warning("Skip {$code}: " . $e->getMessage());
             }
-
-            usleep(120000);
-            $bar->advance();
         }
 
-        $bar->finish();
-        $this->newLine();
-        $this->info("✅ BSJP selesai. {$found} saham lolos.");
+        $this->info("✅ Scan done. {$found} valid overnight setups found.");
     }
 
-    private function analyze(string $code): ?array
+    /**
+     * Core overnight analysis
+     */
+    private function analyze(array $res): ?array
     {
-        $symbol = $code . '.JK';
-        $url = "https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=1d&range=2mo";
+        $data = $res['chart']['result'][0] ?? null;
+        if (!$data) return null;
 
-        try {
-            $res = Http::timeout(6)->get($url)->json();
-            if (empty($res['chart']['result'][0])) return null;
+        $meta  = $data['meta'] ?? null;
+        $quote = $data['indicators']['quote'][0] ?? null;
 
-            $data  = $res['chart']['result'][0];
-            $quote = $data['indicators']['quote'][0];
-            $meta  = $data['meta'];
+        $close  = $this->clean($quote['close'] ?? []);
+        $high   = $this->clean($quote['high'] ?? []);
+        $low    = $this->clean($quote['low'] ?? []);
+        $volume = $this->clean($quote['volume'] ?? []);
 
-            $closes  = $this->clean($quote['close'] ?? []);
-            $highs   = $this->clean($quote['high'] ?? []);
-            $volumes = $this->clean($quote['volume'] ?? []);
+        if (count($close) < 55) return null;
 
-            if (count($closes) < 20) return null;
+        $lastClose = end($close);
+        $lastHigh  = end($high);
+        $lastLow   = end($low);
 
-            $price     = end($closes);
-            $high      = end($highs);
-            $volume    = end($volumes);
-            $prevClose = $meta['chartPreviousClose'];
+        if ($lastClose < 200) return null;
+        if ($lastClose < ($lastHigh * 0.98)) return null; 
 
-            /** ======================
-             *  FILTER DASAR
-             *  ====================== */
-            if ($price < 200) return null;
+        $prevDayClose = $meta['chartPreviousClose'] ?? null;
+        
+        if (!$prevDayClose) return null;
 
-            $changePct = (($price - $prevClose) / $prevClose) * 100;
-            if ($changePct < 2.5 || $changePct > 8.0) return null;
+        $momentum = (($lastClose - $prevDayClose) / $prevDayClose) * 100;
+        if ($momentum < 1.0 || $momentum > 8.0) return null;
 
-            /** ======================
-             *  CLOSE NEAR HIGH
-             *  ====================== */
-            if ($price < ($high * 0.995)) return null;
+        $volLast  = end($volume);
+        $prevVols = array_slice($volume, -6, 5);
+        $avgVol   = array_sum($prevVols) / count($prevVols);
 
-            /** ======================
-             *  VOLUME & VALUE
-             *  ====================== */
-            $avgVol = array_sum(array_slice($volumes, -20)) / 20;
-            if ($volume < ($avgVol * 1.5)) return null;
+        if ($avgVol <= 0) return null;
+        $volSpike = $volLast / $avgVol;
 
-            $avgValue = $price * (array_sum(array_slice($volumes, -5)) / 5);
-            if ($avgValue < 5000000000) return null;
+        if ($volSpike < 1.4) return null;
 
-            /** ======================
-             *  RISK MANAGEMENT
-             *  ====================== */
-            $tp = $price * 1.02;   // +2%
-            $cl = $price * 0.985;  // -1.5%
+        $ema20 = $this->calculateEMA($close, 20); 
+        $ema50 = $this->calculateEMA($close, 55);
+        
+        if ($ema20 <= $ema50) return null;
 
-            return [
-                'price'      => round($price, 0),
-                'change_pct' => round($changePct, 2),
-                'buy_area'   => number_format($price, 0),
-                'tp'         => round($tp, 0),
-                'cl'         => round($cl, 0),
-            ];
+        $sumVol3 = array_sum(array_slice($volume, -3));
+        $avgPrice3 = array_sum(array_slice($close, -3)) / 3;
+        $value3h = $sumVol3 * $avgPrice3; 
 
-        } catch (\Throwable $e) {
-            return null;
-        }
+        if ($value3h < 3000000000) return null;
+
+        $range = $lastHigh - $lastLow;
+        if ($range == 0) $range = $lastClose * 0.01; 
+
+        $tp = $lastClose + ($range * 1.5); 
+        $sl = $lastClose - ($range * 1.0); 
+
+        return [
+            'entry'    => round($lastClose),
+            'tp'       => round($tp),
+            'sl'       => round($sl),
+            'momentum' => round($momentum, 2),
+            'notes'    => "Vol " . round($volSpike, 1) . "x | Uptrend EMA | Mtm " . round($momentum, 1) . "%",
+        ];
     }
 
+    /**
+     * EMA calculation
+     */
+    private function calculateEMA(array $data, int $period): float
+    {
+        $data = array_values($data);
+        
+        if (count($data) <= $period) {
+            return array_sum($data) / count($data);
+        }
+
+        $initialSMA = array_sum(array_slice($data, 0, $period)) / $period;
+        
+        $multiplier = 2 / ($period + 1);
+        $ema = $initialSMA;
+
+        for ($i = $period; $i < count($data); $i++) {
+            $ema = ($data[$i] - $ema) * $multiplier + $ema;
+        }
+
+        return $ema;
+    }
+
+    /**
+     * Remove null & reindex
+     */
     private function clean(array $data): array
     {
-        return array_values(array_filter($data, fn($v) => $v !== null));
+        return array_values(array_filter($data, fn ($v) => $v !== null));
     }
 }
