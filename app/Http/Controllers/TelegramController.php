@@ -366,6 +366,180 @@ class TelegramController extends Controller
         return 100 - (100 / (1 + $rs));
     }
 
+    private function calculateRSIScalping($data, $period = 14)
+    {
+        if (count($data) < $period + 1) return 50;
+
+        $gains = 0;
+        $losses = 0;
+
+        for ($i = count($data) - $period; $i < count($data); $i++) {
+            $change = $data[$i] - $data[$i - 1];
+            if ($change > 0) $gains += $change;
+            else $losses += abs($change);
+        }
+
+        if ($losses == 0) return 100;
+        if ($gains == 0) return 0;
+
+        $rs = $gains / $losses;
+        return 100 - (100 / (1 + $rs));
+    }
+
+    private function calculateEMA($data, $period)
+    {
+        if (count($data) < $period) return 0;
+
+        $k = 2 / ($period + 1);
+        $ema = $data[0];
+
+        foreach ($data as $price) {
+            $ema = ($price * $k) + ($ema * (1 - $k));
+        }
+
+        return $ema;
+    }
+
+    public function analyzeScalpingV2($chatId, $code)
+    {
+        $symbol = strtoupper($code) . '.JK';
+        $url = "https://query1.finance.yahoo.com/v8/finance/chart/{$symbol}?interval=5m&range=5d";
+
+        try {
+            Telegram::sendChatAction(['chat_id' => $chatId, 'action' => 'typing']);
+
+            $now = \Carbon\Carbon::now('Asia/Jakarta');
+            $time = $now->format('H:i');
+
+            $validSession =
+                ($time >= '09:00' && $time <= '11:00') ||
+                ($time >= '13:30' && $time <= '14:30');
+
+            if (!$validSession) {
+                Telegram::sendMessage([
+                    'chat_id' => $chatId,
+                    'text' => "⏰ <b>SCALPING MODE</b>\nDi luar jam efektif. NO TRADE.",
+                    'parse_mode' => 'HTML'
+                ]);
+                return;
+            }
+
+            $response = Http::get($url);
+            if ($response->failed()) throw new \Exception("Koneksi gagal");
+
+            $data = $response->json();
+            if (empty($data['chart']['result'][0]['timestamp'])) {
+                Telegram::sendMessage(['chat_id'=>$chatId,'text'=>"⚠️ Data intraday kosong"]);
+                return;
+            }
+
+            $quote = $data['chart']['result'][0]['indicators']['quote'][0];
+
+            $closes  = $this->cleanData($quote['close']);
+            $highs   = $this->cleanData($quote['high']);
+            $lows    = $this->cleanData($quote['low']);
+            $volumes = $this->cleanData($quote['volume']);
+
+            if (count($closes) < 30) {
+                Telegram::sendMessage(['chat_id'=>$chatId,'text'=>"⚠️ Data belum cukup"]);
+                return;
+            }
+
+            $price = end($closes);
+            $vol   = end($volumes);
+
+            $ema9  = $this->calculateEMA($closes, 9);
+            $ema21 = $this->calculateEMA($closes, 21);
+            $rsi7  = $this->calculateRSIScalping($closes, 7);
+
+            $avgVol = array_sum(array_slice($volumes, -20)) / 20;
+
+            $vwap = array_sum(array_map(
+                fn($h,$l,$c,$v) => (($h+$l+$c)/3)*$v,
+                $highs,$lows,$closes,$volumes
+            )) / array_sum($volumes);
+
+            if ($avgVol < 5000) {
+                Telegram::sendMessage([
+                    'chat_id'=>$chatId,
+                    'text'=>"🚫 <b>NO TRADE</b>\nLikuiditas rendah.",
+                    'parse_mode'=>'HTML'
+                ]);
+                return;
+            }
+
+            if ($rsi7 >= 45 && $rsi7 <= 55 && abs($ema9 - $ema21) / $price < 0.002) {
+                Telegram::sendMessage([
+                    'chat_id'=>$chatId,
+                    'text'=>"⚠️ <b>NO TRADE</b>\nMarket choppy.",
+                    'parse_mode'=>'HTML'
+                ]);
+                return;
+            }
+
+            $recentHigh = max(array_slice($highs, -5));
+            if ($price <= $recentHigh) {
+                Telegram::sendMessage([
+                    'chat_id'=>$chatId,
+                    'text'=>"⚠️ <b>WAIT</b>\nBelum breakout high mikro.",
+                    'parse_mode'=>'HTML'
+                ]);
+                return;
+            }
+
+            $score = 0;
+            if ($price > $vwap) $score += 25;
+            if ($ema9 > $ema21) $score += 20;
+            if ($rsi7 >= 55 && $rsi7 <= 70) $score += 25;
+            if ($vol > $avgVol * 1.5) $score += 30;
+
+            if ($score < 70) {
+                Telegram::sendMessage([
+                    'chat_id'=>$chatId,
+                    'text'=>"⛔ <b>NO TRADE</b>\nScore belum layak ($score).",
+                    'parse_mode'=>'HTML'
+                ]);
+                return;
+            }
+
+            $buyMin = $this->adjustToFraksi($price * 0.998);
+            $buyMax = $this->adjustToFraksi($price * 1.002);
+            $entry  = ($buyMin + $buyMax) / 2;
+
+            $cl  = $this->adjustToFraksi($entry * 0.992);
+            $tp1 = $this->adjustToFraksi($entry * 1.006);
+            $tp2 = $this->adjustToFraksi($entry * 1.010);
+
+            $msg  = "⚡ <b>AI SCALPING V2: ".strtoupper($code)."</b>\n";
+            $msg .= "Harga: ".number_format($price)."\n\n";
+
+            $msg .= "📊 <b>VALID SCALP BUY 🟢</b> (Score: $score)\n";
+            $msg .= "• EMA9 > EMA21\n";
+            $msg .= "• RSI(7): ".number_format($rsi7,1)."\n";
+            $msg .= "• VWAP: ".number_format($vwap)."\n";
+            $msg .= "• Breakout High Mikro\n\n";
+
+            $msg .= "🎯 <b>PLAN</b>\n";
+            $msg .= "🛒 Buy: ".number_format($buyMin)." - ".number_format($buyMax)."\n";
+            $msg .= "✅ TP1: ".number_format($tp1)."\n";
+            $msg .= "🚀 TP2: ".number_format($tp2)."\n";
+            $msg .= "🛡️ CL: < ".number_format($cl)."\n";
+
+            $msg .= "\n<i>Disiplin. 1–2 trade saja.</i>";
+
+            Telegram::sendMessage([
+                'chat_id'=>$chatId,
+                'text'=>$msg,
+                'parse_mode'=>'HTML'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("ScalpV2 Error: ".$e->getMessage());
+            Telegram::sendMessage(['chat_id'=>$chatId,'text'=>"⚠️ Error analisa scalping."]);
+        }
+    }
+
+
     /**
      * Mencari atau membuat pengguna baru TANPA mengubah timestamp interaksi.
      * @param \Telegram\Bot\Objects\Update $update
@@ -805,6 +979,31 @@ class TelegramController extends Controller
                 $this->analyzeAdvanced($chatId, $code);
                 return; 
             }
+                else if (str_starts_with(strtolower($text), '/scalping')) {
+
+                    $parts = explode('-', $text, 2);
+
+                    if (count($parts) < 2 || empty(trim($parts[1]))) {
+                        $this->sendMessageSafely([
+                            'chat_id' => $chatId,
+                            'text' => "⚠️ Format salah.\nKetik: /scalping-KODE\nContoh: /scalping-BBCA"
+                        ]);
+                        return;
+                    }
+
+                    $code = strtoupper(trim($parts[1]));
+
+                    if (!preg_match('/^[A-Z]{4}$/', $code)) {
+                        $this->sendMessageSafely([
+                            'chat_id' => $chatId,
+                            'text' => "⚠️ Kode saham harus 4 huruf.\nContoh: /scalping-TLKM"
+                        ]);
+                        return;
+                    }
+
+                    $this->analyzeScalpingV2($chatId, $code);
+                    return;
+                }
                 else if($text === '/bsjp'){
                     $stocks = DB::table('day_trade_recommendations')
                     ->orderBy('change_pct', 'desc')
