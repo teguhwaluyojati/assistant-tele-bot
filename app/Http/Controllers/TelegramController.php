@@ -1044,6 +1044,18 @@ class TelegramController extends Controller
                     $this->analyzeScalpingV2($chatId, $code);
                     return;
                 }
+                else if(strpos ($text, '/check') === 0){
+                        $input = trim(str_replace('/check', '', $text));
+
+                        $analyzer = new \App\Http\Controllers\BSJPController();
+                        $replyText = $analyzer->analyzeBsjp($input);
+
+                        Telegram::sendMessage([
+                            'chat_id' => $chatId,
+                            'text' => $replyText,
+                            'parse_mode' => 'Markdown'
+                        ]);
+                }
                 else if($text === '/bsjp'){
                     $stocks = DB::table('day_trade_recommendations')
                     ->orderBy('change_pct', 'desc')
