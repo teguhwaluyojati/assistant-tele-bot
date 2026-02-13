@@ -113,4 +113,58 @@ class DashboardController extends Controller
         }
     }
 
+    public function getDailyChart()
+    {
+        try {
+            $days = 7;
+            $startDate = now()->subDays($days - 1)->startOfDay();
+            
+            $labels = [];
+            $incomeData = [];
+            $expenseData = [];
+            
+            for ($i = 0; $i < $days; $i++) {
+                $date = now()->subDays($days - 1 - $i)->startOfDay();
+                $labels[] = $date->format('M d');
+                
+                $income = \App\Models\Transaction::where('type', 'income')
+                    ->whereDate('created_at', $date->toDateString())
+                    ->sum('amount');
+                    
+                $expense = \App\Models\Transaction::where('type', 'expense')
+                    ->whereDate('created_at', $date->toDateString())
+                    ->sum('amount');
+                
+                $incomeData[] = (int) $income;
+                $expenseData[] = (int) $expense;
+            }
+
+            $chartData = [
+                'labels' => $labels,
+                'datasets' => [
+                    [
+                        'label' => 'Income',
+                        'data' => $incomeData,
+                        'borderColor' => 'rgb(34, 197, 94)',
+                        'backgroundColor' => 'rgba(34, 197, 94, 0.1)',
+                        'fill' => true,
+                    ],
+                    [
+                        'label' => 'Expense',
+                        'data' => $expenseData,
+                        'borderColor' => 'rgb(239, 68, 68)',
+                        'backgroundColor' => 'rgba(239, 68, 68, 0.1)',
+                        'fill' => true,
+                    ]
+                ]
+            ];
+
+            return $this->successResponse($chartData, 'Daily chart data retrieved successfully.');
+            
+        } catch (\Exception $e) {
+            Log::error('Error retrieving daily chart: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while retrieving chart data.', 500);
+        }
+    }
+
 }
