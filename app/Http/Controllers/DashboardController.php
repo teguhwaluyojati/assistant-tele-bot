@@ -64,4 +64,53 @@ class DashboardController extends Controller
         }
     }
 
+    public function getTransactions()
+    {
+        try {
+            $transactions = \App\Models\Transaction::with('user:id,user_id,username,first_name,last_name')
+                ->latest()
+                ->paginate(15);
+
+            return $this->successResponse($transactions, 'Transactions retrieved successfully.');
+            
+        } catch (\Exception $e) {
+            Log::error('Error retrieving transactions: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while retrieving transactions.', 500);
+        }
+    }
+
+    public function getTransactionsSummary()
+    {
+        try {
+            $currentMonth = now()->startOfMonth();
+            
+            $totalIncome = \App\Models\Transaction::where('type', 'income')
+                ->where('created_at', '>=', $currentMonth)
+                ->sum('amount');
+            
+            $totalExpense = \App\Models\Transaction::where('type', 'expense')
+                ->where('created_at', '>=', $currentMonth)
+                ->sum('amount');
+            
+            $balance = $totalIncome - $totalExpense;
+            
+            $totalTransactions = \App\Models\Transaction::where('created_at', '>=', $currentMonth)
+                ->count();
+
+            $summary = [
+                'total_income' => $totalIncome,
+                'total_expense' => $totalExpense,
+                'balance' => $balance,
+                'total_transactions' => $totalTransactions,
+                'period' => now()->format('F Y')
+            ];
+
+            return $this->successResponse($summary, 'Transaction summary retrieved successfully.');
+            
+        } catch (\Exception $e) {
+            Log::error('Error retrieving transaction summary: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while retrieving summary.', 500);
+        }
+    }
+
 }

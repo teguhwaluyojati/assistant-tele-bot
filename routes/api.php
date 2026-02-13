@@ -33,6 +33,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/change-password', [ProfileController::class, 'changePassword']);
 
     Route::get('/history-login', [DashboardController::class, 'lastLogin']);
+    
+    Route::get('/transactions', [DashboardController::class, 'getTransactions']);
+    Route::get('/transactions/summary', [DashboardController::class, 'getTransactionsSummary']);
 });
 
 
