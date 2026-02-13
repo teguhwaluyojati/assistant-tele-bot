@@ -22,6 +22,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'telegram_user_id',
     ];
 
     protected $appends = ['avatar_url'];
@@ -55,4 +56,20 @@ class User extends Authenticatable
         'email_verified_at' => 'datetime',
         'password' => 'hashed',
     ];
+
+    /**
+     * Relationship to TelegramUser
+     */
+    public function telegramUser()
+    {
+        return $this->belongsTo(TelegramUser::class, 'telegram_user_id', 'id');
+    }
+
+    /**
+     * Check if user is admin (has telegram user with level = 1)
+     */
+    public function isAdmin()
+    {
+        return $this->telegramUser && $this->telegramUser->isAdmin();
+    }
 }
