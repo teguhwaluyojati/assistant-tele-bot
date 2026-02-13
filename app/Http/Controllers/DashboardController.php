@@ -67,9 +67,27 @@ class DashboardController extends Controller
     public function getTransactions()
     {
         try {
-            $transactions = \App\Models\Transaction::with('user:id,user_id,username,first_name,last_name')
-                ->latest()
-                ->paginate(15);
+            $query = \App\Models\Transaction::with('user:id,user_id,username,first_name,last_name')
+                ->latest();
+
+            // Filter by telegram user if not admin
+            if (!auth()->user()->isAdmin()) {
+                $telegramUserId = auth()->user()->telegram_user_id;
+                
+                if (!$telegramUserId) {
+                    return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
+                }
+                
+                // Get the telegram user's user_id (chat_id)
+                $telegramUser = \App\Models\TelegramUser::find($telegramUserId);
+                if (!$telegramUser) {
+                    return $this->errorResponse('Telegram user not found.', 404);
+                }
+                
+                $query->where('user_id', $telegramUser->user_id);
+            }
+
+            $transactions = $query->paginate(15);
 
             return $this->successResponse($transactions, 'Transactions retrieved successfully.');
             
@@ -83,19 +101,40 @@ class DashboardController extends Controller
     {
         try {
             $currentMonth = now()->startOfMonth();
+            $chatId = null;
             
-            $totalIncome = \App\Models\Transaction::where('type', 'income')
-                ->where('created_at', '>=', $currentMonth)
-                ->sum('amount');
+            // Filter by telegram user if not admin
+            if (!auth()->user()->isAdmin()) {
+                $telegramUserId = auth()->user()->telegram_user_id;
+                
+                if (!$telegramUserId) {
+                    return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
+                }
+                
+                $telegramUser = \App\Models\TelegramUser::find($telegramUserId);
+                if (!$telegramUser) {
+                    return $this->errorResponse('Telegram user not found.', 404);
+                }
+                
+                $chatId = $telegramUser->user_id;
+            }
             
-            $totalExpense = \App\Models\Transaction::where('type', 'expense')
-                ->where('created_at', '>=', $currentMonth)
-                ->sum('amount');
+            $incomeQuery = \App\Models\Transaction::where('type', 'income')
+                ->where('created_at', '>=', $currentMonth);
+            $expenseQuery = \App\Models\Transaction::where('type', 'expense')
+                ->where('created_at', '>=', $currentMonth);
+            $countQuery = \App\Models\Transaction::where('created_at', '>=', $currentMonth);
             
+            if ($chatId) {
+                $incomeQuery->where('user_id', $chatId);
+                $expenseQuery->where('user_id', $chatId);
+                $countQuery->where('user_id', $chatId);
+            }
+            
+            $totalIncome = $incomeQuery->sum('amount');
+            $totalExpense = $expenseQuery->sum('amount');
             $balance = $totalIncome - $totalExpense;
-            
-            $totalTransactions = \App\Models\Transaction::where('created_at', '>=', $currentMonth)
-                ->count();
+            $totalTransactions = $countQuery->count();
 
             $summary = [
                 'total_income' => $totalIncome,
@@ -117,7 +156,23 @@ class DashboardController extends Controller
     {
         try {
             $days = 7;
-            $startDate = now()->subDays($days - 1)->startOfDay();
+            $chatId = null;
+            
+            // Filter by telegram user if not admin
+            if (!auth()->user()->isAdmin()) {
+                $telegramUserId = auth()->user()->telegram_user_id;
+                
+                if (!$telegramUserId) {
+                    return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
+                }
+                
+                $telegramUser = \App\Models\TelegramUser::find($telegramUserId);
+                if (!$telegramUser) {
+                    return $this->errorResponse('Telegram user not found.', 404);
+                }
+                
+                $chatId = $telegramUser->user_id;
+            }
             
             $labels = [];
             $incomeData = [];
@@ -127,13 +182,18 @@ class DashboardController extends Controller
                 $date = now()->subDays($days - 1 - $i)->startOfDay();
                 $labels[] = $date->format('M d');
                 
-                $income = \App\Models\Transaction::where('type', 'income')
-                    ->whereDate('created_at', $date->toDateString())
-                    ->sum('amount');
-                    
-                $expense = \App\Models\Transaction::where('type', 'expense')
-                    ->whereDate('created_at', $date->toDateString())
-                    ->sum('amount');
+                $incomeQuery = \App\Models\Transaction::where('type', 'income')
+                    ->whereDate('created_at', $date->toDateString());
+                $expenseQuery = \App\Models\Transaction::where('type', 'expense')
+                    ->whereDate('created_at', $date->toDateString());
+                
+                if ($chatId) {
+                    $incomeQuery->where('user_id', $chatId);
+                    $expenseQuery->where('user_id', $chatId);
+                }
+                
+                $income = $incomeQuery->sum('amount');
+                $expense = $expenseQuery->sum('amount');
                 
                 $incomeData[] = (int) $income;
                 $expenseData[] = (int) $expense;
