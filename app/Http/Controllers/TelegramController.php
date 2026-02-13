@@ -164,17 +164,12 @@ class TelegramController extends Controller
                 'command' => 'CALLBACK: ' . $data,
             ]);
 
-            if (str_starts_with($data, 'genshin_page_')) {
-                list($_, $_, $category, $page) = explode('_', $data, 4);
-                $this->showItemsInCategory($chatId, $messageId, $category, (int) $page);
-            } else if (str_starts_with($data, 'category_')) {
+            if (str_starts_with($data, 'category_')) {
                 $category = substr($data, 9);
                 $this->showItemsInCategory($chatId, $messageId, $category, 1);
             } else if (str_starts_with($data, 'item_')) {
                 list($_, $category, $itemName) = explode('_', $data, 3);
                 $this->showItemDetails($chatId, $messageId, $category, $itemName);
-            } else if ($data === 'back_to_categories') {
-                $this->showGenshinCategories($chatId, $messageId);
             } else if (str_starts_with($data, 'delete_trx_')) {
                 $transactionId = substr($data, 11);
                 $this->financeController->deleteTransactionFromCallback($chatId, $messageId, $transactionId);
@@ -304,8 +299,6 @@ class TelegramController extends Controller
                     case 'Money Tracker 💸':
                         $this->financeController->showMoneyTrackerMenu($chatId);
                         break;
-                    // case 'Info Genshin 🎮': $this->showGenshinCategories($chatId); break;
-                    // case 'Poop Tracker 💩': $this->poopController->sendPoopTrackerInfo($chatId); break;
                     case 'Info Saham 📊':
                         $this->tradingController->analyzeAdvanced($chatId, 'BIPI');
                         break;
@@ -418,169 +411,6 @@ class TelegramController extends Controller
                 'chat_id' => $chatId,
                 'text' => "Perintah admin tidak dikenal. Gunakan:\n`/listusers`\n`/usercommands [user_id]`",
             ]);
-        }
-    }
-
-    /**
-     * Mengambil kategori dari API dan menampilkannya sebagai tombol inline.
-     */
-    private function showGenshinCategories($chatId, $messageId = null)
-    {
-        try {
-            $response = Http::get('https://genshin.jmp.blue/');
-            if ($response->successful()) {
-                $categories = $response->json()['types'];
-                $inlineKeyboard = [];
-
-                foreach ($categories as $category) {
-                    $inlineKeyboard[] = [
-                        Keyboard::inlineButton([
-                            'text' => ucwords(str_replace('-', ' ', $category)),
-                            'callback_data' => 'category_' . $category,
-                        ]),
-                    ];
-                }
-
-                $messageData = [
-                    'chat_id' => $chatId,
-                    'text' => 'Pilih kategori Genshin Impact yang ingin Anda lihat:',
-                    'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard]),
-                ];
-
-                if ($messageId) {
-                    $messageData['message_id'] = $messageId;
-                    Telegram::editMessageText($messageData);
-                } else {
-                    Telegram::sendMessage($messageData);
-                }
-            } else {
-                Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, gagal mengambil data kategori dari API.']);
-            }
-        } catch (\Exception $e) {
-            Log::error('Error ambil kategori Genshin: ' . $e->getMessage());
-            Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Terjadi kesalahan saat menghubungi API Genshin.']);
-        }
-    }
-
-    /**
-     * Menampilkan daftar item dalam sebuah kategori dengan pagination.
-     */
-    private function showItemsInCategory($chatId, $messageId, $category, $page = 1)
-    {
-        define('ITEMS_PER_PAGE', 20);
-
-        try {
-            $response = Http::get('https://genshin.jmp.blue/' . $category);
-
-            if ($response->successful()) {
-                $allItems = $response->json();
-                $totalItems = count($allItems);
-                $totalPages = ceil($totalItems / ITEMS_PER_PAGE);
-                $offset = ($page - 1) * ITEMS_PER_PAGE;
-                $itemsForCurrentPage = array_slice($allItems, $offset, ITEMS_PER_PAGE);
-                $inlineKeyboard = [];
-                $row = [];
-
-                foreach ($itemsForCurrentPage as $item) {
-                    $button = Keyboard::inlineButton([
-                        'text' => ucwords(str_replace('-', ' ', $item)),
-                        'callback_data' => 'item_' . $category . '_' . $item,
-                    ]);
-                    $row[] = $button;
-                    if (count($row) == 2) {
-                        $inlineKeyboard[] = $row;
-                        $row = [];
-                    }
-                }
-                if (!empty($row)) {
-                    $inlineKeyboard[] = $row;
-                }
-
-                $navKeyboard = [];
-                if ($page > 1) {
-                    $navKeyboard[] = Keyboard::inlineButton([
-                        'text' => '⬅️ Prev',
-                        'callback_data' => 'genshin_page_' . $category . '_' . ($page - 1),
-                    ]);
-                }
-
-                $navKeyboard[] = Keyboard::inlineButton(['text' => "Page {$page}/{$totalPages}", 'callback_data' => 'no_action']);
-
-                if ($page < $totalPages) {
-                    $navKeyboard[] = Keyboard::inlineButton([
-                        'text' => 'Next ➡️',
-                        'callback_data' => 'genshin_page_' . $category . '_' . ($page + 1),
-                    ]);
-                }
-
-                if (!empty($navKeyboard)) {
-                    $inlineKeyboard[] = $navKeyboard;
-                }
-
-                $inlineKeyboard[] = [Keyboard::inlineButton(['text' => '⬅️ Kembali ke Kategori', 'callback_data' => 'back_to_categories'])];
-
-                Telegram::editMessageText([
-                    'chat_id' => $chatId,
-                    'message_id' => $messageId,
-                    'text' => 'Silakan pilih item dari kategori *' . ucwords($category) . '* (Halaman ' . $page . '):',
-                    'parse_mode' => 'Markdown',
-                    'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard]),
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::error("Error ambil item Genshin ({$category}): " . $e->getMessage());
-        }
-    }
-
-    /**
-     * Menampilkan detail dari item yang dipilih.
-     */
-    private function showItemDetails($chatId, $messageId, $category, $itemName)
-    {
-        try {
-            $response = Http::get("https://genshin.jmp.blue/{$category}/{$itemName}");
-
-            if ($response->successful()) {
-                $details = $response->json();
-
-                if (empty($details)) {
-                    Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Maaf, detail untuk item ini tidak ditemukan.']);
-                    return;
-                }
-
-                $text = '✨ *' . ($details['name'] ?? 'Detail Item') . "* ✨\n\n";
-
-                $ignoreKeys = ['name', 'id', 'images', 'slug'];
-
-                foreach ($details as $key => $value) {
-                    if (in_array($key, $ignoreKeys)) {
-                        continue;
-                    }
-                    if (is_scalar($value) && !empty($value)) {
-                        $formattedKey = ucwords(str_replace(['-', '_'], ' ', $key));
-                        $text .= '🔹 *' . $formattedKey . ':* ' . $value . "\n";
-                    }
-                }
-
-                $inlineKeyboard = [[
-                    Keyboard::inlineButton([
-                        'text' => '⬅️ Kembali ke ' . ucwords($category),
-                        'callback_data' => 'category_' . $category,
-                    ]),
-                ]];
-
-                Telegram::editMessageText([
-                    'chat_id' => $chatId,
-                    'message_id' => $messageId,
-                    'text' => rtrim($text),
-                    'parse_mode' => 'Markdown',
-                    'disable_web_page_preview' => true,
-                    'reply_markup' => Keyboard::make(['inline_keyboard' => $inlineKeyboard]),
-                ]);
-            }
-        } catch (\Exception $e) {
-            Log::error("Error ambil detail Genshin ({$itemName}): " . $e->getMessage());
-            Telegram::sendMessage(['chat_id' => $chatId, 'text' => 'Terjadi kesalahan saat mengambil detail item.']);
         }
     }
 
