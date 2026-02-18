@@ -59,6 +59,7 @@ const menuClick = (event, item) => {
 
 <template>
   <div
+    v-bind="$attrs"
     :class="{
       'overflow-hidden lg:overflow-visible': isAsideMobileExpanded,
     }"

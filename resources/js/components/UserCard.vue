@@ -42,7 +42,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <CardBox>
+  <CardBox v-bind="$attrs">
     <BaseLevel type="justify-around lg:justify-center">
       <div @click="openModal" class="cursor-pointer transition-transform hover:scale-105" title="Klik untuk memperbesar">
       <UserAvatarCurrentUser class="lg:mx-12" />

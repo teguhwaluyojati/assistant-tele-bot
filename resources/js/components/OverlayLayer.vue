@@ -19,6 +19,7 @@ const overlayClick = (event) => {
 
 <template>
   <div
+    v-bind="$attrs"
     :class="[type, zIndex]"
     class="items-center flex-col justify-center overflow-hidden fixed inset-0"
   >
