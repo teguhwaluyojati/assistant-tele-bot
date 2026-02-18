@@ -24,7 +24,7 @@ class Transaction extends Model
      */
     public function user()
     {
-        return $this->belongsTo(TelegramUser::class, 'user_id', 'id');
+        return $this->belongsTo(TelegramUser::class, 'user_id', 'user_id');
     }
 
     public function DailyExpenses()

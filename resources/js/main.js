@@ -22,7 +22,7 @@ if (
 const mainStore = useMainStore(pinia)
 
 mainStore.fetchSampleClients()
-mainStore.fetchSampleHistory()
+mainStore.fetchTransactionsFromApi()
 
 
 const defaultDocumentTitle = 'My Asisstant'

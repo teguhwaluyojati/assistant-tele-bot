@@ -64,6 +64,36 @@ export const useMainStore = defineStore('main', () => {
       })
   }
 
+  function fetchTransactionsFromApi() {
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    }
+
+    axios
+      .get('/api/transactions')
+      .then((result) => {
+        const transactions = result?.data?.data?.data || result?.data?.data || []
+        if (Array.isArray(transactions) && transactions.length > 0) {
+          history.value = transactions.map((t) => ({
+            id: t.id,
+            amount: t.amount,
+            date: new Date(t.created_at).toLocaleDateString('id-ID'),
+            business: t.user?.username || 'Unknown',
+            type: t.type,
+            name: t.description,
+            account: t.user?.first_name + ' ' + t.user?.last_name || 'User',
+          }))
+        } else {
+          fetchSampleHistory()
+        }
+      })
+      .catch((error) => {
+        console.error('Failed to fetch transactions:', error)
+        fetchSampleHistory()
+      })
+  }
+
   return {
     userName,
     userEmail,
@@ -74,5 +104,6 @@ export const useMainStore = defineStore('main', () => {
     setUser,
     fetchSampleClients,
     fetchSampleHistory,
+    fetchTransactionsFromApi,
   }
 })

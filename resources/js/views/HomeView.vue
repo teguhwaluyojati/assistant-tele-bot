@@ -109,6 +109,10 @@ onMounted(() => {
 
 const mainStore = useMainStore()
 
+onMounted(() => {
+  mainStore.fetchTransactionsFromApi()
+})
+
 const displayClientName = (client) => {
   const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ').trim()
   return fullName || client.username || (client.user_id ? `User ${client.user_id}` : 'Unknown')
@@ -142,7 +146,7 @@ const clientBarItems = computed(() =>
   })),
 )
 
-const transactionBarItems = computed(() => mainStore.history)
+const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
 </script>
 
 <template>
@@ -224,7 +228,7 @@ const transactionBarItems = computed(() => mainStore.history)
       <SectionTitleLineWithButton :icon="mdiAccountMultiple" title="Clients" />
 
       <NotificationBar color="info" :icon="mdiMonitorCellphone">
-        <b>Responsive table.</b> Collapses on mobile
+        <b>Users Telegram Only</b>
       </NotificationBar>
 
       <CardBox has-table>

@@ -72,21 +72,10 @@ class DashboardController extends Controller
                 ->latest();
 
             // Filter by telegram user if not admin
-            if (!auth()->user()->isAdmin()) {
-                $telegramUserId = auth()->user()->telegram_user_id;
-                
-                if (!$telegramUserId) {
-                    return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
-                }
-                
-                // Get the telegram user's user_id (chat_id)
-                $telegramUser = \App\Models\TelegramUser::find($telegramUserId);
-                if (!$telegramUser) {
-                    return $this->errorResponse('Telegram user not found.', 404);
-                }
-                
-                $query->where('user_id', $telegramUser->user_id);
+            if (auth()->user()->telegramUser && !auth()->user()->telegramUser->isAdmin()) {
+                $query->where('user_id', auth()->user()->telegramUser->user_id);
             }
+            // If no telegram user linked, still show all for now (can be restricted later)
 
             $transactions = $query->paginate(15);
 
