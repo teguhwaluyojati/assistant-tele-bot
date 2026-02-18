@@ -53,6 +53,11 @@ const buildDateParams = () => {
   return params
 }
 
+const toNumber = (value) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 const fetchSummary = async (params = {}) => {
   try {
     const response = await axios.get('/api/transactions/summary', { params })
@@ -125,21 +130,21 @@ const transactionBarItems = computed(() => mainStore.history)
         <CardBoxWidget
           color="text-emerald-500"
           :icon="mdiChartTimelineVariant"
-          :number="summary.total_income"
+          :number="toNumber(summary.total_income)"
           prefix="Rp"
           label="Income"
         />
         <CardBoxWidget
           color="text-red-500"
           :icon="mdiCartOutline"
-          :number="summary.total_expense"
+          :number="toNumber(summary.total_expense)"
           prefix="Rp"
           label="Expense"
         />
         <CardBoxWidget
           color="text-blue-500"
           :icon="mdiAccountMultiple"
-          :number="summary.balance"
+          :number="toNumber(summary.balance)"
           prefix="Rp"
           label="Balance"
         />
