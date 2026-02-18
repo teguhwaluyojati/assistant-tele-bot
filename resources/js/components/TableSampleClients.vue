@@ -10,6 +10,7 @@ import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import FormControl from '@/components/FormControl.vue'
+import axios from 'axios'
 
 defineProps({
   checkable: Boolean,
@@ -119,6 +120,9 @@ const handleSort = (field) => {
 }
 
 const isModalActive = ref(false)
+const selectedUser = ref(null)
+const userCommands = ref([])
+const isLoadingDetail = ref(false)
 
 const isModalDangerActive = ref(false)
 
@@ -165,12 +169,90 @@ const checked = (isChecked, client) => {
     checkedRows.value = remove(checkedRows.value, (row) => row.id === client.id)
   }
 }
+
+const viewUserDetail = async (client) => {
+  isLoadingDetail.value = true
+  selectedUser.value = client
+  userCommands.value = []
+  isModalActive.value = true
+
+  try {
+    const token = localStorage.getItem('auth_token')
+    
+    // Ensure axios has the auth header
+    if (token && !axios.defaults.headers.common['Authorization']) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    }
+    
+    const response = await axios.get(`/api/users/${client.user_id}`)
+
+    if (response.data.success) {
+      selectedUser.value = response.data.data.user
+      userCommands.value = response.data.data.commands
+    }
+  } catch (error) {
+    console.error('Error fetching user detail:', error)
+    if (error.response?.status === 401) {
+      alert('Session expired. Please login again.')
+      localStorage.clear()
+      window.location.href = '/login'
+    } else {
+      alert('Failed to load user detail. Please try again.')
+    }
+  } finally {
+    isLoadingDetail.value = false
+  }
+}
 </script>
 
 <template>
-  <CardBoxModal v-model="isModalActive" title="Sample modal">
-    <p>Lorem ipsum dolor sit amet <b>adipiscing elit</b></p>
-    <p>This is sample modal</p>
+  <CardBoxModal v-model="isModalActive" title="User Detail" large>
+    <div v-if="isLoadingDetail" class="text-center py-4">
+      <p>Loading...</p>
+    </div>
+    <div v-else-if="selectedUser" class="space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Name</p>
+          <p class="font-semibold">{{ displayName(selectedUser) }}</p>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Username</p>
+          <p class="font-semibold">{{ selectedUser.username || '-' }}</p>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Level</p>
+          <p class="font-semibold">{{ getLevelLabel(selectedUser.level) }}</p>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Telegram ID</p>
+          <p class="font-semibold">{{ selectedUser.user_id }}</p>
+        </div>
+        <div>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Last Interaction</p>
+          <p class="font-semibold">{{ formatShortDate(selectedUser.last_interaction_at) }}</p>
+        </div>
+      </div>
+      
+      <div class="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
+        <h3 class="font-semibold text-lg mb-3">Command History (Last 50)</h3>
+        <div v-if="userCommands.length === 0" class="text-gray-500 dark:text-gray-400 text-sm">
+          No commands found
+        </div>
+        <div v-else class="max-h-64 overflow-y-auto space-y-2">
+          <div
+            v-for="cmd in userCommands"
+            :key="cmd.id"
+            class="p-3 bg-gray-50 dark:bg-slate-800 rounded text-sm"
+          >
+            <div class="flex justify-between items-start">
+              <span class="font-mono text-blue-600 dark:text-blue-400">{{ cmd.command }}</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatShortDate(cmd.created_at) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </CardBoxModal>
 
   <CardBoxModal v-model="isModalDangerActive" title="Please confirm" button="danger" has-cancel>
@@ -288,7 +370,7 @@ const checked = (isChecked, client) => {
         </td>
         <td class="before:hidden lg:w-1 whitespace-nowrap">
           <BaseButtons type="justify-center" no-wrap>
-            <BaseButton color="info" :icon="mdiEye" small @click="isModalActive = true" />
+            <BaseButton color="info" :icon="mdiEye" small @click="viewUserDetail(client)" />
             <BaseButton
               color="danger"
               :icon="mdiTrashCan"

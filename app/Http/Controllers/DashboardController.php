@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\TelegramUser;
 use App\Models\LoginModel;
+use App\Models\TelegramUserCommand;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Carbon;
 use App\Traits\ApiResponse;
@@ -254,6 +255,27 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Error retrieving daily chart: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while retrieving chart data.', 500);
+        }
+    }
+
+    public function getUserDetail($userId)
+    {
+        try {
+            $user = TelegramUser::where('user_id', $userId)->firstOrFail();
+            
+            $commands = TelegramUserCommand::where('user_id', $userId)
+                ->latest()
+                ->limit(50)
+                ->get();
+
+            return $this->successResponse([
+                'user' => $user,
+                'commands' => $commands
+            ], 'User detail retrieved successfully.');
+            
+        } catch (\Exception $e) {
+            Log::error('Error retrieving user detail: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while retrieving user detail.', 500);
         }
     }
 
