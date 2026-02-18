@@ -17,6 +17,29 @@ const mainStore = useMainStore()
 
 const items = computed(() => mainStore.clients)
 
+const displayName = (client) => {
+  const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ').trim()
+  return fullName || client.username || `User ${client.user_id}`
+}
+
+const formatShortDate = (value) => {
+  if (!value) {
+    return '-'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
 const isModalActive = ref(false)
 
 const isModalDangerActive = ref(false)
@@ -85,10 +108,10 @@ const checked = (isChecked, client) => {
         <th v-if="checkable" />
         <th />
         <th>Name</th>
-        <th>Company</th>
-        <th>City</th>
-        <th>Progress</th>
-        <th>Created</th>
+        <th>Username</th>
+        <th>Level</th>
+        <th>Telegram ID</th>
+        <th>Last Interaction</th>
         <th />
       </tr>
     </thead>
@@ -96,25 +119,26 @@ const checked = (isChecked, client) => {
       <tr v-for="client in itemsPaginated" :key="client.id">
         <TableCheckboxCell v-if="checkable" @checked="checked($event, client)" />
         <td class="border-b-0 lg:w-6 before:hidden">
-          <UserAvatar :username="client.name" class="w-24 h-24 mx-auto lg:w-6 lg:h-6" />
+          <UserAvatar :username="displayName(client)" class="w-24 h-24 mx-auto lg:w-6 lg:h-6" />
         </td>
         <td data-label="Name">
-          {{ client.name }}
+          {{ displayName(client) }}
         </td>
-        <td data-label="Company">
-          {{ client.company }}
+        <td data-label="Username">
+          {{ client.username || '-' }}
         </td>
-        <td data-label="City">
-          {{ client.city }}
+        <td data-label="Level">
+          {{ client.level ?? '-' }}
         </td>
-        <td data-label="Progress" class="lg:w-32">
-          <progress class="flex w-2/5 self-center lg:w-full" max="100" :value="client.progress">
-            {{ client.progress }}
-          </progress>
+        <td data-label="Telegram ID">
+          {{ client.user_id || '-' }}
         </td>
-        <td data-label="Created" class="lg:w-1 whitespace-nowrap">
-          <small class="text-gray-500 dark:text-slate-400" :title="client.created">{{
-            client.created
+        <td data-label="Last Interaction" class="lg:w-1 whitespace-nowrap">
+          <small
+            class="text-gray-500 dark:text-slate-400"
+            :title="client.last_interaction_at"
+          >{{
+            formatShortDate(client.last_interaction_at)
           }}</small>
         </td>
         <td class="before:hidden lg:w-1 whitespace-nowrap">
@@ -135,6 +159,13 @@ const checked = (isChecked, client) => {
     <BaseLevel>
       <BaseButtons>
         <BaseButton
+          label="Prev"
+          color="whiteDark"
+          small
+          :disabled="currentPage === 0"
+          @click="currentPage = Math.max(currentPage - 1, 0)"
+        />
+        <BaseButton
           v-for="page in pagesList"
           :key="page"
           :active="page === currentPage"
@@ -142,6 +173,13 @@ const checked = (isChecked, client) => {
           :color="page === currentPage ? 'lightDark' : 'whiteDark'"
           small
           @click="currentPage = page"
+        />
+        <BaseButton
+          label="Next"
+          color="whiteDark"
+          small
+          :disabled="currentPage >= numPages - 1"
+          @click="currentPage = Math.min(currentPage + 1, numPages - 1)"
         />
       </BaseButtons>
       <small>Page {{ currentPageHuman }} of {{ numPages }}</small>

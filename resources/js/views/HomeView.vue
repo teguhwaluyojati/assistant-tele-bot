@@ -109,7 +109,38 @@ onMounted(() => {
 
 const mainStore = useMainStore()
 
-const clientBarItems = computed(() => mainStore.clients.slice(0, 4))
+const displayClientName = (client) => {
+  const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ').trim()
+  return fullName || client.username || (client.user_id ? `User ${client.user_id}` : 'Unknown')
+}
+
+const formatShortDate = (value) => {
+  if (!value) {
+    return '-'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return new Intl.DateTimeFormat('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+const clientBarItems = computed(() =>
+  mainStore.clients.slice(0, 4).map((client) => ({
+    id: client.id,
+    name: displayClientName(client),
+    login: client.username || '-',
+    date: formatShortDate(client.last_interaction_at),
+    progress: Number.isFinite(Number(client.level)) ? Number(client.level) * 20 : 0,
+  })),
+)
 
 const transactionBarItems = computed(() => mainStore.history)
 </script>
@@ -169,7 +200,7 @@ const transactionBarItems = computed(() => mainStore.history)
             :key="client.id"
             :name="client.name"
             :login="client.login"
-            :date="client.created"
+            :date="client.date"
             :progress="client.progress"
           />
         </div>

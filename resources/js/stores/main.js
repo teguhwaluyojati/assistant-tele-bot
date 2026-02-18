@@ -38,10 +38,15 @@ export const useMainStore = defineStore('main', () => {
   }
 
   function fetchSampleClients() {
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    }
+
     axios
-      .get(`data-sources/clients.json?v=3`)
+      .get('/api/users')
       .then((result) => {
-        clients.value = result?.data?.data
+        clients.value = result?.data?.data || []
       })
       .catch((error) => {
         alert(error.message)
