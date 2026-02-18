@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
+import axios from 'axios'
 import { useMainStore } from '@/stores/main'
 import {
   mdiAccountMultiple,
@@ -9,7 +10,6 @@ import {
   mdiReload,
   mdiChartPie,
 } from '@mdi/js'
-import * as chartConfig from '@/components/Charts/chart.config.js'
 import LineChart from '@/components/Charts/LineChart.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBoxWidget from '@/components/CardBoxWidget.vue'
@@ -23,13 +23,35 @@ import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 
 const chartData = ref(null)
+const summary = ref({
+  total_income: 0,
+  total_expense: 0,
+  balance: 0,
+  total_transactions: 0,
+  period: '',
+})
 
-const fillChartData = () => {
-  chartData.value = chartConfig.sampleChartData()
+const fetchSummary = async () => {
+  try {
+    const response = await axios.get('/api/transactions/summary')
+    summary.value = response.data?.data || summary.value
+  } catch (error) {
+    console.error('Failed to load summary:', error)
+  }
+}
+
+const fetchChartData = async () => {
+  try {
+    const response = await axios.get('/api/transactions/daily-chart')
+    chartData.value = response.data?.data || null
+  } catch (error) {
+    console.error('Failed to load chart data:', error)
+  }
 }
 
 onMounted(() => {
-  fillChartData()
+  fetchSummary()
+  fetchChartData()
 })
 
 const mainStore = useMainStore()
@@ -47,30 +69,25 @@ const transactionBarItems = computed(() => mainStore.history)
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
         <CardBoxWidget
-          trend="12%"
-          trend-type="up"
           color="text-emerald-500"
-          :icon="mdiAccountMultiple"
-          :number="512"
-          label="Clients"
-        />
-        <CardBoxWidget
-          trend="12%"
-          trend-type="down"
-          color="text-blue-500"
-          :icon="mdiCartOutline"
-          :number="7770"
-          prefix="$"
-          label="Sales"
-        />
-        <CardBoxWidget
-          trend="Overflow"
-          trend-type="alert"
-          color="text-red-500"
           :icon="mdiChartTimelineVariant"
-          :number="256"
-          suffix="%"
-          label="Performance"
+          :number="summary.total_income"
+          prefix="Rp"
+          label="Income"
+        />
+        <CardBoxWidget
+          color="text-red-500"
+          :icon="mdiCartOutline"
+          :number="summary.total_expense"
+          prefix="Rp"
+          label="Expense"
+        />
+        <CardBoxWidget
+          color="text-blue-500"
+          :icon="mdiAccountMultiple"
+          :number="summary.balance"
+          prefix="Rp"
+          label="Balance"
         />
       </div>
 
@@ -101,7 +118,7 @@ const transactionBarItems = computed(() => mainStore.history)
 
 
       <SectionTitleLineWithButton :icon="mdiChartPie" title="Trends overview">
-        <BaseButton :icon="mdiReload" color="whiteDark" @click="fillChartData" />
+        <BaseButton :icon="mdiReload" color="whiteDark" @click="fetchChartData" />
       </SectionTitleLineWithButton>
 
       <CardBox class="mb-6">
