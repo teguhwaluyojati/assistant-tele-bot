@@ -6,6 +6,7 @@ import {
   mdiAccountMultiple,
   mdiCartOutline,
   mdiChartTimelineVariant,
+  mdiCog,
   mdiMonitorCellphone,
   mdiReload,
   mdiChartPie,
@@ -21,6 +22,9 @@ import CardBoxTransaction from '@/components/CardBoxTransaction.vue'
 import CardBoxClient from '@/components/CardBoxClient.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
+import CardBoxModal from '@/components/CardBoxModal.vue'
+import FormField from '@/components/FormField.vue'
+import FormControl from '@/components/FormControl.vue'
 
 const chartData = ref(null)
 const summary = ref({
@@ -30,28 +34,72 @@ const summary = ref({
   total_transactions: 0,
   period: '',
 })
+const isFilterModalOpen = ref(false)
+const filterStartDate = ref('')
+const filterEndDate = ref('')
+const activeDateFilter = ref({
+  start_date: '',
+  end_date: '',
+})
 
-const fetchSummary = async () => {
+const buildDateParams = () => {
+  const params = {}
+  if (activeDateFilter.value.start_date) {
+    params.start_date = activeDateFilter.value.start_date
+  }
+  if (activeDateFilter.value.end_date) {
+    params.end_date = activeDateFilter.value.end_date
+  }
+  return params
+}
+
+const fetchSummary = async (params = {}) => {
   try {
-    const response = await axios.get('/api/transactions/summary')
+    const response = await axios.get('/api/transactions/summary', { params })
     summary.value = response.data?.data || summary.value
   } catch (error) {
     console.error('Failed to load summary:', error)
   }
 }
 
-const fetchChartData = async () => {
+const fetchChartData = async (params = {}) => {
   try {
-    const response = await axios.get('/api/transactions/daily-chart')
+    const response = await axios.get('/api/transactions/daily-chart', { params })
     chartData.value = response.data?.data || null
   } catch (error) {
     console.error('Failed to load chart data:', error)
   }
 }
 
+const openFilterModal = () => {
+  filterStartDate.value = activeDateFilter.value.start_date
+  filterEndDate.value = activeDateFilter.value.end_date
+  isFilterModalOpen.value = true
+}
+
+const applyDateFilter = () => {
+  if (filterStartDate.value && filterEndDate.value) {
+    if (filterStartDate.value > filterEndDate.value) {
+      console.error('Start date must be before end date')
+      return
+    }
+  }
+
+  activeDateFilter.value = {
+    start_date: filterStartDate.value || '',
+    end_date: filterEndDate.value || '',
+  }
+
+  const params = buildDateParams()
+  fetchSummary(params)
+  fetchChartData(params)
+  isFilterModalOpen.value = false
+}
+
 onMounted(() => {
-  fetchSummary()
-  fetchChartData()
+  const params = buildDateParams()
+  fetchSummary(params)
+  fetchChartData(params)
 })
 
 const mainStore = useMainStore()
@@ -65,6 +113,12 @@ const transactionBarItems = computed(() => mainStore.history)
   <LayoutAuthenticated>
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiChartTimelineVariant" title="Overview" main>
+        <div class="flex items-center gap-3">
+          <span v-if="summary.period" class="text-sm text-gray-500">
+            Period: {{ summary.period }}
+          </span>
+          <BaseButton :icon="mdiCog" color="whiteDark" @click="openFilterModal" />
+        </div>
       </SectionTitleLineWithButton>
 
       <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
@@ -118,7 +172,11 @@ const transactionBarItems = computed(() => mainStore.history)
 
 
       <SectionTitleLineWithButton :icon="mdiChartPie" title="Trends overview">
-        <BaseButton :icon="mdiReload" color="whiteDark" @click="fetchChartData" />
+        <BaseButton
+          :icon="mdiReload"
+          color="whiteDark"
+          @click="fetchChartData(buildDateParams())"
+        />
       </SectionTitleLineWithButton>
 
       <CardBox class="mb-6">
@@ -136,6 +194,29 @@ const transactionBarItems = computed(() => mainStore.history)
       <CardBox has-table>
         <TableSampleClients />
       </CardBox>
+      <CardBoxModal
+        v-model="isFilterModalOpen"
+        title="Filter Period"
+        button-label="Apply"
+        :has-cancel="true"
+        @confirm="applyDateFilter"
+        @cancel="isFilterModalOpen = false"
+      >
+        <FormField label="Start date" label-for="filter-start-date">
+          <FormControl
+            id="filter-start-date"
+            v-model="filterStartDate"
+            type="date"
+          />
+        </FormField>
+        <FormField label="End date" label-for="filter-end-date">
+          <FormControl
+            id="filter-end-date"
+            v-model="filterEndDate"
+            type="date"
+          />
+        </FormField>
+      </CardBoxModal>
     </SectionMain>
   </LayoutAuthenticated>
 </template>

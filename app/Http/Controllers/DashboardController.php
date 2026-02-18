@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\TelegramUser;
 use App\Models\LoginModel;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Carbon;
 use App\Traits\ApiResponse;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\StocksImport;
@@ -97,10 +98,28 @@ class DashboardController extends Controller
         }
     }
 
-    public function getTransactionsSummary()
+    public function getTransactionsSummary(Request $request)
     {
         try {
-            $currentMonth = now()->startOfMonth();
+            $startDateInput = $request->query('start_date');
+            $endDateInput = $request->query('end_date');
+
+            if ($startDateInput || $endDateInput) {
+                $startDate = $startDateInput
+                    ? Carbon::parse($startDateInput)->startOfDay()
+                    : now()->startOfMonth();
+                $endDate = $endDateInput
+                    ? Carbon::parse($endDateInput)->endOfDay()
+                    : now()->endOfDay();
+            } else {
+                $startDate = now()->startOfMonth();
+                $endDate = now()->endOfMonth();
+            }
+
+            if ($startDate->gt($endDate)) {
+                return $this->errorResponse('Start date must be before end date.', 422);
+            }
+
             $chatId = null;
             
             // Filter by telegram user if not admin
@@ -120,10 +139,10 @@ class DashboardController extends Controller
             }
             
             $incomeQuery = \App\Models\Transaction::where('type', 'income')
-                ->where('created_at', '>=', $currentMonth);
+                ->whereBetween('created_at', [$startDate, $endDate]);
             $expenseQuery = \App\Models\Transaction::where('type', 'expense')
-                ->where('created_at', '>=', $currentMonth);
-            $countQuery = \App\Models\Transaction::where('created_at', '>=', $currentMonth);
+                ->whereBetween('created_at', [$startDate, $endDate]);
+            $countQuery = \App\Models\Transaction::whereBetween('created_at', [$startDate, $endDate]);
             
             if ($chatId) {
                 $incomeQuery->where('user_id', $chatId);
@@ -141,7 +160,7 @@ class DashboardController extends Controller
                 'total_expense' => $totalExpense,
                 'balance' => $balance,
                 'total_transactions' => $totalTransactions,
-                'period' => now()->format('F Y')
+                'period' => $startDate->format('M d, Y') . ' - ' . $endDate->format('M d, Y'),
             ];
 
             return $this->successResponse($summary, 'Transaction summary retrieved successfully.');
@@ -152,10 +171,28 @@ class DashboardController extends Controller
         }
     }
 
-    public function getDailyChart()
+    public function getDailyChart(Request $request)
     {
         try {
-            $days = 7;
+            $startDateInput = $request->query('start_date');
+            $endDateInput = $request->query('end_date');
+
+            if ($startDateInput || $endDateInput) {
+                $startDate = $startDateInput
+                    ? Carbon::parse($startDateInput)->startOfDay()
+                    : now()->startOfMonth();
+                $endDate = $endDateInput
+                    ? Carbon::parse($endDateInput)->endOfDay()
+                    : now()->endOfDay();
+            } else {
+                $startDate = now()->subDays(6)->startOfDay();
+                $endDate = now()->endOfDay();
+            }
+
+            if ($startDate->gt($endDate)) {
+                return $this->errorResponse('Start date must be before end date.', 422);
+            }
+
             $chatId = null;
             
             // Filter by telegram user if not admin
@@ -177,15 +214,17 @@ class DashboardController extends Controller
             $labels = [];
             $incomeData = [];
             $expenseData = [];
-            
-            for ($i = 0; $i < $days; $i++) {
-                $date = now()->subDays($days - 1 - $i)->startOfDay();
-                $labels[] = $date->format('M d');
+
+            $cursor = $startDate->copy();
+            $endDateDay = $endDate->copy()->startOfDay();
+
+            while ($cursor->lte($endDateDay)) {
+                $labels[] = $cursor->format('M d');
                 
                 $incomeQuery = \App\Models\Transaction::where('type', 'income')
-                    ->whereDate('created_at', $date->toDateString());
+                    ->whereDate('created_at', $cursor->toDateString());
                 $expenseQuery = \App\Models\Transaction::where('type', 'expense')
-                    ->whereDate('created_at', $date->toDateString());
+                    ->whereDate('created_at', $cursor->toDateString());
                 
                 if ($chatId) {
                     $incomeQuery->where('user_id', $chatId);
@@ -197,6 +236,8 @@ class DashboardController extends Controller
                 
                 $incomeData[] = (int) $income;
                 $expenseData[] = (int) $expense;
+
+                $cursor->addDay();
             }
 
             $chartData = [
