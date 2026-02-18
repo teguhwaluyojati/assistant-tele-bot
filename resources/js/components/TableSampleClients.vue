@@ -1,13 +1,15 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useMainStore } from '@/stores/main'
-import { mdiEye, mdiTrashCan } from '@mdi/js'
+import { mdiEye, mdiTrashCan, mdiArrowUp, mdiArrowDown } from '@mdi/js'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import TableCheckboxCell from '@/components/TableCheckboxCell.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
 import BaseButton from '@/components/BaseButton.vue'
+import BaseIcon from '@/components/BaseIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
+import FormControl from '@/components/FormControl.vue'
 
 defineProps({
   checkable: Boolean,
@@ -16,6 +18,10 @@ defineProps({
 const mainStore = useMainStore()
 
 const items = computed(() => mainStore.clients)
+
+const searchQuery = ref('')
+const sortField = ref('last_interaction_at')
+const sortDirection = ref('desc')
 
 const displayName = (client) => {
   const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ').trim()
@@ -40,6 +46,78 @@ const formatShortDate = (value) => {
   }).format(date)
 }
 
+const getLevelLabel = (level) => {
+  const levels = {
+    1: 'Admin',
+    2: 'Member',
+  }
+  return levels[level] || '-'
+}
+
+const filteredAndSortedItems = computed(() => {
+  let filtered = items.value
+
+  // Search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase().trim()
+    filtered = filtered.filter((client) => {
+      const name = displayName(client).toLowerCase()
+      const username = (client.username || '').toLowerCase()
+      const userId = String(client.user_id || '').toLowerCase()
+      const level = getLevelLabel(client.level).toLowerCase()
+      
+      return name.includes(query) || username.includes(query) || userId.includes(query) || level.includes(query)
+    })
+  }
+
+  // Sort
+  const sorted = [...filtered].sort((a, b) => {
+    let aVal, bVal
+
+    switch (sortField.value) {
+      case 'name':
+        aVal = displayName(a).toLowerCase()
+        bVal = displayName(b).toLowerCase()
+        break
+      case 'username':
+        aVal = (a.username || '').toLowerCase()
+        bVal = (b.username || '').toLowerCase()
+        break
+      case 'level':
+        aVal = a.level ?? 0
+        bVal = b.level ?? 0
+        break
+      case 'user_id':
+        aVal = a.user_id || 0
+        bVal = b.user_id || 0
+        break
+      case 'last_interaction_at':
+        aVal = new Date(a.last_interaction_at || 0).getTime()
+        bVal = new Date(b.last_interaction_at || 0).getTime()
+        break
+      default:
+        return 0
+    }
+
+    if (aVal < bVal) return sortDirection.value === 'asc' ? -1 : 1
+    if (aVal > bVal) return sortDirection.value === 'asc' ? 1 : -1
+    return 0
+  })
+
+  return sorted
+})
+
+const handleSort = (field) => {
+  if (sortField.value === field) {
+    // Toggle direction if clicking same field
+    sortDirection.value = sortDirection.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    // New field, default to asc
+    sortField.value = field
+    sortDirection.value = 'asc'
+  }
+}
+
 const isModalActive = ref(false)
 
 const isModalDangerActive = ref(false)
@@ -51,10 +129,10 @@ const currentPage = ref(0)
 const checkedRows = ref([])
 
 const itemsPaginated = computed(() =>
-  items.value.slice(perPage.value * currentPage.value, perPage.value * (currentPage.value + 1)),
+  filteredAndSortedItems.value.slice(perPage.value * currentPage.value, perPage.value * (currentPage.value + 1)),
 )
 
-const numPages = computed(() => Math.ceil(items.value.length / perPage.value))
+const numPages = computed(() => Math.ceil(filteredAndSortedItems.value.length / perPage.value))
 
 const currentPageHuman = computed(() => currentPage.value + 1)
 
@@ -100,19 +178,86 @@ const checked = (isChecked, client) => {
     <p>This is sample modal</p>
   </CardBoxModal>
 
-  <!-- <table> -->
+  <!-- Table -->
+  <div class="border border-gray-100 dark:border-slate-800 rounded">
     <table class="min-w-full text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-900">
-
-    <thead>
-      <tr>
+      <thead>
+        <tr>
         <th v-if="checkable" />
         <th />
-        <th>Name</th>
-        <th>Username</th>
-        <th>Level</th>
-        <th>Telegram ID</th>
-        <th>Last Interaction</th>
-        <th />
+        <th>
+          <button
+            class="flex items-center gap-1 hover:opacity-70 cursor-pointer"
+            @click="handleSort('name')"
+          >
+            Name
+            <BaseIcon
+              v-if="sortField === 'name'"
+              :path="sortDirection === 'asc' ? mdiArrowUp : mdiArrowDown"
+              size="16"
+            />
+          </button>
+        </th>
+        <th>
+          <button
+            class="flex items-center gap-1 hover:opacity-70 cursor-pointer"
+            @click="handleSort('username')"
+          >
+            Username
+            <BaseIcon
+              v-if="sortField === 'username'"
+              :path="sortDirection === 'asc' ? mdiArrowUp : mdiArrowDown"
+              size="16"
+            />
+          </button>
+        </th>
+        <th>
+          <button
+            class="flex items-center gap-1 hover:opacity-70 cursor-pointer"
+            @click="handleSort('level')"
+          >
+            Level
+            <BaseIcon
+              v-if="sortField === 'level'"
+              :path="sortDirection === 'asc' ? mdiArrowUp : mdiArrowDown"
+              size="16"
+            />
+          </button>
+        </th>
+        <th>
+          <button
+            class="flex items-center gap-1 hover:opacity-70 cursor-pointer"
+            @click="handleSort('user_id')"
+          >
+            Telegram ID
+            <BaseIcon
+              v-if="sortField === 'user_id'"
+              :path="sortDirection === 'asc' ? mdiArrowUp : mdiArrowDown"
+              size="16"
+            />
+          </button>
+        </th>
+        <th>
+          <button
+            class="flex items-center gap-1 hover:opacity-70 cursor-pointer"
+            @click="handleSort('last_interaction_at')"
+          >
+            Last Interaction
+            <BaseIcon
+              v-if="sortField === 'last_interaction_at'"
+              :path="sortDirection === 'asc' ? mdiArrowUp : mdiArrowDown"
+              size="16"
+            />
+          </button>
+        </th>
+        <th class="flex justify-end items-center p-2 lg:px-4">
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search..."
+            class="w-40 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+        </th>
       </tr>
     </thead>
     <tbody>
@@ -128,7 +273,7 @@ const checked = (isChecked, client) => {
           {{ client.username || '-' }}
         </td>
         <td data-label="Level">
-          {{ client.level ?? '-' }}
+          {{ getLevelLabel(client.level) }}
         </td>
         <td data-label="Telegram ID">
           {{ client.user_id || '-' }}
@@ -142,7 +287,7 @@ const checked = (isChecked, client) => {
           }}</small>
         </td>
         <td class="before:hidden lg:w-1 whitespace-nowrap">
-          <BaseButtons type="justify-start lg:justify-end" no-wrap>
+          <BaseButtons type="justify-center" no-wrap>
             <BaseButton color="info" :icon="mdiEye" small @click="isModalActive = true" />
             <BaseButton
               color="danger"
@@ -155,6 +300,7 @@ const checked = (isChecked, client) => {
       </tr>
     </tbody>
   </table>
+  </div>
   <div class="p-3 lg:px-6 border-t border-gray-100 dark:border-slate-800">
     <BaseLevel>
       <BaseButtons>
