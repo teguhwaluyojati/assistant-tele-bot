@@ -10,6 +10,7 @@ import {
   mdiMonitorCellphone,
   mdiReload,
   mdiChartPie,
+  mdiWallet,
 } from '@mdi/js'
 import LineChart from '@/components/Charts/LineChart.vue'
 import SectionMain from '@/components/SectionMain.vue'
@@ -178,7 +179,7 @@ const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
         />
         <CardBoxWidget
           color="text-blue-500"
-          :icon="mdiAccountMultiple"
+          :icon="mdiWallet"
           :number="toNumber(summary.balance)"
           prefix="Rp"
           label="Balance"
