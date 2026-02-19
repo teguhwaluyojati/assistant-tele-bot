@@ -144,8 +144,33 @@ const formatShortDate = (value) => {
   }).format(date)
 }
 
-const clientBarItems = computed(() =>
-  mainStore.clients.slice(0, 4).map((client) => {
+const displayPeriod = computed(() => summary.value.period || 'N/A')
+
+const fallbackTransactions = Array.from({ length: 4 }, (_, index) => ({
+  id: `placeholder-${index}`,
+  amount: 'N/A',
+  date: 'N/A',
+  business: 'N/A',
+  type: 'n/a',
+  name: 'N/A',
+  account: 'N/A',
+}))
+
+const fallbackClients = Array.from({ length: 4 }, (_, index) => ({
+  id: `placeholder-${index}`,
+  name: 'N/A',
+  login: 'N/A',
+  date: 'N/A',
+  type: 'info',
+  text: 'N/A',
+}))
+
+const clientBarItems = computed(() => {
+  if (!mainStore.clients.length) {
+    return fallbackClients
+  }
+
+  return mainStore.clients.slice(0, 4).map((client) => {
     const levelLabel = client.level === 1 ? 'Admin' : 'Member'
     const levelType = client.level === 1 ? 'success' : 'info'
     return {
@@ -156,10 +181,16 @@ const clientBarItems = computed(() =>
       type: levelType,
       text: levelLabel,
     }
-  }),
-)
+  })
+})
 
-const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
+const transactionBarItems = computed(() => {
+  if (!mainStore.history.length) {
+    return fallbackTransactions
+  }
+
+  return mainStore.history.slice(0, 4)
+})
 
 const isAdminUser = computed(() => {
   return mainStore.currentUser?.telegram_user?.level === 1
@@ -171,8 +202,8 @@ const isAdminUser = computed(() => {
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiChartTimelineVariant" title="Overview" main>
         <div class="flex items-center gap-4">
-          <span v-if="summary.period" class="text-base text-gray-500 font-medium">
-            Period: {{ summary.period }}
+          <span class="text-base text-gray-500 font-medium">
+            Period: {{ displayPeriod }}
           </span>
           <BaseButton :icon="mdiCog" color="whiteDark" @click="openFilterModal" />
         </div>
@@ -240,6 +271,12 @@ const isAdminUser = computed(() => {
       <CardBox class="mb-8">
         <div v-if="chartData">
           <line-chart :data="chartData" class="h-[500px]" />
+        </div>
+        <div
+          v-else
+          class="h-[500px] flex items-center justify-center text-gray-500 dark:text-slate-400"
+        >
+          N/A
         </div>
       </CardBox>
 

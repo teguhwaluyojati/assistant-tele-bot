@@ -8,7 +8,7 @@ import IconRounded from '@/components/IconRounded.vue'
 
 const props = defineProps({
   amount: {
-    type: Number,
+    type: [Number, String],
     required: true,
   },
   date: {
@@ -51,6 +51,11 @@ const icon = computed(() => {
     type: 'info',
   }
 })
+
+const amountLabel = computed(() => {
+  const parsed = Number(props.amount)
+  return Number.isFinite(parsed) ? `Rp. ${parsed}` : 'N/A'
+})
 </script>
 
 <template>
@@ -59,7 +64,7 @@ const icon = computed(() => {
       <BaseLevel type="justify-start">
         <IconRounded :icon="icon.icon" :color="icon.type" class="md:mr-6" />
         <div class="text-center space-y-1 md:text-left md:mr-6">
-          <h4 class="text-xl">Rp. {{ amount }}</h4>
+          <h4 class="text-xl">{{ amountLabel }}</h4>
           <p class="text-gray-500 dark:text-slate-400">
             <b>{{ date }}</b> via {{ business }}
           </p>
