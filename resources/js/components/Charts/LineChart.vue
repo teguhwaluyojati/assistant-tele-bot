@@ -9,6 +9,7 @@ import {
   CategoryScale,
   Tooltip,
   Filler,
+  Legend,
 } from 'chart.js'
 
 const props = defineProps({
@@ -22,7 +23,7 @@ const root = ref(null)
 
 let chart
 
-Chart.register(LineElement, PointElement, LineController, LinearScale, CategoryScale, Tooltip, Filler)
+Chart.register(LineElement, PointElement, LineController, LinearScale, CategoryScale, Tooltip, Filler, Legend)
 
 onMounted(() => {
   chart = new Chart(root.value, {
@@ -41,7 +42,23 @@ onMounted(() => {
       },
       plugins: {
         legend: {
-          display: false,
+          display: true,
+          position: 'bottom',
+          labels: {
+            usePointStyle: true,
+            padding: 15,
+            font: {
+              size: 14,
+              weight: 'bold',
+            },
+          },
+          onClick: (e, legendItem, legend) => {
+            const index = legendItem.datasetIndex
+            const chart = legend.chart
+            const meta = chart.getDatasetMeta(index)
+            meta.hidden = !meta.hidden
+            chart.update()
+          },
         },
       },
     },

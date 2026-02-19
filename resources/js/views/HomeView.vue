@@ -138,13 +138,18 @@ const formatShortDate = (value) => {
 }
 
 const clientBarItems = computed(() =>
-  mainStore.clients.slice(0, 4).map((client) => ({
-    id: client.id,
-    name: displayClientName(client),
-    login: client.username || '-',
-    date: formatShortDate(client.last_interaction_at),
-    progress: Number.isFinite(Number(client.level)) ? Number(client.level) * 20 : 0,
-  })),
+  mainStore.clients.slice(0, 4).map((client) => {
+    const levelLabel = client.level === 1 ? 'Admin' : 'Member'
+    const levelType = client.level === 1 ? 'success' : 'info'
+    return {
+      id: client.id,
+      name: displayClientName(client),
+      login: client.username || '-',
+      date: formatShortDate(client.last_interaction_at),
+      type: levelType,
+      text: levelLabel,
+    }
+  }),
 )
 
 const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
@@ -206,7 +211,8 @@ const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
             :name="client.name"
             :login="client.login"
             :date="client.date"
-            :progress="client.progress"
+            :type="client.type"
+            :text="client.text"
           />
         </div>
       </div>
