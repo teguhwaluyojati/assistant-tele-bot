@@ -21,6 +21,7 @@ import NotificationBar from '@/components/NotificationBar.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import CardBoxTransaction from '@/components/CardBoxTransaction.vue'
 import CardBoxClient from '@/components/CardBoxClient.vue'
+import TableTransactions from '@/components/TableTransactions.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
@@ -240,6 +241,12 @@ const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
 
       <CardBox has-table>
         <TableSampleClients />
+      </CardBox>
+
+      <SectionTitleLineWithButton :icon="mdiCartOutline" title="All Transactions" />
+
+      <CardBox has-table>
+        <TableTransactions />
       </CardBox>
       <CardBoxModal
         v-model="isFilterModalOpen"
