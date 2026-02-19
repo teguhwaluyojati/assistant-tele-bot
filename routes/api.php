@@ -48,7 +48,8 @@ Route::post('/webhook', [TelegramController::class, 'handle']);
 Route::get('/daily-expenses', [TelegramController::class, 'broadcastDailyExpenses']);
 
 //Login Register Logout
-Route::post('/register', [RegisterController::class, 'register']);
+Route::post('/register/initiate', [RegisterController::class, 'initiateRegister']);
+Route::post('/register/verify', [RegisterController::class, 'verifyAndRegister']);
 Route::post('/login', [LoginController::class, 'login']);
 
 Route::post('/stocks/upload', [DashboardController::class, 'upload']);

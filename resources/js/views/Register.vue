@@ -16,7 +16,8 @@
     </div>
 
     <div class="right-pane">
-      <div class="login-box">
+      <!-- Registration Form -->
+      <div class="login-box" v-if="!showVerificationModal">
         <div class="logo">
           🤖
         </div>
@@ -25,7 +26,7 @@
 
         <form @submit.prevent="handleRegister">
           <div class="form-group">
-            <label for="name">Name</label>
+            <label for="name">Full Name</label>
             <div class="input-wrapper">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
               <input type="text" id="name" v-model="form.name" placeholder="Full Name" required :disabled="loading" />
@@ -38,6 +39,15 @@
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
               <input type="email" id="email" v-model="form.email" placeholder="example@email.com" required :disabled="loading" />
             </div>
+          </div>
+
+          <div class="form-group">
+            <label for="telegram_username">Telegram Username</label>
+            <div class="input-wrapper">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+              <input type="text" id="telegram_username" v-model="form.telegram_username" placeholder="@username" required :disabled="loading" />
+            </div>
+            <small class="help-text">Your Telegram username (without @)</small>
           </div>
 
           <div class="form-group">
@@ -68,13 +78,58 @@
             <span v-if="loading">
               <div class="spinner"></div>
             </span>
-            <span v-else>Register</span>
+            <span v-else>Proceed to Verification</span>
           </button>
 
           <p class="login-link">
             Already have an account? 
             <router-link to="/">Login here!</router-link>
           </p>
+        </form>
+      </div>
+
+      <!-- Verification Modal -->
+      <div class="login-box" v-else>
+        <div class="logo">
+          🔐
+        </div>
+        <h2 class="login-title">Verify Your Account</h2>
+        <p class="login-subtitle">Enter the 6-digit code sent to your Telegram</p>
+
+        <form @submit.prevent="handleVerify">
+          <div class="form-group">
+            <label for="verification_code">Verification Code</label>
+            <div class="input-wrapper verify-input-wrapper">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <input 
+                type="text" 
+                id="verification_code" 
+                v-model="verificationCode" 
+                placeholder="000000" 
+                maxlength="6"
+                inputmode="numeric"
+                required 
+                :disabled="loading"
+                @input="verificationCode = verificationCode.replace(/[^0-9]/g, '')"
+              />
+            </div>
+            <small class="help-text">Check your Telegram for the code. It expires in 15 minutes.</small>
+          </div>
+
+          <div v-if="verificationError" class="error-message">
+            {{ verificationError }}
+          </div>
+
+          <button type="submit" :disabled="verificationCode.length !== 6 || loading" :class="{ 'loading': loading }">
+            <span v-if="loading">
+              <div class="spinner"></div>
+            </span>
+            <span v-else>Verify & Complete Registration</span>
+          </button>
+
+          <button type="button" @click="backToForm" :disabled="loading" class="btn-back">
+            Back to Form
+          </button>
         </form>
       </div>
     </div>
@@ -91,12 +146,16 @@ export default {
       form: {
         name: '',
         email: '',
+        telegram_username: '',
         password: '',
         password_confirmation: ''
       },
       loading: false,
       error: null,
       passwordFieldType: 'password',
+      showVerificationModal: false,
+      verificationCode: '',
+      verificationError: null,
       phrases: [
         'your Telegram bot',
         'user data',
@@ -119,6 +178,7 @@ export default {
       return (
         this.form.name.length > 0 &&
         this.form.email.length > 0 &&
+        this.form.telegram_username.length > 0 &&
         this.form.password.length > 0 &&
         this.form.password_confirmation.length > 0 &&
         this.form.password === this.form.password_confirmation
@@ -175,24 +235,22 @@ export default {
       }
 
       try {
-        const response = await axios.post('/api/register', {
+        const response = await axios.post('/api/register/initiate', {
           name: this.form.name,
           email: this.form.email,
+          telegram_username: this.form.telegram_username.replace('@', ''),
           password: this.form.password,
           password_confirmation: this.form.password_confirmation,
         });
         
-        localStorage.setItem('auth_token', response.data.access_token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
-
-        console.log('Register successful:', response.data);
-
-        window.location.href = '/dashboard';
+        console.log('Registration initiated:', response.data);
+        this.showVerificationModal = true;
+        this.verificationCode = '';
+        this.verificationError = null;
 
       } catch (error) {
         if (error.response) {
-          this.error = error.response.data.message || 'Registration failed. Please try again.';
+          this.error = error.response.data.message || 'Registration initiation failed. Please try again.';
           console.error('Register error response:', error.response.data);
         } else if (error.request) {
           this.error = 'Unable to connect to server. Please try again.';
@@ -204,6 +262,44 @@ export default {
       } finally {
         this.loading = false;
       }
+    },
+    async handleVerify() {
+      this.verificationError = null;
+      this.loading = true;
+
+      try {
+        const response = await axios.post('/api/register/verify', {
+          email: this.form.email,
+          code: this.verificationCode,
+        });
+        
+        localStorage.setItem('auth_token', response.data.access_token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
+
+        console.log('Registration successful:', response.data);
+
+        window.location.href = '/dashboard';
+
+      } catch (error) {
+        if (error.response) {
+          this.verificationError = error.response.data.message || 'Invalid verification code. Please try again.';
+          console.error('Verify error response:', error.response.data);
+        } else if (error.request) {
+          this.verificationError = 'Unable to connect to server. Please try again.';
+          console.error('Verify error request:', error.request);
+        } else {
+          this.verificationError = 'An error occurred. Please reload the page.';
+          console.error('Verify error:', error.message);
+        }
+      } finally {
+        this.loading = false;
+      }
+    },
+    backToForm() {
+      this.showVerificationModal = false;
+      this.verificationCode = '';
+      this.verificationError = null;
     }
   }
 }
@@ -478,6 +574,49 @@ button[type="submit"]:disabled {
 .login-link a:hover {
   color: #764ba2;
   text-decoration: underline;
+}
+
+.help-text {
+  display: block;
+  font-size: 0.8rem;
+  color: #999;
+  margin-top: 4px;
+  margin-left: 0;
+}
+
+.verify-input-wrapper {
+  text-align: center;
+}
+
+.verify-input-wrapper input {
+  text-align: center;
+  letter-spacing: 0.3em;
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+.btn-back {
+  width: 100%;
+  padding: 12px;
+  background-color: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.btn-back:hover:not(:disabled) {
+  background-color: #e0e0e0;
+  border-color: #999;
+}
+
+.btn-back:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 1024px) {
