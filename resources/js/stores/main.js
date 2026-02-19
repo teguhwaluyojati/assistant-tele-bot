@@ -112,7 +112,6 @@ export const useMainStore = defineStore('main', () => {
       .get('/api/user')
       .then((result) => {
         currentUser.value = result?.data
-        console.log('Current User Loaded:', currentUser.value)
         return currentUser.value
       })
       .catch((error) => {
