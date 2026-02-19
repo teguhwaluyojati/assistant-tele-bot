@@ -72,11 +72,18 @@ class DashboardController extends Controller
             $query = \App\Models\Transaction::with('user:id,user_id,username,first_name,last_name')
                 ->latest();
 
-            // Filter by telegram user if not admin
-            if (auth()->user()->telegramUser && !auth()->user()->telegramUser->isAdmin()) {
-                $query->where('user_id', auth()->user()->telegramUser->user_id);
+            $currentUser = auth()->user();
+            $telegramUser = $currentUser->telegramUser;
+
+            // If no telegram user linked, deny access
+            if (!$telegramUser) {
+                return $this->errorResponse('User not linked to Telegram account.', 403);
             }
-            // If no telegram user linked, still show all for now (can be restricted later)
+
+            // Filter by telegram user if not admin
+            if (!$telegramUser->isAdmin()) {
+                $query->where('user_id', $telegramUser->user_id);
+            }
 
             $transactions = $query->paginate(15);
 
@@ -276,6 +283,30 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Error retrieving user detail: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while retrieving user detail.', 500);
+        }
+    }
+
+    public function deleteTransaction($id)
+    {
+        try {
+            $transaction = \App\Models\Transaction::findOrFail($id);
+            $currentUser = auth()->user();
+            
+            // Check authorization: Admin can delete any, User can only delete their own
+            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
+            $isOwner = $currentUser->telegramUser && $currentUser->telegramUser->user_id === $transaction->user_id;
+            
+            if (!$isAdmin && !$isOwner) {
+                return $this->errorResponse('Unauthorized to delete this transaction.', 403);
+            }
+            
+            $transaction->delete();
+            
+            return $this->successResponse(null, 'Transaction deleted successfully.');
+            
+        } catch (\Exception $e) {
+            Log::error('Error deleting transaction: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while deleting transaction.', 500);
         }
     }
 

@@ -22,7 +22,7 @@ use App\Http\Controllers\ProfileController;
 Route::middleware('auth:sanctum')->group(function () {
     
     Route::get('/user', function (Request $request) {
-        return $request->user();
+        return $request->user()->load('telegramUser');
     });
     
     Route::post('/logout', [LoginController::class, 'logout']);
@@ -38,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/transactions', [DashboardController::class, 'getTransactions']);
     Route::get('/transactions/summary', [DashboardController::class, 'getTransactionsSummary']);
     Route::get('/transactions/daily-chart', [DashboardController::class, 'getDailyChart']);
+    Route::delete('/transactions/{id}', [DashboardController::class, 'deleteTransaction']);
 });
 
 

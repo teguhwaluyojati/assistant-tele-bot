@@ -24,6 +24,7 @@ export const useMainStore = defineStore('main', () => {
 
   const clients = ref([])
   const history = ref([])
+  const currentUser = ref(null)
 
   function setUser(payload) {
     if (payload.name) {
@@ -94,6 +95,22 @@ export const useMainStore = defineStore('main', () => {
       })
   }
 
+  function fetchCurrentUser() {
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    }
+
+    axios
+      .get('/api/user')
+      .then((result) => {
+        currentUser.value = result?.data
+      })
+      .catch((error) => {
+        console.error('Failed to fetch current user:', error)
+      })
+  }
+
   return {
     userName,
     userEmail,
@@ -101,9 +118,11 @@ export const useMainStore = defineStore('main', () => {
     isFieldFocusRegistered,
     clients,
     history,
+    currentUser,
     setUser,
     fetchSampleClients,
     fetchSampleHistory,
     fetchTransactionsFromApi,
+    fetchCurrentUser,
   }
 })

@@ -21,6 +21,9 @@ const currentPage = ref(0)
 const isDetailModalActive = ref(false)
 const selectedTransaction = ref(null)
 
+const isDeleteConfirmActive = ref(false)
+const transactionToDelete = ref(null)
+
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -175,6 +178,42 @@ const viewTransactionDetail = (transaction) => {
   selectedTransaction.value = transaction
   isDetailModalActive.value = true
 }
+
+const canDeleteTransaction = (transaction) => {
+  // Always show delete button - backend will validate authorization
+  return true
+}
+
+const openDeleteConfirm = (transaction) => {
+  transactionToDelete.value = transaction
+  isDeleteConfirmActive.value = true
+}
+
+const deleteTransaction = async () => {
+  if (!transactionToDelete.value) return
+
+  try {
+    const token = localStorage.getItem('auth_token')
+    if (token && !axios.defaults.headers.common['Authorization']) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    }
+
+    const response = await axios.delete(`/api/transactions/${transactionToDelete.value.id}`)
+
+    // Remove from list
+    transactions.value = transactions.value.filter(
+      (t) => t.id !== transactionToDelete.value.id
+    )
+
+    isDeleteConfirmActive.value = false
+    transactionToDelete.value = null
+    alert('Transaction deleted successfully!')
+  } catch (error) {
+    console.error('Error deleting transaction:', error)
+    const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
+    alert('Failed to delete transaction: ' + errorMsg)
+  }
+}
 </script>
 
 <template>
@@ -317,6 +356,13 @@ const viewTransactionDetail = (transaction) => {
           <td class="before:hidden lg:w-1 whitespace-nowrap">
             <BaseButtons type="justify-center" no-wrap>
               <BaseButton color="info" :icon="mdiEye" small @click="viewTransactionDetail(transaction)" />
+              <BaseButton
+                v-if="canDeleteTransaction(transaction)"
+                color="danger"
+                :icon="mdiTrashCan"
+                small
+                @click="openDeleteConfirm(transaction)"
+              />
             </BaseButtons>
           </td>
         </tr>
@@ -398,6 +444,25 @@ const viewTransactionDetail = (transaction) => {
         <p class="text-sm text-gray-500 dark:text-gray-400">Description</p>
         <p class="font-semibold">{{ selectedTransaction.description || '-' }}</p>
       </div>
+    </div>
+  </CardBoxModal>
+
+  <!-- Delete Confirmation Modal -->
+  <CardBoxModal
+    v-model="isDeleteConfirmActive"
+    title="Delete Transaction"
+    button="danger"
+    has-cancel
+    @confirm="deleteTransaction"
+    @cancel="isDeleteConfirmActive = false"
+  >
+    <p v-if="transactionToDelete" class="mb-4">
+      Are you sure you want to delete this transaction?
+    </p>
+    <div v-if="transactionToDelete" class="bg-gray-50 dark:bg-slate-800 p-3 rounded">
+      <p><strong>Amount:</strong> {{ formatCurrency(transactionToDelete.amount) }}</p>
+      <p><strong>Type:</strong> {{ getTransactionTypeLabel(transactionToDelete.type) }}</p>
+      <p><strong>Description:</strong> {{ transactionToDelete.description || '-' }}</p>
     </div>
   </CardBoxModal>
 </template>
