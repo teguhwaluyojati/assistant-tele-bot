@@ -43,6 +43,7 @@ const activeDateFilter = ref({
   start_date: '',
   end_date: '',
 })
+const isUserReady = ref(false)
 
 const buildDateParams = () => {
   const params = {}
@@ -112,6 +113,7 @@ onMounted(async () => {
   
   // Fetch current user first to determine admin status
   await mainStore.fetchCurrentUser()
+  isUserReady.value = true
   
   mainStore.fetchTransactionsFromApi()
   
@@ -251,7 +253,7 @@ const isAdminUser = computed(() => {
           />
         </div>
         <div class="flex flex-col justify-between gap-4">
-          <template v-if="isAdminUser">
+          <template v-if="isUserReady && isAdminUser">
             <CardBoxClient
               v-for="client in clientBarItems"
               :key="client.id"
@@ -262,13 +264,19 @@ const isAdminUser = computed(() => {
               :text="client.text"
             />
           </template>
-          <CardBox v-else class="flex-1">
+          <CardBox v-else-if="isUserReady" class="flex-1">
             <div class="space-y-2">
               <h3 class="text-lg font-semibold">Need help?</h3>
               <p class="text-sm text-gray-500 dark:text-slate-400">
                 This area is for admin insights. You can still track your transactions on the left
                 panel and the table below.
               </p>
+            </div>
+          </CardBox>
+          <CardBox v-else class="flex-1">
+            <div class="space-y-2">
+              <h3 class="text-lg font-semibold">Loading...</h3>
+              <p class="text-sm text-gray-500 dark:text-slate-400">Preparing your dashboard.</p>
             </div>
           </CardBox>
         </div>
