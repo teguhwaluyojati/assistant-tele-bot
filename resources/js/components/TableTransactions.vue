@@ -10,6 +10,7 @@ import BaseIcon from '@/components/BaseIcon.vue'
 
 const transactions = ref([])
 const searchQuery = ref('')
+const typeFilter = ref('all') // 'all', 'income', 'expense'
 const sortField = ref('created_at')
 const sortDirection = ref('desc')
 const isLoading = ref(true)
@@ -87,6 +88,11 @@ onMounted(() => {
 
 const filteredAndSortedItems = computed(() => {
   let filtered = transactions.value
+
+  // Type filter
+  if (typeFilter.value !== 'all') {
+    filtered = filtered.filter((transaction) => transaction.type === typeFilter.value)
+  }
 
   // Search filter
   if (searchQuery.value.trim()) {
@@ -173,13 +179,30 @@ const viewTransactionDetail = (transaction) => {
 
 <template>
   <div class="border border-gray-100 dark:border-slate-800 rounded">
-    <!-- Search Input (Top Right) -->
-    <div class="flex justify-end p-2 lg:px-4 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+    <!-- Filters -->
+    <div class="p-3 lg:px-6 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+      <!-- Type Filter Buttons -->
+      <div class="flex gap-2">
+        <button
+          v-for="type in ['all', 'income', 'expense']"
+          :key="type"
+          @click="typeFilter = type"
+          :class="{
+            'px-4 py-2 rounded text-sm font-semibold transition': true,
+            'bg-blue-500 text-white': typeFilter === type,
+            'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-gray-300 hover:opacity-70': typeFilter !== type,
+          }"
+        >
+          {{ type === 'all' ? 'All' : type === 'income' ? 'Income' : 'Expense' }}
+        </button>
+      </div>
+
+      <!-- Search Input -->
       <input
         v-model="searchQuery"
         type="text"
         placeholder="Search..."
-        class="w-40 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        class="w-full lg:w-40 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
       />
     </div>
 
