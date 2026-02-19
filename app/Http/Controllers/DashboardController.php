@@ -310,4 +310,41 @@ class DashboardController extends Controller
         }
     }
 
+    public function updateTransaction(Request $request, $id)
+    {
+        try {
+            $transaction = \App\Models\Transaction::findOrFail($id);
+            $currentUser = auth()->user();
+            
+            // Check authorization: Admin can edit any, User can only edit their own
+            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
+            $isOwner = $currentUser->telegramUser && $currentUser->telegramUser->user_id === $transaction->user_id;
+            
+            if (!$isAdmin && !$isOwner) {
+                return $this->errorResponse('Unauthorized to update this transaction.', 403);
+            }
+
+            // Validate input
+            $validated = $request->validate([
+                'amount' => 'required|numeric|min:0',
+                'type' => 'required|in:income,expense',
+                'description' => 'nullable|string|max:255',
+            ]);
+
+            // Update transaction
+            $transaction->update($validated);
+            
+            // Load relationship for response
+            $transaction->load('user:id,user_id,username,first_name,last_name');
+            
+            return $this->successResponse($transaction, 'Transaction updated successfully.');
+            
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->errorResponse('Validation failed: ' . json_encode($e->errors()), 422);
+        } catch (\Exception $e) {
+            Log::error('Error updating transaction: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while updating transaction.', 500);
+        }
+    }
+
 }

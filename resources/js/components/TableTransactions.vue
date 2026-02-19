@@ -1,12 +1,14 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import axios from 'axios'
-import { mdiEye, mdiTrashCan, mdiArrowUp, mdiArrowDown } from '@mdi/js'
+import { mdiEye, mdiTrashCan, mdiPencil, mdiArrowUp, mdiArrowDown } from '@mdi/js'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
+import FormField from '@/components/FormField.vue'
+import FormControl from '@/components/FormControl.vue'
 
 const props = defineProps({
   dateStart: {
@@ -31,6 +33,14 @@ const currentPage = ref(0)
 
 const isDetailModalActive = ref(false)
 const selectedTransaction = ref(null)
+
+const isEditModalActive = ref(false)
+const transactionToEdit = ref(null)
+const editForm = ref({
+  amount: '',
+  type: 'income',
+  description: '',
+})
 
 const isDeleteConfirmActive = ref(false)
 const transactionToDelete = ref(null)
@@ -215,6 +225,51 @@ const viewTransactionDetail = (transaction) => {
 const canDeleteTransaction = (transaction) => {
   // Always show delete button - backend will validate authorization
   return true
+}
+
+const canEditTransaction = (transaction) => {
+  // Always show edit button - backend will validate authorization
+  return true
+}
+
+const openEditModal = (transaction) => {
+  transactionToEdit.value = transaction
+  editForm.value = {
+    amount: transaction.amount,
+    type: transaction.type,
+    description: transaction.description || '',
+  }
+  isEditModalActive.value = true
+}
+
+const updateTransaction = async () => {
+  if (!transactionToEdit.value) return
+
+  try {
+    const token = localStorage.getItem('auth_token')
+    if (token && !axios.defaults.headers.common['Authorization']) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    }
+
+    const response = await axios.put(
+      `/api/transactions/${transactionToEdit.value.id}`,
+      editForm.value
+    )
+
+    // Update in list
+    const index = transactions.value.findIndex((t) => t.id === transactionToEdit.value.id)
+    if (index !== -1) {
+      transactions.value[index] = response.data.data
+    }
+
+    isEditModalActive.value = false
+    transactionToEdit.value = null
+    alert('Transaction updated successfully!')
+  } catch (error) {
+    console.error('Error updating transaction:', error)
+    const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
+    alert('Failed to update transaction: ' + errorMsg)
+  }
 }
 
 const openDeleteConfirm = (transaction) => {
@@ -404,6 +459,13 @@ const clearFilters = () => {
             <BaseButtons type="justify-center" no-wrap>
               <BaseButton color="info" :icon="mdiEye" small @click="viewTransactionDetail(transaction)" />
               <BaseButton
+                v-if="canEditTransaction(transaction)"
+                color="success"
+                :icon="mdiPencil"
+                small
+                @click="openEditModal(transaction)"
+              />
+              <BaseButton
                 v-if="canDeleteTransaction(transaction)"
                 color="danger"
                 :icon="mdiTrashCan"
@@ -490,6 +552,69 @@ const clearFilters = () => {
       <div class="border-t border-gray-200 dark:border-slate-700 pt-4 mt-4">
         <p class="text-sm text-gray-500 dark:text-gray-400">Description</p>
         <p class="font-semibold">{{ selectedTransaction.description || '-' }}</p>
+      </div>
+    </div>
+  </CardBoxModal>
+
+  <!-- Edit Modal -->
+  <CardBoxModal
+    v-model="isEditModalActive"
+    title="Edit Transaction"
+    button="success"
+    button-label="Save Changes"
+    has-cancel
+    @confirm="updateTransaction"
+    @cancel="isEditModalActive = false"
+  >
+    <div v-if="transactionToEdit" class="space-y-4">
+      <FormField label="Amount">
+        <FormControl
+          v-model="editForm.amount"
+          type="number"
+          placeholder="Enter amount"
+          min="0"
+          step="0.01"
+        />
+      </FormField>
+
+      <FormField label="Type">
+        <div class="flex gap-4">
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input
+              v-model="editForm.type"
+              type="radio"
+              value="income"
+              class="w-4 h-4 text-green-600 focus:ring-green-500"
+            />
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Income</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer">
+            <input
+              v-model="editForm.type"
+              type="radio"
+              value="expense"
+              class="w-4 h-4 text-red-600 focus:ring-red-500"
+            />
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Expense</span>
+          </label>
+        </div>
+      </FormField>
+
+      <FormField label="Description">
+        <FormControl
+          v-model="editForm.description"
+          type="textarea"
+          placeholder="Enter description (optional)"
+        />
+      </FormField>
+
+      <div class="bg-gray-50 dark:bg-slate-800 p-3 rounded">
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          <strong>User:</strong> {{ getFullName(transactionToEdit.user) }}
+        </p>
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+          <strong>Date:</strong> {{ formatShortDate(transactionToEdit.created_at) }}
+        </p>
       </div>
     </div>
   </CardBoxModal>

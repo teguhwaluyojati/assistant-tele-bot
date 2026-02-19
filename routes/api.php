@@ -38,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/transactions', [DashboardController::class, 'getTransactions']);
     Route::get('/transactions/summary', [DashboardController::class, 'getTransactionsSummary']);
     Route::get('/transactions/daily-chart', [DashboardController::class, 'getDailyChart']);
+    Route::put('/transactions/{id}', [DashboardController::class, 'updateTransaction']);
     Route::delete('/transactions/{id}', [DashboardController::class, 'deleteTransaction']);
 });
 
