@@ -310,40 +310,55 @@ class DashboardController extends Controller
         }
     }
 
-    public function updateTransaction(Request $request, $id)
+    public function bulkDeleteTransactions(Request $request)
     {
         try {
-            $transaction = \App\Models\Transaction::findOrFail($id);
-            $currentUser = auth()->user();
-            
-            // Check authorization: Admin can edit any, User can only edit their own
-            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
-            $isOwner = $currentUser->telegramUser && $currentUser->telegramUser->user_id === $transaction->user_id;
-            
-            if (!$isAdmin && !$isOwner) {
-                return $this->errorResponse('Unauthorized to update this transaction.', 403);
-            }
-
-            // Validate input
             $validated = $request->validate([
-                'amount' => 'required|numeric|min:0',
-                'type' => 'required|in:income,expense',
-                'description' => 'nullable|string|max:255',
+                'ids' => 'required|array|min:1',
+                'ids.*' => 'required|integer',
             ]);
 
-            // Update transaction
-            $transaction->update($validated);
+            $currentUser = auth()->user();
+            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
             
-            // Load relationship for response
-            $transaction->load('user:id,user_id,username,first_name,last_name');
+            // Get transactions to delete
+            $query = \App\Models\Transaction::whereIn('id', $validated['ids']);
             
-            return $this->successResponse($transaction, 'Transaction updated successfully.');
+            // If not admin, only allow deleting own transactions
+            if (!$isAdmin) {
+                $telegramUserId = $currentUser->telegram_user_id;
+                if (!$telegramUserId) {
+                    return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
+                }
+                
+                $telegramUser = \App\Models\TelegramUser::find($telegramUserId);
+                if (!$telegramUser) {
+                    return $this->errorResponse('Telegram user not found.', 404);
+                }
+                
+                $query->where('user_id', $telegramUser->user_id);
+            }
+            
+            $transactionsToDelete = $query->get();
+            $deleteCount = $transactionsToDelete->count();
+            
+            if ($deleteCount === 0) {
+                return $this->errorResponse('No authorized transactions found to delete.', 403);
+            }
+            
+            // Delete transactions
+            \App\Models\Transaction::whereIn('id', $transactionsToDelete->pluck('id'))->delete();
+            
+            return $this->successResponse(
+                ['deleted' => $deleteCount],
+                "{$deleteCount} transaction(s) deleted successfully."
+            );
             
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->errorResponse('Validation failed: ' . json_encode($e->errors()), 422);
         } catch (\Exception $e) {
-            Log::error('Error updating transaction: ' . $e->getMessage());
-            return $this->errorResponse('An error occurred while updating transaction.', 500);
+            Log::error('Error bulk deleting transactions: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while deleting transactions.', 500);
         }
     }
 

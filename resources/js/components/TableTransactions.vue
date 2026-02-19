@@ -22,6 +22,8 @@ const props = defineProps({
 })
 
 const transactions = ref([])
+const selectedTransactions = ref(new Set())
+const selectAll = ref(false)
 const searchQuery = ref('')
 const typeFilter = ref('all') // 'all', 'income', 'expense'
 const sortField = ref('created_at')
@@ -49,6 +51,8 @@ const isMessageModalActive = ref(false)
 const messageModalTitle = ref('')
 const messageModalContent = ref('')
 const messageModalType = ref('success') // 'success' or 'error'
+
+const isBulkDeleteConfirmActive = ref(false)
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('id-ID', {
@@ -332,43 +336,136 @@ const clearFilters = () => {
   searchQuery.value = ''
   typeFilter.value = 'all'
 }
+
+const toggleSelectTransaction = (transactionId) => {
+  if (selectedTransactions.value.has(transactionId)) {
+    selectedTransactions.value.delete(transactionId)
+  } else {
+    selectedTransactions.value.add(transactionId)
+  }
+  updateSelectAllState()
+}
+
+const updateSelectAllState = () => {
+  selectAll.value = itemsPaginated.value.length > 0 && 
+    itemsPaginated.value.every((t) => selectedTransactions.value.has(t.id))
+}
+
+const toggleSelectAll = () => {
+  if (selectAll.value) {
+    // Deselect all on current page
+    itemsPaginated.value.forEach((t) => selectedTransactions.value.delete(t.id))
+    selectAll.value = false
+  } else {
+    // Select all on current page
+    itemsPaginated.value.forEach((t) => selectedTransactions.value.add(t.id))
+    selectAll.value = true
+  }
+}
+
+const isTransactionSelected = (transactionId) => {
+  return selectedTransactions.value.has(transactionId)
+}
+
+const selectedCount = computed(() => selectedTransactions.value.size)
+
+const openBulkDeleteConfirm = () => {
+  if (selectedCount.value === 0) return
+  isBulkDeleteConfirmActive.value = true
+}
+
+const bulkDeleteTransactions = async () => {
+  if (selectedCount.value === 0) return
+
+  try {
+    const token = localStorage.getItem('auth_token')
+    if (token && !axios.defaults.headers.common['Authorization']) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    }
+
+    const selectedIds = Array.from(selectedTransactions.value)
+    const response = await axios.post('/api/transactions/bulk-delete', {
+      ids: selectedIds,
+    })
+
+    // Remove deleted transactions from list
+    transactions.value = transactions.value.filter(
+      (t) => !selectedTransactions.value.has(t.id)
+    )
+    selectedTransactions.value.clear()
+    selectAll.value = false
+
+    isBulkDeleteConfirmActive.value = false
+
+    // Show success modal
+    messageModalTitle.value = 'Success'
+    messageModalContent.value = `${response.data.data.deleted} transaction(s) deleted successfully!`
+    messageModalType.value = 'success'
+    isMessageModalActive.value = true
+  } catch (error) {
+    console.error('Error bulk deleting transactions:', error)
+    const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
+
+    // Show error modal
+    messageModalTitle.value = 'Error'
+    messageModalContent.value = `Failed to delete transactions: ${errorMsg}`
+    messageModalType.value = 'danger'
+    isMessageModalActive.value = true
+  }
+}
 </script>
 
 <template>
   <div class="border border-gray-100 dark:border-slate-800 rounded-lg overflow-hidden">
-    <!-- Filters -->
-    <div class="p-3 lg:px-6 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-      <!-- Type Filter Buttons -->
-      <div class="flex gap-2">
-        <button
-          v-for="type in ['all', 'income', 'expense']"
-          :key="type"
-          @click="typeFilter = type"
-          :class="{
-            'px-4 py-2 rounded text-sm font-semibold transition': true,
-            'bg-blue-500 text-white': typeFilter === type,
-            'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-gray-300 hover:opacity-70': typeFilter !== type,
-          }"
-        >
-          {{ type === 'all' ? 'All' : type === 'income' ? 'Income' : 'Expense' }}
-        </button>
+    <!-- Filters & Toolbar -->
+    <div class="p-3 lg:px-6 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
+      <!-- Bulk Actions Toolbar -->
+      <div v-if="selectedCount > 0" class="flex items-center justify-between gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded">
+        <span class="text-sm font-medium text-blue-900 dark:text-blue-100">
+          {{ selectedCount }} transaction(s) selected
+        </span>
+        <BaseButton
+          label="Delete Selected"
+          color="danger"
+          small
+          @click="openBulkDeleteConfirm"
+        />
       </div>
 
-      <div class="flex items-center gap-2">
-        <!-- Search Input -->
-        <input
-          v-model="searchQuery"
-          type="text"
-          placeholder="Search..."
-          class="w-full lg:w-40 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
-        <button
-          v-if="searchQuery || typeFilter !== 'all'"
-          @click="clearFilters"
-          class="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-gray-300 rounded hover:opacity-70 transition whitespace-nowrap"
-        >
-          Clear
-        </button>
+      <!-- Filters -->
+      <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+        <!-- Type Filter Buttons -->
+        <div class="flex gap-2">
+          <button
+            v-for="type in ['all', 'income', 'expense']"
+            :key="type"
+            @click="typeFilter = type"
+            :class="{
+              'px-4 py-2 rounded text-sm font-semibold transition': true,
+              'bg-blue-500 text-white': typeFilter === type,
+              'bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-gray-300 hover:opacity-70': typeFilter !== type,
+            }"
+          >
+            {{ type === 'all' ? 'All' : type === 'income' ? 'Income' : 'Expense' }}
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <!-- Search Input -->
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Search..."
+            class="w-full lg:w-40 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <button
+            v-if="searchQuery || typeFilter !== 'all'"
+            @click="clearFilters"
+            class="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-gray-300 rounded hover:opacity-70 transition whitespace-nowrap"
+          >
+            Clear
+          </button>
+        </div>
       </div>
     </div>
 
@@ -381,6 +478,14 @@ const clearFilters = () => {
     <table v-else class="min-w-full text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-900">
       <thead>
         <tr>
+          <th class="w-10">
+            <input
+              type="checkbox"
+              :checked="selectAll"
+              @change="toggleSelectAll"
+              class="w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+          </th>
           <th>
             <button
               class="flex items-center gap-1 hover:opacity-70 cursor-pointer"
@@ -451,6 +556,14 @@ const clearFilters = () => {
       </thead>
       <tbody>
         <tr v-for="transaction in itemsPaginated" :key="transaction.id">
+          <td class="w-10">
+            <input
+              type="checkbox"
+              :checked="isTransactionSelected(transaction.id)"
+              @change="toggleSelectTransaction(transaction.id)"
+              class="w-4 h-4 text-blue-600 focus:ring-blue-500 cursor-pointer"
+            />
+          </td>
           <td data-label="Date" class="lg:w-1 whitespace-nowrap">
             <small class="text-gray-500 dark:text-slate-400">
               {{ formatShortDate(transaction.created_at) }}
@@ -661,6 +774,21 @@ const clearFilters = () => {
       <p><strong>Type:</strong> {{ getTransactionTypeLabel(transactionToDelete.type) }}</p>
       <p><strong>Description:</strong> {{ transactionToDelete.description || '-' }}</p>
     </div>
+  </CardBoxModal>
+
+  <!-- Bulk Delete Confirmation Modal -->
+  <CardBoxModal
+    v-model="isBulkDeleteConfirmActive"
+    title="Delete Selected Transactions"
+    button="danger"
+    button-label="Yes, Delete All"
+    has-cancel
+    @confirm="bulkDeleteTransactions"
+    @cancel="isBulkDeleteConfirmActive = false"
+  >
+    <p class="mb-4">
+      Are you sure you want to delete {{ selectedCount }} transaction(s)? This action cannot be undone.
+    </p>
   </CardBoxModal>
 
   <!-- Message Modal (Success/Error) -->
