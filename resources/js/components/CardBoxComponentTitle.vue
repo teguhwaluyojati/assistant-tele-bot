@@ -9,7 +9,7 @@ defineProps({
 
 <template>
   <div class="flex items-center justify-between mb-3">
-    <h1 class="text-2xl">
+    <h1 class="text-2xl text-gray-900 dark:text-white">
       {{ title }}
     </h1>
     <slot />

@@ -4,8 +4,6 @@ import { computed } from 'vue'
 import AsideMenuList from '@/components/AsideMenuList.vue'
 import AsideMenuItem from '@/components/AsideMenuItem.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
-import axios from 'axios'
-import { useRouter } from 'vue-router'
 
 defineProps({
   menu: {
@@ -15,7 +13,6 @@ defineProps({
 })
 
 const emit = defineEmits(['menu-click', 'aside-lg-close-click'])
-const router = useRouter()
 
 const logoutItem = computed(() => ({
   label: 'Logout',
@@ -25,32 +22,8 @@ const logoutItem = computed(() => ({
 }))
 
 
-const menuClick = async (event, item) => {
-  if (item.isLogout) {
-    if (!confirm('Did you sure want to logout?')) {
-      return
-    }
-    try {
-      console.log('Attempting logout via /api/logout from AsideMenuLayer...');
-      await axios.post('/api/logout');
-
-      console.log('Logout successful on server. Clearing local data...');
-      localStorage.clear();
-      delete axios.defaults.headers.common['Authorization'];
-
-      console.log('Redirecting to login page...');
-      router.push('/');
-
-    } catch (error) {
-      console.error('Logout failed:', error);
-      alert('Gagal untuk logout. Mungkin sesi Anda sudah berakhir.');
-      localStorage.clear();
-      delete axios.defaults.headers.common['Authorization'];
-      router.push('/');
-    }
-  } else {
-    emit('menu-click', event, item)
-  }
+const menuClick = (event, item) => {
+  emit('menu-click', event, item)
 }
 
 const asideLgCloseClick = (event) => {

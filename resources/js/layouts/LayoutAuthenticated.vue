@@ -11,6 +11,7 @@ import NavBar from '@/components/NavBar.vue'
 import NavBarItemPlain from '@/components/NavBarItemPlain.vue'
 import AsideMenu from '@/components/AsideMenu.vue'
 import FooterBar from '@/components/FooterBar.vue'
+import CardBoxModal from '@/components/CardBoxModal.vue'
 import axios from 'axios'
 
 const layoutAsidePadding = 'xl:pl-60'
@@ -21,26 +22,28 @@ const router = useRouter()
 
 const isAsideMobileExpanded = ref(false)
 const isAsideLgActive = ref(false)
+const isLogoutModalOpen = ref(false)
 
 router.beforeEach(() => {
   isAsideMobileExpanded.value = false
   isAsideLgActive.value = false
 })
 
-const handleLogout = async () => {
-  if (!confirm('Did you sure want to logout?')) {
-    return
-  }
+const handleLogout = () => {
+  isLogoutModalOpen.value = true
+}
+
+const confirmLogout = async () => {
   try {
-    await axios.post('/api/logout');
-    localStorage.clear();
-    delete axios.defaults.headers.common['Authorization'];
-    router.push('/');
+    await axios.post('/api/logout')
+    localStorage.clear()
+    delete axios.defaults.headers.common['Authorization']
+    router.push('/')
   } catch (error) {
-    console.error('Logout failed:', error);
-    localStorage.clear();
-    delete axios.defaults.headers.common['Authorization'];
-    router.push('/');
+    console.error('Logout failed:', error)
+    localStorage.clear()
+    delete axios.defaults.headers.common['Authorization']
+    router.push('/')
   }
 }
 
@@ -101,5 +104,16 @@ const menuClick = (event, item) => {
         >
       </FooterBar>
     </div>
+
+    <CardBoxModal
+      v-model="isLogoutModalOpen"
+      title="Confirm Logout"
+      button="danger"
+      buttonLabel="Yes, Logout"
+      has-cancel
+      @confirm="confirmLogout"
+    >
+      Are you sure you want to logout?
+    </CardBoxModal>
   </div>
 </template>
