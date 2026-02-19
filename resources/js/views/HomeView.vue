@@ -43,6 +43,9 @@ const activeDateFilter = ref({
   start_date: '',
   end_date: '',
 })
+const isTransactionFilterModalOpen = ref(false)
+const transactionFilterStartDate = ref('')
+const transactionFilterEndDate = ref('')
 const isUserReady = ref(false)
 const isClientsLoading = ref(false)
 const isTransactionsLoading = ref(true)
@@ -104,6 +107,25 @@ const applyDateFilter = () => {
   fetchSummary(params)
   fetchChartData(params)
   isFilterModalOpen.value = false
+}
+
+const openTransactionFilterModal = () => {
+  isTransactionFilterModalOpen.value = true
+}
+
+const applyTransactionDateFilter = () => {
+  if (transactionFilterStartDate.value && transactionFilterEndDate.value) {
+    if (transactionFilterStartDate.value > transactionFilterEndDate.value) {
+      console.error('Start date must be before end date')
+      return
+    }
+  }
+  isTransactionFilterModalOpen.value = false
+}
+
+const clearTransactionFilter = () => {
+  transactionFilterStartDate.value = ''
+  transactionFilterEndDate.value = ''
 }
 
 const mainStore = useMainStore()
@@ -402,10 +424,15 @@ const isAdminUser = computed(() => {
         <TableSampleClients />
       </CardBox>
 
-      <SectionTitleLineWithButton :icon="mdiCartOutline" title="All Transactions" />
+      <SectionTitleLineWithButton :icon="mdiCartOutline" title="All Transactions">
+        <BaseButton :icon="mdiCog" color="whiteDark" @click="openTransactionFilterModal" />
+      </SectionTitleLineWithButton>
 
       <CardBox has-table>
-        <TableTransactions />
+        <TableTransactions 
+          :date-start="transactionFilterStartDate" 
+          :date-end="transactionFilterEndDate"
+        />
       </CardBox>
       <CardBoxModal
         v-model="isFilterModalOpen"
@@ -429,6 +456,38 @@ const isAdminUser = computed(() => {
             type="date"
           />
         </FormField>
+      </CardBoxModal>
+
+      <CardBoxModal
+        v-model="isTransactionFilterModalOpen"
+        title="Filter Transactions by Date"
+        button-label="Apply"
+        :has-cancel="true"
+        @confirm="applyTransactionDateFilter"
+        @cancel="isTransactionFilterModalOpen = false"
+      >
+        <FormField label="Start date" label-for="transaction-filter-start-date">
+          <FormControl
+            id="transaction-filter-start-date"
+            v-model="transactionFilterStartDate"
+            type="date"
+          />
+        </FormField>
+        <FormField label="End date" label-for="transaction-filter-end-date">
+          <FormControl
+            id="transaction-filter-end-date"
+            v-model="transactionFilterEndDate"
+            type="date"
+          />
+        </FormField>
+        <div class="mt-4">
+          <BaseButton
+            label="Clear Filter"
+            color="whiteDark"
+            outline
+            @click="clearTransactionFilter"
+          />
+        </div>
       </CardBoxModal>
     </SectionMain>
   </LayoutAuthenticated>

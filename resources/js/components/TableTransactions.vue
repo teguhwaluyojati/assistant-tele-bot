@@ -8,6 +8,17 @@ import BaseButtons from '@/components/BaseButtons.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
 
+const props = defineProps({
+  dateStart: {
+    type: String,
+    default: '',
+  },
+  dateEnd: {
+    type: String,
+    default: '',
+  },
+})
+
 const transactions = ref([])
 const searchQuery = ref('')
 const typeFilter = ref('all') // 'all', 'income', 'expense'
@@ -95,6 +106,28 @@ const filteredAndSortedItems = computed(() => {
   // Type filter
   if (typeFilter.value !== 'all') {
     filtered = filtered.filter((transaction) => transaction.type === typeFilter.value)
+  }
+
+  // Date range filter
+  if (props.dateStart || props.dateEnd) {
+    filtered = filtered.filter((transaction) => {
+      const transactionDate = new Date(transaction.created_at)
+      if (Number.isNaN(transactionDate.getTime())) return false
+
+      if (props.dateStart) {
+        const startDate = new Date(props.dateStart)
+        startDate.setHours(0, 0, 0, 0)
+        if (transactionDate < startDate) return false
+      }
+
+      if (props.dateEnd) {
+        const endDate = new Date(props.dateEnd)
+        endDate.setHours(23, 59, 59, 999)
+        if (transactionDate > endDate) return false
+      }
+
+      return true
+    })
   }
 
   // Search filter
@@ -214,6 +247,11 @@ const deleteTransaction = async () => {
     alert('Failed to delete transaction: ' + errorMsg)
   }
 }
+
+const clearFilters = () => {
+  searchQuery.value = ''
+  typeFilter.value = 'all'
+}
 </script>
 
 <template>
@@ -236,13 +274,22 @@ const deleteTransaction = async () => {
         </button>
       </div>
 
-      <!-- Search Input -->
-      <input
-        v-model="searchQuery"
-        type="text"
-        placeholder="Search..."
-        class="w-full lg:w-40 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-      />
+      <div class="flex items-center gap-2">
+        <!-- Search Input -->
+        <input
+          v-model="searchQuery"
+          type="text"
+          placeholder="Search..."
+          class="w-full lg:w-40 px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+        />
+        <button
+          v-if="searchQuery || typeFilter !== 'all'"
+          @click="clearFilters"
+          class="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 dark:bg-slate-700 dark:text-gray-300 rounded hover:opacity-70 transition whitespace-nowrap"
+        >
+          Clear
+        </button>
+      </div>
     </div>
 
     <!-- Loading State -->
