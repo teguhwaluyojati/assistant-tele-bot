@@ -362,4 +362,29 @@ class DashboardController extends Controller
         }
     }
 
+    public function exportTransactions(Request $request)
+    {
+        try {
+            $currentUser = auth()->user();
+            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
+            
+            $startDate = $request->query('start_date');
+            $endDate = $request->query('end_date');
+
+            // Non-admin users can only export their own transactions
+            $userId = $isAdmin ? null : $currentUser->telegramUser->user_id;
+
+            $fileName = 'transactions-' . now()->format('Y-m-d-H-i-s') . '.xlsx';
+
+            return Excel::download(
+                new \App\Exports\TransactionsExport($userId, $isAdmin, $startDate, $endDate),
+                $fileName
+            );
+
+        } catch (\Exception $e) {
+            Log::error('Error exporting transactions: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while exporting transactions.', 500);
+        }
+    }
+
 }

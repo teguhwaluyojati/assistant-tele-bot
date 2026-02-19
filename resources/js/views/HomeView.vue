@@ -11,6 +11,7 @@ import {
   mdiReload,
   mdiChartPie,
   mdiWallet,
+  mdiDownload,
 } from '@mdi/js'
 import LineChart from '@/components/Charts/LineChart.vue'
 import SectionMain from '@/components/SectionMain.vue'
@@ -126,6 +127,35 @@ const applyTransactionDateFilter = () => {
 const clearTransactionFilter = () => {
   transactionFilterStartDate.value = ''
   transactionFilterEndDate.value = ''
+}
+
+const exportTransactions = async () => {
+  try {
+    const params = {}
+    if (transactionFilterStartDate.value) {
+      params.start_date = transactionFilterStartDate.value
+    }
+    if (transactionFilterEndDate.value) {
+      params.end_date = transactionFilterEndDate.value
+    }
+
+    const response = await axios.get('/api/transactions/export', {
+      params,
+      responseType: 'blob'
+    })
+
+    // Create blob link to download
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `transactions-${new Date().toISOString().split('T')[0]}.xlsx`)
+    document.body.appendChild(link)
+    link.click()
+    link.parentNode.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Error exporting transactions:', error)
+  }
 }
 
 const mainStore = useMainStore()
@@ -425,7 +455,10 @@ const isAdminUser = computed(() => {
       </CardBox>
 
       <SectionTitleLineWithButton :icon="mdiCartOutline" title="All Transactions">
-        <BaseButton :icon="mdiCog" color="whiteDark" @click="openTransactionFilterModal" />
+        <div class="flex gap-2">
+          <BaseButton :icon="mdiDownload" color="whiteDark" @click="exportTransactions" />
+          <BaseButton :icon="mdiCog" color="whiteDark" @click="openTransactionFilterModal" />
+        </div>
       </SectionTitleLineWithButton>
 
       <CardBox has-table>
