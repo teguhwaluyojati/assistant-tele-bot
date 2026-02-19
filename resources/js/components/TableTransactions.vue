@@ -45,6 +45,11 @@ const editForm = ref({
 const isDeleteConfirmActive = ref(false)
 const transactionToDelete = ref(null)
 
+const isMessageModalActive = ref(false)
+const messageModalTitle = ref('')
+const messageModalContent = ref('')
+const messageModalType = ref('success') // 'success' or 'error'
+
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
@@ -264,11 +269,21 @@ const updateTransaction = async () => {
 
     isEditModalActive.value = false
     transactionToEdit.value = null
-    alert('Transaction updated successfully!')
+    
+    // Show success modal
+    messageModalTitle.value = 'Success'
+    messageModalContent.value = 'Transaction updated successfully!'
+    messageModalType.value = 'success'
+    isMessageModalActive.value = true
   } catch (error) {
     console.error('Error updating transaction:', error)
     const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
-    alert('Failed to update transaction: ' + errorMsg)
+    
+    // Show error modal
+    messageModalTitle.value = 'Error'
+    messageModalContent.value = `Failed to update transaction: ${errorMsg}`
+    messageModalType.value = 'danger'
+    isMessageModalActive.value = true
   }
 }
 
@@ -295,11 +310,21 @@ const deleteTransaction = async () => {
 
     isDeleteConfirmActive.value = false
     transactionToDelete.value = null
-    alert('Transaction deleted successfully!')
+    
+    // Show success modal
+    messageModalTitle.value = 'Success'
+    messageModalContent.value = 'Transaction deleted successfully!'
+    messageModalType.value = 'success'
+    isMessageModalActive.value = true
   } catch (error) {
     console.error('Error deleting transaction:', error)
     const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
-    alert('Failed to delete transaction: ' + errorMsg)
+    
+    // Show error modal
+    messageModalTitle.value = 'Error'
+    messageModalContent.value = `Failed to delete transaction: ${errorMsg}`
+    messageModalType.value = 'danger'
+    isMessageModalActive.value = true
   }
 }
 
@@ -636,5 +661,16 @@ const clearFilters = () => {
       <p><strong>Type:</strong> {{ getTransactionTypeLabel(transactionToDelete.type) }}</p>
       <p><strong>Description:</strong> {{ transactionToDelete.description || '-' }}</p>
     </div>
+  </CardBoxModal>
+
+  <!-- Message Modal (Success/Error) -->
+  <CardBoxModal
+    v-model="isMessageModalActive"
+    :title="messageModalTitle"
+    :button="messageModalType"
+    button-label="OK"
+    @confirm="isMessageModalActive = false"
+  >
+    <p>{{ messageModalContent }}</p>
   </CardBoxModal>
 </template>
