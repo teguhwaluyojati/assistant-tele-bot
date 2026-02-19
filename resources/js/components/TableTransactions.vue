@@ -217,7 +217,7 @@ const deleteTransaction = async () => {
 </script>
 
 <template>
-  <div class="border border-gray-100 dark:border-slate-800 rounded">
+  <div class="border border-gray-100 dark:border-slate-800 rounded-lg overflow-hidden">
     <!-- Filters -->
     <div class="p-3 lg:px-6 border-b border-gray-100 dark:border-slate-800 bg-white dark:bg-slate-900 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
       <!-- Type Filter Buttons -->

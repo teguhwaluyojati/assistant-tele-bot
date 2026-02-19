@@ -100,17 +100,20 @@ export const useMainStore = defineStore('main', () => {
   function fetchCurrentUser() {
     const token = localStorage.getItem('auth_token')
     if (!token) {
-      return
+      return Promise.resolve()
     }
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
-    axios
+    return axios
       .get('/api/user')
       .then((result) => {
         currentUser.value = result?.data
+        console.log('Current User Loaded:', currentUser.value)
+        return currentUser.value
       })
       .catch((error) => {
         console.error('Failed to fetch current user:', error)
+        return null
       })
   }
 

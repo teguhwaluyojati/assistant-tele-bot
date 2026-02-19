@@ -105,13 +105,20 @@ const applyDateFilter = () => {
 
 const mainStore = useMainStore()
 
-onMounted(() => {
+onMounted(async () => {
   const params = buildDateParams()
   fetchSummary(params)
   fetchChartData(params)
-  mainStore.fetchCurrentUser()
-  mainStore.fetchSampleClients()
+  
+  // Fetch current user first to determine admin status
+  await mainStore.fetchCurrentUser()
+  
   mainStore.fetchTransactionsFromApi()
+  
+  // Fetch clients only if user is admin
+  if (mainStore.currentUser?.telegram_user?.level === 1) {
+    mainStore.fetchSampleClients()
+  }
 })
 
 const displayClientName = (client) => {
@@ -153,21 +160,25 @@ const clientBarItems = computed(() =>
 )
 
 const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
+
+const isAdminUser = computed(() => {
+  return mainStore.currentUser?.telegram_user?.level === 1
+})
 </script>
 
 <template>
   <LayoutAuthenticated>
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiChartTimelineVariant" title="Overview" main>
-        <div class="flex items-center gap-3">
-          <span v-if="summary.period" class="text-sm text-gray-500">
+        <div class="flex items-center gap-4">
+          <span v-if="summary.period" class="text-base text-gray-500 font-medium">
             Period: {{ summary.period }}
           </span>
           <BaseButton :icon="mdiCog" color="whiteDark" @click="openFilterModal" />
         </div>
       </SectionTitleLineWithButton>
 
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
+      <div class="grid grid-cols-1 gap-8 lg:grid-cols-3 mb-8">
         <CardBoxWidget
           color="text-emerald-500"
           :icon="mdiChartTimelineVariant"
@@ -191,8 +202,8 @@ const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
         />
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div class="flex flex-col justify-between">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <div class="flex flex-col justify-between gap-4">
           <CardBoxTransaction
             v-for="(transaction, index) in transactionBarItems"
             :key="index"
@@ -204,7 +215,7 @@ const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
             :account="transaction.account"
           />
         </div>
-        <div class="flex flex-col justify-between">
+        <div class="flex flex-col justify-between gap-4">
           <CardBoxClient
             v-for="client in clientBarItems"
             :key="client.id"
@@ -226,19 +237,19 @@ const transactionBarItems = computed(() => mainStore.history.slice(0, 4))
         />
       </SectionTitleLineWithButton>
 
-      <CardBox class="mb-6">
+      <CardBox class="mb-8">
         <div v-if="chartData">
-          <line-chart :data="chartData" class="h-96" />
+          <line-chart :data="chartData" class="h-[500px]" />
         </div>
       </CardBox>
 
-      <SectionTitleLineWithButton :icon="mdiAccountMultiple" title="Clients" />
+      <SectionTitleLineWithButton v-if="isAdminUser" :icon="mdiAccountMultiple" title="Clients" />
 
-      <NotificationBar color="info" :icon="mdiMonitorCellphone">
+      <NotificationBar v-if="isAdminUser" color="info" :icon="mdiMonitorCellphone" class="mb-4">
         <b>Users Telegram Only</b>
       </NotificationBar>
 
-      <CardBox has-table>
+      <CardBox v-if="isAdminUser" has-table class="mb-8">
         <TableSampleClients />
       </CardBox>
 

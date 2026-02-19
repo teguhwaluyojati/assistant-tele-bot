@@ -261,7 +261,7 @@ const viewUserDetail = async (client) => {
   </CardBoxModal>
 
   <!-- Table -->
-  <div class="border border-gray-100 dark:border-slate-800 rounded">
+  <div class="border border-gray-100 dark:border-slate-800 rounded-lg overflow-hidden">
     <table class="min-w-full text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-900">
       <thead>
         <tr>
