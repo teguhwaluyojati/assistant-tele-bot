@@ -2,8 +2,8 @@
   <div class="login-container">
     <div class="left-pane">
       <div class="welcome-text">
-        <h1>Bergabung Sekarang</h1>
-        <p>Buat akun untuk mengakses
+        <h1>Join Now</h1>
+        <p>Create an account to access
             <span class="typing-text">{{ typedText }}</span>
         </p>
       </div>
@@ -20,15 +20,15 @@
         <div class="logo">
           🤖
         </div>
-        <h2 class="login-title">Daftar Akun Baru</h2>
-        <p class="login-subtitle">Isi form di bawah untuk membuat akun.</p>
+        <h2 class="login-title">Create New Account</h2>
+        <p class="login-subtitle">Fill in the form below to create an account.</p>
 
         <form @submit.prevent="handleRegister">
           <div class="form-group">
             <label for="name">Name</label>
             <div class="input-wrapper">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-              <input type="text" id="name" v-model="form.name" placeholder="Nama Lengkap" required :disabled="loading" />
+              <input type="text" id="name" v-model="form.name" placeholder="Full Name" required :disabled="loading" />
             </div>
           </div>
 
@@ -36,7 +36,7 @@
             <label for="email">Email</label>
             <div class="input-wrapper">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              <input type="email" id="email" v-model="form.email" placeholder="contoh@email.com" required :disabled="loading" />
+              <input type="email" id="email" v-model="form.email" placeholder="example@email.com" required :disabled="loading" />
             </div>
           </div>
 
@@ -53,7 +53,7 @@
           </div>
 
           <div class="form-group">
-            <label for="password_confirmation">Konfirmasi Password</label>
+            <label for="password_confirmation">Confirm Password</label>
             <div class="input-wrapper">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
               <input :type="passwordFieldType" id="password_confirmation" v-model="form.password_confirmation" placeholder="••••••••" required :disabled="loading" />
@@ -72,7 +72,7 @@
           </button>
 
           <p class="login-link">
-            Sudah punya akun? 
+            Already have an account? 
             <router-link to="/">Login here!</router-link>
           </p>
         </form>
@@ -98,11 +98,11 @@ export default {
       error: null,
       passwordFieldType: 'password',
       phrases: [
-        'bot Telegram Anda',
-        'data pengguna',
-        'laporan harian',
-        'laporan mingguan',
-        'laporan bulanan'
+        'your Telegram bot',
+        'user data',
+        'daily reports',
+        'weekly reports',
+        'monthly reports'
       ],
       typedText: '',
       phraseIndex: 0,
@@ -169,7 +169,7 @@ export default {
       this.loading = true;
       
       if (this.form.password !== this.form.password_confirmation) {
-        this.error = 'Password tidak cocok.';
+        this.error = 'Passwords do not match.';
         this.loading = false;
         return;
       }
@@ -186,19 +186,19 @@ export default {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
 
-        console.log('Register berhasil:', response.data);
+        console.log('Register successful:', response.data);
 
         window.location.href = '/dashboard';
 
       } catch (error) {
         if (error.response) {
-          this.error = error.response.data.message || 'Registrasi gagal. Silakan coba lagi.';
+          this.error = error.response.data.message || 'Registration failed. Please try again.';
           console.error('Register error response:', error.response.data);
         } else if (error.request) {
-          this.error = 'Tidak bisa terhubung ke server. Silakan coba lagi.';
+          this.error = 'Unable to connect to server. Please try again.';
           console.error('Register error request:', error.request);
         } else {
-          this.error = 'Terjadi kesalahan. Coba muat ulang halaman.';
+          this.error = 'An error occurred. Please reload the page.';
           console.error('Register error:', error.message);
         }
       } finally {

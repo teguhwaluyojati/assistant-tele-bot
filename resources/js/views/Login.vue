@@ -2,8 +2,8 @@
   <div class="login-container">
     <div class="left-pane">
       <div class="welcome-text">
-        <h1>Kelola Bot Anda</h1>
-        <p>Akses dasbor admin untuk memonitor
+        <h1>Manage Your Bot</h1>
+        <p>Access admin dashboard to monitor
             <span class="typing-text">{{ typedText }}</span>
         </p>
       </div>
@@ -20,15 +20,15 @@
         <div class="logo">
           🤖
         </div>
-        <h2 class="login-title">Selamat Datang!</h2>
-        <p class="login-subtitle">Silakan login untuk melanjutkan.</p>
+        <h2 class="login-title">Welcome!</h2>
+        <p class="login-subtitle">Please login to continue.</p>
 
         <form @submit.prevent="handleLogin">
           <div class="form-group">
             <label for="email">Email</label>
             <div class="input-wrapper">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              <input type="email" id="email" v-model="form.email" placeholder="contoh@email.com" required :disabled="loading" />
+              <input type="email" id="email" v-model="form.email" placeholder="example@email.com" required :disabled="loading" />
             </div>
           </div>
 
@@ -80,11 +80,11 @@ export default {
       error: null,
       passwordFieldType: 'password',
       phrases: [
-        'bot Telegram Anda',
-        'data pengguna',
-        'laporan harian',
-        'laporan mingguan',
-        'laporan bulanan'
+        'your Telegram bot',
+        'user data',
+        'daily reports',
+        'weekly reports',
+        'monthly reports'
       ],
       typedText: '',
       phraseIndex: 0,
@@ -162,19 +162,19 @@ export default {
             localStorage.setItem('user', JSON.stringify(response.data.user));
             axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
 
-            console.log('Login berhasil:', response.data);
+            console.log('Login successful:', response.data);
 
             window.location.href = '/dashboard';
 
         } catch (error) {
             if (error.response) {
-            this.error = error.response.data.message || 'Email atau password salah.';
+            this.error = error.response.data.message || 'Email or password is incorrect.';
             console.error('Login error response:', error.response.data);
             } else if (error.request) {
-            this.error = 'Tidak bisa terhubung ke server. Silakan coba lagi.';
+            this.error = 'Unable to connect to server. Please try again.';
             console.error('Login error request:', error.request);
             } else {
-            this.error = 'Terjadi kesalahan. Coba muat ulang halaman.';
+            this.error = 'An error occurred. Please reload the page.';
             console.error('Login error:', error.message);
             }
         } finally {
