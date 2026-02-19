@@ -41,39 +41,43 @@ export const useMainStore = defineStore('main', () => {
   function fetchSampleClients() {
     const token = localStorage.getItem('auth_token')
     if (!token) {
-      return
+      return Promise.resolve([])
     }
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
-    axios
+    return axios
       .get('/api/users')
       .then((result) => {
         clients.value = result?.data?.data || []
+        return clients.value
       })
       .catch((error) => {
         console.error('Failed to fetch clients:', error)
+        return []
       })
   }
 
   function fetchSampleHistory() {
-    axios
+    return axios
       .get(`data-sources/history.json`)
       .then((result) => {
-        history.value = result?.data?.data
+        history.value = result?.data?.data || []
+        return history.value
       })
       .catch((error) => {
         alert(error.message)
+        return []
       })
   }
 
   function fetchTransactionsFromApi() {
     const token = localStorage.getItem('auth_token')
     if (!token) {
-      return
+      return Promise.resolve([])
     }
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
-    axios
+    return axios
       .get('/api/transactions')
       .then((result) => {
         const transactions = result?.data?.data?.data || result?.data?.data || []
@@ -87,13 +91,13 @@ export const useMainStore = defineStore('main', () => {
             name: t.description,
             account: t.user?.first_name + ' ' + t.user?.last_name || 'User',
           }))
-        } else {
-          fetchSampleHistory()
+          return history.value
         }
+        return fetchSampleHistory()
       })
       .catch((error) => {
         console.error('Failed to fetch transactions:', error)
-        fetchSampleHistory()
+        return fetchSampleHistory()
       })
   }
 
