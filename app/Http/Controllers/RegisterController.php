@@ -117,11 +117,22 @@ class RegisterController extends Controller
                 ], 401);
             }
             
-            // Create user
+            // Find telegram user and get their ID
+            $telegramUser = TelegramUser::where('username', $verification->telegram_username)->first();
+            if (!$telegramUser) {
+                $verification->delete();
+                return response()->json([
+                    'message' => 'Telegram user not found.',
+                    'status' => 'error'
+                ], 404);
+            }
+            
+            // Create user with telegram_user_id
             $user = User::create([
                 'name' => $verification->name,
                 'email' => $verification->email,
                 'password' => $verification->password,
+                'telegram_user_id' => $telegramUser->id,
             ]);
             
             // Create API token
@@ -130,20 +141,17 @@ class RegisterController extends Controller
             // Clean up verification record
             $verification->delete();
             
-            // Send confirmation via Telegram
-            $telegramUser = TelegramUser::where('username', $verification->telegram_username)->first();
-            if ($telegramUser) {
-                try {
-                    Telegram::sendMessage([
-                        'chat_id' => $telegramUser->user_id,
-                        'text' => "✅ *Registration Successful!*\n\n" .
-                                 "Your account has been created successfully.\n" .
-                                 "You can now login to your dashboard.",
-                        'parse_mode' => 'Markdown',
-                    ]);
-                } catch (\Exception $e) {
-                    \Log::error('Failed to send confirmation: ' . $e->getMessage());
-                }
+            // Send confirmation via Telegram (using already found telegramUser)
+            try {
+                Telegram::sendMessage([
+                    'chat_id' => $telegramUser->user_id,
+                    'text' => "✅ *Registration Successful!*\n\n" .
+                             "Your account has been created successfully.\n" .
+                             "You can now login to your dashboard.",
+                    'parse_mode' => 'Markdown',
+                ]);
+            } catch (\Exception $e) {
+                \Log::error('Failed to send confirmation: ' . $e->getMessage());
             }
             
             return response()->json([
