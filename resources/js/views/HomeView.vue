@@ -166,6 +166,10 @@ const fallbackClients = Array.from({ length: 4 }, (_, index) => ({
 }))
 
 const clientBarItems = computed(() => {
+  if (!isAdminUser.value) {
+    return []
+  }
+
   if (!mainStore.clients.length) {
     return fallbackClients
   }
@@ -247,15 +251,26 @@ const isAdminUser = computed(() => {
           />
         </div>
         <div class="flex flex-col justify-between gap-4">
-          <CardBoxClient
-            v-for="client in clientBarItems"
-            :key="client.id"
-            :name="client.name"
-            :login="client.login"
-            :date="client.date"
-            :type="client.type"
-            :text="client.text"
-          />
+          <template v-if="isAdminUser">
+            <CardBoxClient
+              v-for="client in clientBarItems"
+              :key="client.id"
+              :name="client.name"
+              :login="client.login"
+              :date="client.date"
+              :type="client.type"
+              :text="client.text"
+            />
+          </template>
+          <CardBox v-else class="flex-1">
+            <div class="space-y-2">
+              <h3 class="text-lg font-semibold">Need help?</h3>
+              <p class="text-sm text-gray-500 dark:text-slate-400">
+                This area is for admin insights. You can still track your transactions on the left
+                panel and the table below.
+              </p>
+            </div>
+          </CardBox>
         </div>
       </div>
 
