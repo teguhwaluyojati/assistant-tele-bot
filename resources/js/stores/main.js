@@ -40,9 +40,10 @@ export const useMainStore = defineStore('main', () => {
 
   function fetchSampleClients() {
     const token = localStorage.getItem('auth_token')
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    if (!token) {
+      return
     }
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
     axios
       .get('/api/users')
@@ -50,7 +51,7 @@ export const useMainStore = defineStore('main', () => {
         clients.value = result?.data?.data || []
       })
       .catch((error) => {
-        alert(error.message)
+        console.error('Failed to fetch clients:', error)
       })
   }
 
@@ -67,9 +68,10 @@ export const useMainStore = defineStore('main', () => {
 
   function fetchTransactionsFromApi() {
     const token = localStorage.getItem('auth_token')
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    if (!token) {
+      return
     }
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
     axios
       .get('/api/transactions')
@@ -97,9 +99,10 @@ export const useMainStore = defineStore('main', () => {
 
   function fetchCurrentUser() {
     const token = localStorage.getItem('auth_token')
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    if (!token) {
+      return
     }
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
     axios
       .get('/api/user')

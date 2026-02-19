@@ -103,15 +103,14 @@ const applyDateFilter = () => {
   isFilterModalOpen.value = false
 }
 
+const mainStore = useMainStore()
+
 onMounted(() => {
   const params = buildDateParams()
   fetchSummary(params)
   fetchChartData(params)
-})
-
-const mainStore = useMainStore()
-
-onMounted(() => {
+  mainStore.fetchCurrentUser()
+  mainStore.fetchSampleClients()
   mainStore.fetchTransactionsFromApi()
 })
 

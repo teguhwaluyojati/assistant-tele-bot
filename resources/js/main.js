@@ -19,13 +19,6 @@ if (
   darkStore.set(true)
 }
 
-const mainStore = useMainStore(pinia)
-
-mainStore.fetchSampleClients()
-mainStore.fetchTransactionsFromApi()
-mainStore.fetchCurrentUser()
-
-
 const defaultDocumentTitle = 'My Asisstant'
 
 router.afterEach((to) => {

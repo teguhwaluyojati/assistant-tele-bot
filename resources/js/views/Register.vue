@@ -2,8 +2,8 @@
   <div class="login-container">
     <div class="left-pane">
       <div class="welcome-text">
-        <h1>Kelola Bot Anda</h1>
-        <p>Akses dasbor admin untuk memonitor
+        <h1>Bergabung Sekarang</h1>
+        <p>Buat akun untuk mengakses
             <span class="typing-text">{{ typedText }}</span>
         </p>
       </div>
@@ -20,10 +20,18 @@
         <div class="logo">
           🤖
         </div>
-        <h2 class="login-title">Selamat Datang!</h2>
-        <p class="login-subtitle">Silakan login untuk melanjutkan.</p>
+        <h2 class="login-title">Daftar Akun Baru</h2>
+        <p class="login-subtitle">Isi form di bawah untuk membuat akun.</p>
 
-        <form @submit.prevent="handleLogin">
+        <form @submit.prevent="handleRegister">
+          <div class="form-group">
+            <label for="name">Name</label>
+            <div class="input-wrapper">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+              <input type="text" id="name" v-model="form.name" placeholder="Nama Lengkap" required :disabled="loading" />
+            </div>
+          </div>
+
           <div class="form-group">
             <label for="email">Email</label>
             <div class="input-wrapper">
@@ -44,6 +52,14 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label for="password_confirmation">Konfirmasi Password</label>
+            <div class="input-wrapper">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+              <input :type="passwordFieldType" id="password_confirmation" v-model="form.password_confirmation" placeholder="••••••••" required :disabled="loading" />
+            </div>
+          </div>
+
           <div v-if="error" class="error-message">
             {{ error }}
           </div>
@@ -52,12 +68,12 @@
             <span v-if="loading">
               <div class="spinner"></div>
             </span>
-            <span v-else>Login</span>
+            <span v-else>Register</span>
           </button>
 
-          <p class="register-link">
-            Did not have an account? 
-            <router-link to="/register">Register here!</router-link>
+          <p class="login-link">
+            Sudah punya akun? 
+            <router-link to="/">Login here!</router-link>
           </p>
         </form>
       </div>
@@ -69,12 +85,14 @@
 import axios from 'axios';
 
 export default {
-  name: 'Login',
+  name: 'Register',
   data() {
     return {
       form: {
+        name: '',
         email: '',
-        password: ''
+        password: '',
+        password_confirmation: ''
       },
       loading: false,
       error: null,
@@ -98,24 +116,21 @@ export default {
   },
   computed: {
     isFormValid() {
-      return this.form.email.length > 0 && this.form.password.length > 0;
+      return (
+        this.form.name.length > 0 &&
+        this.form.email.length > 0 &&
+        this.form.password.length > 0 &&
+        this.form.password_confirmation.length > 0 &&
+        this.form.password === this.form.password_confirmation
+      );
     }
   },
   mounted() {
     this.typingEffect();
   },
-  created() {
-    const token = localStorage.getItem('auth_token');
-
-    if (token) {
-      console.log('Token ditemukan, redirect ke dashboard...');
-      window.location.href = '/dashboard';
-    }
-  },
-    beforeUnmount() {
+  beforeUnmount() {
     if (this._typingTimer) {
       clearTimeout(this._typingTimer);
-      this._typingTimer = null;
     }
   },
   methods: {
@@ -147,43 +162,53 @@ export default {
         }
       }
 
-      setTimeout(this.typingEffect, timeoutSpeed);
+      this._typingTimer = setTimeout(this.typingEffect, timeoutSpeed);
     },
-    async handleLogin() {
-    this.error = null;
-    this.loading = true;
-        try {
-            const response = await axios.post('/api/login', {
-            email: this.form.email,
-            password: this.form.password,
-            });
-          
-            localStorage.setItem('auth_token', response.data.access_token);
-            localStorage.setItem('user', JSON.stringify(response.data.user));
-            axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
+    async handleRegister() {
+      this.error = null;
+      this.loading = true;
+      
+      if (this.form.password !== this.form.password_confirmation) {
+        this.error = 'Password tidak cocok.';
+        this.loading = false;
+        return;
+      }
 
-            console.log('Login berhasil:', response.data);
+      try {
+        const response = await axios.post('/api/register', {
+          name: this.form.name,
+          email: this.form.email,
+          password: this.form.password,
+          password_confirmation: this.form.password_confirmation,
+        });
+        
+        localStorage.setItem('auth_token', response.data.access_token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
 
-            window.location.href = '/dashboard';
+        console.log('Register berhasil:', response.data);
 
-        } catch (error) {
-            if (error.response) {
-            this.error = error.response.data.message || 'Email atau password salah.';
-            console.error('Login error response:', error.response.data);
-            } else if (error.request) {
-            this.error = 'Tidak bisa terhubung ke server. Silakan coba lagi.';
-            console.error('Login error request:', error.request);
-            } else {
-            this.error = 'Terjadi kesalahan. Coba muat ulang halaman.';
-            console.error('Login error:', error.message);
-            }
-        } finally {
-            this.loading = false;
+        window.location.href = '/dashboard';
+
+      } catch (error) {
+        if (error.response) {
+          this.error = error.response.data.message || 'Registrasi gagal. Silakan coba lagi.';
+          console.error('Register error response:', error.response.data);
+        } else if (error.request) {
+          this.error = 'Tidak bisa terhubung ke server. Silakan coba lagi.';
+          console.error('Register error request:', error.request);
+        } else {
+          this.error = 'Terjadi kesalahan. Coba muat ulang halaman.';
+          console.error('Register error:', error.message);
         }
+      } finally {
+        this.loading = false;
+      }
     }
   }
 }
 </script>
+
 <style scoped>
 :root {
   --primary-color: #4a90e2;
@@ -200,17 +225,15 @@ export default {
   min-height: 100vh;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   
-  background-image:
-    linear-gradient(rgba(10, 25, 47, 0.7), rgba(10, 25, 47, 0.7)),
-    url('/images/background-login.jpg');
-  
-  background-size: cover; 
-  background-position: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-attachment: fixed;
+  justify-content: center;
+  align-items: center;
 }
 
 .left-pane {
+  display: none;
   flex: 1;
-  display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
@@ -219,6 +242,7 @@ export default {
   background: transparent; 
   text-align: center;
 }
+
 .welcome-text h1 {
   color: white;
   font-size: 3rem;
@@ -226,6 +250,7 @@ export default {
   font-weight: 300;
   text-shadow: 2px 2px 8px rgba(0,0,0,0.5); 
 }
+
 .welcome-text p {
   color: white;
   font-size: 1.1rem;
@@ -247,107 +272,124 @@ export default {
   from, to { border-color: transparent }
   50% { border-color: #f1c40f; }
 }
+
 .welcome-illustration {
-  margin-top: 40px;
-}
-.welcome-illustration svg {
-  stroke: var(--text-color-light);
-  opacity: 0.8;
-  filter: drop-shadow(0px 0px 10px rgba(0,0,0,0.5)); 
+  margin-top: 50px;
+  color: rgba(255, 255, 255, 0.6);
 }
 
 .right-pane {
-  flex: 1;
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 40px;
+  padding: 20px;
+  background: transparent;
+  width: 100%;
+  max-width: 500px;
 }
 
 .login-box {
-  background-color: #fff;
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 400px;
-  animation: fadeIn 0.8s ease-in-out;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-
-}
-
-.login-box:hover {
-  transform: translateY(-10px); 
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 40px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 .logo {
+  text-align: center;
   font-size: 3rem;
   margin-bottom: 20px;
 }
 
 .login-title {
+  text-align: center;
   color: var(--text-color);
-  font-size: 2rem;
+  margin-bottom: 10px;
+  font-size: 1.6rem;
   font-weight: 600;
 }
 
 .login-subtitle {
-  color: #666;
+  text-align: center;
+  color: #999;
   margin-bottom: 30px;
+  font-size: 0.9rem;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
 }
 
 .form-group {
-  margin-bottom: 25px;
-  text-align: left;
+  margin-bottom: 18px;
 }
-.form-group label {
+
+label {
   display: block;
+  color: var(--text-color);
   margin-bottom: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   color: #555;
-  font-weight: 500;
 }
+
 .input-wrapper {
   position: relative;
   display: flex;
   align-items: center;
-}
-.input-wrapper svg:not(.password-toggle-icon) {
-  position: absolute;
-  left: 15px;
-  color: #aaa;
-  z-index: 10;
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  padding: 0 12px;
+  transition: all 0.3s ease;
+  background-color: #f8f9fa;
 }
 
-.input-wrapper input {
-  width: 100%;
-  padding: 12px 12px 12px 45px; 
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-}
-.input-wrapper input:focus {
+.input-wrapper:focus-within {
   border-color: var(--primary-color);
-  outline: none;
-  box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.2);
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
 }
-.password-toggle {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  
-  height: 100%;
-  width: 45px; 
-  
+
+.input-wrapper svg {
+  color: #999;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+input {
+  flex: 1;
+  padding: 12px 0;
+  border: none;
   background: transparent;
+  font-size: 1rem;
+  color: var(--text-color);
+  outline: none;
+}
+
+input::placeholder {
+  color: #ccc;
+}
+
+.password-toggle {
+  background: none;
   border: none;
   cursor: pointer;
-
+  color: #999;
+  padding: 5px;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
+  transition: color 0.3s ease;
+}
+
+.password-toggle:hover {
+  color: #333;
 }
 
 .error-message {
@@ -357,38 +399,41 @@ export default {
   padding: 12px;
   margin-bottom: 20px;
   font-size: 0.9rem;
+  border-left: 4px solid var(--error-color);
   animation: slideDown 0.5s ease-out;
 }
 
 button[type="submit"] {
   width: 100%;
   padding: 14px;
-  background-color: var(--primary-color);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
   border: none;
-  border-radius: 8px;
-  font-size: 1.1rem;
+  border-radius: 10px;
+  font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
-  transition: background-color 0.3s ease;
+  transition: all 0.3s ease;
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 50px;
+  height: 48px;
+  margin-top: 10px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
 }
-button[type="submit"]:hover:not(:disabled) {
-  background-color: #71b5e6;
 
+button[type="submit"]:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
 }
+
 button[type="submit"].loading {
   cursor: not-allowed;
-  background-color: #a0ccec;
+  opacity: 0.8;
 }
-button[type="submit"] {
-  background-color: #a0ccec;
-}
+
 button[type="submit"]:disabled {
-  background-color: #a0ccec;
+  opacity: 0.6;
   cursor: not-allowed;
 }
 
@@ -396,6 +441,7 @@ button[type="submit"]:disabled {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
 @keyframes slideDown {
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -409,36 +455,136 @@ button[type="submit"]:disabled {
   height: 20px;
   animation: spin 1s linear infinite;
 }
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
 
-.register-link {
+.login-link {
   text-align: center;
   margin-top: 20px;
   color: #666;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
-.register-link a {
-  color: #2c5aa0;
+.login-link a {
+  color: #667eea;
   text-decoration: none;
   font-weight: 600;
-  transition: color 0.3s ease;
+  transition: all 0.3s ease;
 }
 
-.register-link a:hover {
-  color: #71b5e6;
+.login-link a:hover {
+  color: #764ba2;
   text-decoration: underline;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .left-pane {
     display: none;
   }
+
+  .login-box {
+    padding: 35px;
+    max-width: 380px;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-container {
+    min-height: auto;
+    padding: 20px 0;
+  }
+
   .right-pane {
+    padding: 15px;
+    max-width: 100%;
+  }
+
+  .login-box {
+    padding: 30px;
+    max-width: 100%;
+    border-radius: 12px;
+  }
+
+  .login-title {
+    font-size: 1.4rem;
+  }
+
+  label {
+    font-size: 0.85rem;
+  }
+
+  input {
+    font-size: 1rem;
+  }
+
+  button[type="submit"] {
+    height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-container {
+    justify-content: stretch;
+  }
+
+  .right-pane {
+    max-width: 100%;
+    padding: 15px;
+  }
+
+  .login-box {
     padding: 20px;
+    max-width: 100%;
+    border-radius: 12px;
+  }
+
+  .logo {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+  }
+
+  .login-title {
+    font-size: 1.3rem;
+    margin-bottom: 8px;
+  }
+
+  .login-subtitle {
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+  }
+
+  .form-group {
+    margin-bottom: 14px;
+  }
+
+  label {
+    font-size: 0.8rem;
+  }
+
+  input {
+    font-size: 1rem;
+  }
+
+  .input-wrapper {
+    padding: 0 10px;
+  }
+
+  .input-wrapper svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  button[type="submit"] {
+    height: 42px;
+    font-size: 0.95rem;
+  }
+
+  .login-link {
+    font-size: 0.85rem;
+    margin-top: 15px;
   }
 }
 </style>
