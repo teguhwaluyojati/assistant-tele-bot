@@ -31,7 +31,7 @@ class RegisterController extends Controller
             
             if (!$telegramUser) {
                 return response()->json([
-                    'message' => 'Telegram username not found. Please make sure you have started the bot.',
+                    'message' => 'Telegram account not found. Please start the bot first on Telegram, then try registering again.',
                     'status' => 'error'
                 ], 404);
             }
