@@ -35,6 +35,14 @@ class RegisterController extends Controller
                     'status' => 'error'
                 ], 404);
             }
+
+            $isTelegramAlreadyUsed = User::where('telegram_user_id', $telegramUser->id)->exists();
+            if ($isTelegramAlreadyUsed) {
+                return response()->json([
+                    'message' => 'This Telegram account is already linked to another web account and cannot be used to register again.',
+                    'status' => 'error'
+                ], 409);
+            }
             
             // Generate 6-digit code
             $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
@@ -128,6 +136,15 @@ class RegisterController extends Controller
                     'message' => 'Telegram user not found.',
                     'status' => 'error'
                 ], 404);
+            }
+
+            $isTelegramAlreadyUsed = User::where('telegram_user_id', $telegramUser->id)->exists();
+            if ($isTelegramAlreadyUsed) {
+                $verification->delete();
+                return response()->json([
+                    'message' => 'This Telegram account is already linked to another web account and cannot be used to register again.',
+                    'status' => 'error'
+                ], 409);
             }
             
             // Create user with telegram_user_id
