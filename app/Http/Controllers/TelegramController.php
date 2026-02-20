@@ -97,14 +97,22 @@ class TelegramController extends Controller
                 return null;
             }
 
-            return \App\Models\TelegramUser::firstOrCreate(
+            $user = \App\Models\TelegramUser::firstOrCreate(
                 ['user_id' => $from->getId()],
                 [
                     'username' => $from->getUsername(),
                     'first_name' => $from->getFirstName(),
                     'last_name' => $from->getLastName(),
+                    'level' => 2,
                 ]
             );
+
+            if (is_null($user->level)) {
+                $user->level = 2;
+                $user->save();
+            }
+
+            return $user;
         } catch (\Exception $e) {
             Log::error('Gagal findOrCreateUser: ' . $e->getMessage());
             return null;

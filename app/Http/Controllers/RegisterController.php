@@ -7,6 +7,7 @@ use App\Models\TelegramUser;
 use App\Models\VerificationCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
 use Telegram\Bot\Laravel\Facades\Telegram;
 
@@ -21,9 +22,11 @@ class RegisterController extends Controller
                 'password' => ['required', 'string', 'min:6'],
                 'telegram_username' => ['required', 'string'],
             ]);
+
+            $normalizedUsername = ltrim(trim($validatedData['telegram_username']), '@');
             
             // Find telegram user by username
-            $telegramUser = TelegramUser::where('username', $validatedData['telegram_username'])
+            $telegramUser = TelegramUser::where('username', $normalizedUsername)
                 ->first();
             
             if (!$telegramUser) {
@@ -39,7 +42,7 @@ class RegisterController extends Controller
             // Store verification record with 15 minute expiration
             $verification = VerificationCode::create([
                 'email' => $validatedData['email'],
-                'telegram_username' => $validatedData['telegram_username'],
+                'telegram_username' => $normalizedUsername,
                 'code' => $code,
                 'name' => $validatedData['name'],
                 'password' => Hash::make($validatedData['password']),
@@ -57,7 +60,7 @@ class RegisterController extends Controller
                     'parse_mode' => 'Markdown',
                 ]);
             } catch (\Exception $e) {
-                \Log::error('Failed to send verification code: ' . $e->getMessage());
+                Log::error('Failed to send verification code: ' . $e->getMessage());
                 
                 $verification->delete();
                 
@@ -80,7 +83,7 @@ class RegisterController extends Controller
                 'status' => 'error'
             ], 422);
         } catch (\Exception $e) {
-            \Log::error('Register error: ' . $e->getMessage());
+            Log::error('Register error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'An error occurred during registration.',
                 'status' => 'error'
@@ -151,7 +154,7 @@ class RegisterController extends Controller
                     'parse_mode' => 'Markdown',
                 ]);
             } catch (\Exception $e) {
-                \Log::error('Failed to send confirmation: ' . $e->getMessage());
+                Log::error('Failed to send confirmation: ' . $e->getMessage());
             }
             
             return response()->json([
@@ -169,7 +172,7 @@ class RegisterController extends Controller
                 'status' => 'error'
             ], 422);
         } catch (\Exception $e) {
-            \Log::error('Verify error: ' . $e->getMessage());
+            Log::error('Verify error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'An error occurred during verification.',
                 'status' => 'error'
