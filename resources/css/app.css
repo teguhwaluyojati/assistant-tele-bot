@@ -6,9 +6,8 @@
 @tailwind utilities;
 
 /* 2. Impor custom style Anda yang lain bisa tetap di sini jika diperlukan */
-/* Baris-baris ini mungkin tidak lagi dibutuhkan jika sudah diimpor di tempat lain,
-   tapi biarkan dulu untuk sekarang. */
-@import './_checkbox-radio-switch.css';
-@import './_progress.css';
-@import './_scrollbars.css';
-@import './_table.css';
+/* File-file berikut tidak ditemukan, sehingga di-comment untuk sekarang */
+/* @import './_checkbox-radio-switch.css'; */
+/* @import './_progress.css'; */
+/* @import './_scrollbars.css'; */
+/* @import './_table.css'; */
