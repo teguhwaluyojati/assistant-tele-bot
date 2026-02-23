@@ -423,6 +423,20 @@ const isAdminUser = computed(() => {
                 <div class="h-3 w-1/3 rounded bg-gray-200 dark:bg-slate-700"></div>
               </div>
             </div>
+            <div class="flex items-center gap-4">
+              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-4 w-4/5 rounded bg-gray-200 dark:bg-slate-700"></div>
+                <div class="h-3 w-2/5 rounded bg-gray-200 dark:bg-slate-700"></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-4 w-3/5 rounded bg-gray-200 dark:bg-slate-700"></div>
+                <div class="h-3 w-2/6 rounded bg-gray-200 dark:bg-slate-700"></div>
+              </div>
+            </div>
           </div>
 
           <template v-else>
