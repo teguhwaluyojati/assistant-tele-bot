@@ -471,6 +471,10 @@ input {
 input::placeholder {
   color: #ccc;
 }
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
 
 .password-toggle {
   background: none;

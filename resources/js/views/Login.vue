@@ -332,6 +332,10 @@ export default {
   outline: none;
   box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.2);
 }
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
 .password-toggle {
   position: absolute;
   right: 0;
