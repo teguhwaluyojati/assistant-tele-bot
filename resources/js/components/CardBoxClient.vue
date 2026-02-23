@@ -31,6 +31,10 @@ const props = defineProps({
     type: String,
     default: null,
   },
+  avatar: {
+    type: String,
+    default: null,
+  },
 })
 
 const pillType = computed(() => {
@@ -68,7 +72,7 @@ const pillText = computed(() => props.text ?? `${props.progress}%`)
   <CardBox class="mb-6 last:mb-0">
     <BaseLevel>
       <BaseLevel type="justify-start">
-        <UserAvatar class="w-12 h-12 mr-6" :username="name" />
+        <UserAvatar class="w-12 h-12 mr-6" :username="name" :avatar="props.avatar" />
         <div class="text-center md:text-left overflow-hidden">
           <h4 class="text-xl text-ellipsis">
             {{ name }}

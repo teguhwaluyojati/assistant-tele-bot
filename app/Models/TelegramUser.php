@@ -17,6 +17,8 @@ class TelegramUser extends Model
         'level',
     ];
 
+    protected $appends = ['avatar_url'];
+
     protected $casts = [
         'last_interaction_at' => 'datetime',
     ];
@@ -43,5 +45,10 @@ class TelegramUser extends Model
     public function isAdmin()
     {
         return $this->level == 1;
+    }
+
+    public function getAvatarUrlAttribute()
+    {
+        return $this->webUser && $this->webUser->avatar_url ? $this->webUser->avatar_url : null;
     }
 }

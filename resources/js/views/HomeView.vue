@@ -234,6 +234,7 @@ const clientBarItems = computed(() => {
       date: formatShortDate(client.last_interaction_at),
       type: levelType,
       text: levelLabel,
+      avatar_url: client.avatar_url ?? null,
     }
   })
 })
@@ -377,6 +378,7 @@ const isAdminUser = computed(() => {
               :date="client.date"
               :type="client.type"
               :text="client.text"
+              :avatar="client.avatar_url"
             />
           </template>
           <CardBox v-else-if="isUserReady" class="flex-1">

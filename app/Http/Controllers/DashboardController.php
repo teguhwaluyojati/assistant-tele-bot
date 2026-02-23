@@ -24,7 +24,9 @@ class DashboardController extends Controller
     }
     public function getUsers()
     {
-        $users = TelegramUser::latest('last_interaction_at')->paginate(15);
+        $users = TelegramUser::with('webUser:id,telegram_user_id,name,avatar')
+            ->latest('last_interaction_at')
+            ->paginate(15);
 
         return response()->json($users);
     }
@@ -268,7 +270,9 @@ class DashboardController extends Controller
     public function getUserDetail($userId)
     {
         try {
-            $user = TelegramUser::where('user_id', $userId)->firstOrFail();
+            $user = TelegramUser::with('webUser:id,telegram_user_id,name,avatar')
+                ->where('user_id', $userId)
+                ->firstOrFail();
             
             $commands = TelegramUserCommand::where('user_id', $userId)
                 ->latest()
