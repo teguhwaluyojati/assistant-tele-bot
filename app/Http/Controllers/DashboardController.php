@@ -96,7 +96,7 @@ class DashboardController extends Controller
         }
     }
 
-    public function getTransactions()
+    public function getTransactions(Request $request)
     {
         try {
             $query = \App\Models\Transaction::with('user:id,user_id,username,first_name,last_name')
@@ -113,6 +113,40 @@ class DashboardController extends Controller
             // Filter by telegram user if not admin
             if (!$telegramUser->isAdmin()) {
                 $query->where('user_id', $telegramUser->user_id);
+            }
+
+            // Type filter
+            if ($request->has('type') && $request->type !== 'all') {
+                $query->where('type', $request->type);
+            }
+
+            // Search filter
+            if ($request->has('search') && $request->search) {
+                $search = '%' . $request->search . '%';
+                $query->where(function ($q) use ($search) {
+                    $q->where('description', 'like', $search)
+                      ->orWhereHas('user', function ($subQ) use ($search) {
+                          $subQ->where('username', 'like', $search)
+                               ->orWhere('first_name', 'like', $search)
+                               ->orWhere('last_name', 'like', $search);
+                      });
+                });
+            }
+
+            // Sorting
+            $sortField = $request->has('sort') ? $request->sort : 'created_at';
+            $sortDirection = $request->has('direction') ? $request->direction : 'desc';
+            
+            // Validate sort field to prevent injection
+            $validFields = ['created_at', 'amount', 'type', 'description'];
+            if (!in_array($sortField, $validFields)) {
+                $sortField = 'created_at';
+            }
+            
+            $sortDirection = strtolower($sortDirection) === 'asc' ? 'asc' : 'desc';
+            
+            if ($sortField === 'created_at' || in_array($sortField, $validFields)) {
+                $query->orderBy($sortField, $sortDirection);
             }
 
             $transactions = $query->paginate(15);

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { mdiEye, mdiTrashCan, mdiPencil, mdiArrowUp, mdiArrowDown } from '@mdi/js'
 import CardBoxModal from '@/components/CardBoxModal.vue'
@@ -30,8 +30,11 @@ const sortField = ref('created_at')
 const sortDirection = ref('desc')
 const isLoading = ref(true)
 
-const perPage = ref(10)
-const currentPage = ref(0)
+// Server-side pagination
+const currentPage = ref(1)
+const lastPage = ref(1)
+const total = ref(0)
+const perPage = 15 // Backend default
 
 const isDetailModalActive = ref(false)
 const selectedTransaction = ref(null)
@@ -102,10 +105,21 @@ const fetchTransactions = async () => {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
     }
 
-    const response = await axios.get('/api/transactions?per_page=100')
+    // Server-side pagination with default per_page=15 from backend
+    const params = new URLSearchParams({
+      page: currentPage.value,
+      sort: sortField.value,
+      direction: sortDirection.value,
+      ...(typeFilter.value !== 'all' && { type: typeFilter.value }),
+      ...(searchQuery.value && { search: searchQuery.value }),
+    })
+
+    const response = await axios.get(`/api/transactions?${params.toString()}`)
     if (response.data.success || response.data.data) {
-      const data = response.data.data.data || response.data.data || []
-      transactions.value = Array.isArray(data) ? data : []
+      const paginatedData = response.data.data
+      transactions.value = Array.isArray(paginatedData.data) ? paginatedData.data : []
+      lastPage.value = paginatedData.last_page || 1
+      total.value = paginatedData.total || 0
     }
   } catch (error) {
     console.error('Error fetching transactions:', error)
@@ -119,83 +133,22 @@ onMounted(() => {
   fetchTransactions()
 })
 
+// Refetch when filters/sorts change
+const refetchTransactions = () => {
+  currentPage.value = 1 // Reset to first page
+  fetchTransactions()
+}
+
+// Watch for filter/search changes and refetch
+watch([searchQuery, typeFilter], () => {
+  refetchTransactions()
+})
+
+
 const filteredAndSortedItems = computed(() => {
-  let filtered = transactions.value
-
-  // Type filter
-  if (typeFilter.value !== 'all') {
-    filtered = filtered.filter((transaction) => transaction.type === typeFilter.value)
-  }
-
-  // Date range filter
-  if (props.dateStart || props.dateEnd) {
-    filtered = filtered.filter((transaction) => {
-      const transactionDate = new Date(transaction.created_at)
-      if (Number.isNaN(transactionDate.getTime())) return false
-
-      if (props.dateStart) {
-        const startDate = new Date(props.dateStart)
-        startDate.setHours(0, 0, 0, 0)
-        if (transactionDate < startDate) return false
-      }
-
-      if (props.dateEnd) {
-        const endDate = new Date(props.dateEnd)
-        endDate.setHours(23, 59, 59, 999)
-        if (transactionDate > endDate) return false
-      }
-
-      return true
-    })
-  }
-
-  // Search filter
-  if (searchQuery.value.trim()) {
-    const query = searchQuery.value.toLowerCase().trim()
-    filtered = filtered.filter((transaction) => {
-      const description = (transaction.description || '').toLowerCase()
-      const fullName = getFullName(transaction.user).toLowerCase()
-      const amount = String(transaction.amount || '').toLowerCase()
-      
-      return (
-        description.includes(query) ||
-        fullName.includes(query) ||
-        amount.includes(query)
-      )
-    })
-  }
-
-  // Sort
-  const sorted = [...filtered].sort((a, b) => {
-    let aVal, bVal
-
-    switch (sortField.value) {
-      case 'created_at':
-        aVal = new Date(a.created_at || 0).getTime()
-        bVal = new Date(b.created_at || 0).getTime()
-        break
-      case 'amount':
-        aVal = a.amount || 0
-        bVal = b.amount || 0
-        break
-      case 'type':
-        aVal = a.type || ''
-        bVal = b.type || ''
-        break
-      case 'user':
-        aVal = getFullName(a.user).toLowerCase()
-        bVal = getFullName(b.user).toLowerCase()
-        break
-      default:
-        return 0
-    }
-
-    if (aVal < bVal) return sortDirection.value === 'asc' ? -1 : 1
-    if (aVal > bVal) return sortDirection.value === 'asc' ? 1 : -1
-    return 0
-  })
-
-  return sorted
+  // Filtering and sorting is now handled by backend via server-side pagination
+  // Return transactions directly as they come from API
+  return transactions.value
 })
 
 const handleSort = (field) => {
@@ -205,22 +158,21 @@ const handleSort = (field) => {
     sortField.value = field
     sortDirection.value = 'asc'
   }
+  refetchTransactions() // Refetch with new sort
 }
 
-const itemsPaginated = computed(() =>
-  filteredAndSortedItems.value.slice(
-    perPage.value * currentPage.value,
-    perPage.value * (currentPage.value + 1)
-  ),
-)
+const itemsPaginated = computed(() => {
+  // No longer need client-side slicing since backend handles pagination
+  return transactions.value
+})
 
-const numPages = computed(() => Math.ceil(filteredAndSortedItems.value.length / perPage.value))
+const numPages = computed(() => lastPage.value)
 
-const currentPageHuman = computed(() => currentPage.value + 1)
+const currentPageHuman = computed(() => currentPage.value)
 
 const pagesList = computed(() => {
   const pagesList = []
-  for (let i = 0; i < numPages.value; i++) {
+  for (let i = 1; i <= numPages.value; i++) {
     pagesList.push(i)
   }
   return pagesList
@@ -335,6 +287,7 @@ const deleteTransaction = async () => {
 const clearFilters = () => {
   searchQuery.value = ''
   typeFilter.value = 'all'
+  refetchTransactions()
 }
 
 const toggleSelectTransaction = (transactionId) => {
@@ -629,27 +582,27 @@ const bulkDeleteTransactions = async () => {
             label="Prev"
             color="whiteDark"
             small
-            :disabled="currentPage === 0"
-            @click="currentPage = Math.max(currentPage - 1, 0)"
+            :disabled="currentPage === 1"
+            @click="currentPage = Math.max(currentPage - 1, 1); fetchTransactions()"
           />
           <BaseButton
             v-for="page in pagesList"
             :key="page"
             :active="page === currentPage"
-            :label="page + 1"
+            :label="String(page)"
             :color="page === currentPage ? 'lightDark' : 'whiteDark'"
             small
-            @click="currentPage = page"
+            @click="currentPage = page; fetchTransactions()"
           />
           <BaseButton
             label="Next"
             color="whiteDark"
             small
-            :disabled="currentPage >= numPages - 1"
-            @click="currentPage = Math.min(currentPage + 1, numPages - 1)"
+            :disabled="currentPage >= numPages"
+            @click="currentPage = Math.min(currentPage + 1, numPages); fetchTransactions()"
           />
         </BaseButtons>
-        <small>Page {{ currentPageHuman }} of {{ numPages }}</small>
+        <small>Page {{ currentPageHuman }} of {{ numPages }} (Total: {{ total }})</small>
       </BaseLevel>
     </div>
   </div>
