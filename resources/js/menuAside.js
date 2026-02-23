@@ -22,6 +22,7 @@ export default [
     to: '/tables',
     label: 'Tables',
     icon: mdiTable,
+    requiresAdmin: true,
   },
   {
     to: '/forms',

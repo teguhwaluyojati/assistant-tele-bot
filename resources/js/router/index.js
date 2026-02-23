@@ -45,7 +45,7 @@ const routes = [
         path: 'tables',
         name: 'tables',
         component: () => import('@/views/TablesView.vue'),
-        meta: { title: 'Tables' },
+        meta: { title: 'Tables', requiresAdmin: true },
       },
       {
         path: 'forms',
@@ -101,7 +101,18 @@ router.beforeEach(async (to, from, next) => {
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     try {
       console.log('Verifying token in router...');
-      await axios.get('/api/users');
+      const response = await axios.get('/api/user');
+      const currentUser = response?.data || null;
+      if (currentUser) {
+        localStorage.setItem('user', JSON.stringify(currentUser));
+      }
+      const isAdmin = currentUser?.telegram_user?.level === 1;
+      const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
+      if (requiresAdmin && !isAdmin) {
+        console.log('Admin role required, redirecting to dashboard.');
+        next({ name: 'dashboard' });
+        return;
+      }
       console.log('Token is valid, proceeding to route.');
       next();
     } catch (error) {

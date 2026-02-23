@@ -1,10 +1,11 @@
 <script setup>
 import { mdiForwardburger, mdiBackburger, mdiMenu } from '@mdi/js'
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import menuAside from '@/menuAside.js'
 import menuNavBar from '@/menuNavBar.js'
 import { useDarkModeStore } from '@/stores/darkMode.js'
+import { useMainStore } from '@/stores/main'
 import BaseIcon from '@/components/BaseIcon.vue'
 import FormControl from '@/components/FormControl.vue'
 import NavBar from '@/components/NavBar.vue'
@@ -17,12 +18,25 @@ import axios from 'axios'
 const layoutAsidePadding = 'xl:pl-60'
 
 const darkModeStore = useDarkModeStore()
+const mainStore = useMainStore()
 
 const router = useRouter()
 
 const isAsideMobileExpanded = ref(false)
 const isAsideLgActive = ref(false)
 const isLogoutModalOpen = ref(false)
+
+const isAdminUser = computed(() => mainStore.currentUser?.telegram_user?.level === 1)
+const menuAsideFiltered = computed(() =>
+  menuAside.filter((item) => !item.requiresAdmin || isAdminUser.value),
+)
+
+onMounted(async () => {
+  const token = localStorage.getItem('auth_token')
+  if (token && !mainStore.currentUser) {
+    await mainStore.fetchCurrentUser()
+  }
+})
 
 router.beforeEach(() => {
   isAsideMobileExpanded.value = false
@@ -92,7 +106,7 @@ const menuClick = (event, item) => {
       <AsideMenu
         :is-aside-mobile-expanded="isAsideMobileExpanded"
         :is-aside-lg-active="isAsideLgActive"
-        :menu="menuAside"
+        :menu="menuAsideFiltered"
         @menu-click="menuClick"
         @aside-lg-close-click="isAsideLgActive = false"
       />
