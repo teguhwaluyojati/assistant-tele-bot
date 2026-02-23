@@ -18,12 +18,35 @@ class DashboardController extends Controller
     protected $model_login;
     use ApiResponse;
 
+    private function requireAdmin()
+    {
+        $currentUser = auth()->user();
+        if (!$currentUser) {
+            return $this->errorResponse('Unauthorized.', 401);
+        }
+
+        $telegramUser = $currentUser->telegramUser;
+        if (!$telegramUser) {
+            return $this->errorResponse('User not linked to Telegram account.', 403);
+        }
+
+        if (!$telegramUser->isAdmin()) {
+            return $this->errorResponse('Forbidden.', 403);
+        }
+
+        return null;
+    }
+
     public function __construct()
     {
         $this->model_login = new LoginModel();
     }
     public function getUsers()
     {
+        if ($response = $this->requireAdmin()) {
+            return $response;
+        }
+
         $users = TelegramUser::with('webUser:id,telegram_user_id,name,avatar')
             ->latest('last_interaction_at')
             ->paginate(15);
@@ -33,6 +56,10 @@ class DashboardController extends Controller
 
     public function lastLogin()
     {
+        if ($response = $this->requireAdmin()) {
+            return $response;
+        }
+
         Log::info('Cek: Fungsi lastLogin dipanggil');
        try{
 
@@ -54,6 +81,10 @@ class DashboardController extends Controller
 
     public function upload(Request $request)
     {
+        if ($response = $this->requireAdmin()) {
+            return $response;
+        }
+
         $request->validate([
             'file' => 'required|mimes:xlsx,csv,xls'
         ]);
@@ -269,6 +300,10 @@ class DashboardController extends Controller
 
     public function getUserDetail($userId)
     {
+        if ($response = $this->requireAdmin()) {
+            return $response;
+        }
+
         try {
             $user = TelegramUser::with('webUser:id,telegram_user_id,name,avatar')
                 ->where('user_id', $userId)
@@ -374,6 +409,12 @@ class DashboardController extends Controller
             
             $startDate = $request->query('start_date');
             $endDate = $request->query('end_date');
+
+            if (!$isAdmin) {
+                if (!$currentUser->telegramUser) {
+                    return $this->errorResponse('User not linked to Telegram account.', 403);
+                }
+            }
 
             // Non-admin users can only export their own transactions
             $userId = $isAdmin ? null : $currentUser->telegramUser->user_id;
