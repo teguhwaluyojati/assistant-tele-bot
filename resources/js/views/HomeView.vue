@@ -21,7 +21,6 @@ import TableSampleClients from '@/components/TableSampleClients.vue'
 import NotificationBar from '@/components/NotificationBar.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import CardBoxTransaction from '@/components/CardBoxTransaction.vue'
-import CardBoxClient from '@/components/CardBoxClient.vue'
 import TableTransactions from '@/components/TableTransactions.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
@@ -48,8 +47,12 @@ const isTransactionFilterModalOpen = ref(false)
 const transactionFilterStartDate = ref('')
 const transactionFilterEndDate = ref('')
 const isUserReady = ref(false)
-const isClientsLoading = ref(false)
 const isTransactionsLoading = ref(true)
+const isInsightLoading = ref(true)
+const recentCommands = ref([])
+const recentLogins = ref([])
+const activeInsightSlide = ref(0)
+const isInsightSwitching = ref(false)
 
 const buildDateParams = () => {
   const params = {}
@@ -83,6 +86,75 @@ const fetchChartData = async (params = {}) => {
   } catch (error) {
     console.error('Failed to load chart data:', error)
   }
+}
+
+const fetchRecentCommands = async () => {
+  try {
+    const response = await axios.get('/api/dashboard/recent-commands')
+    recentCommands.value = response.data?.data || []
+  } catch (error) {
+    console.error('Failed to load recent commands:', error)
+    recentCommands.value = []
+  }
+}
+
+const fetchRecentLogins = async () => {
+  try {
+    const response = await axios.get('/api/dashboard/recent-logins')
+    recentLogins.value = response.data?.data || []
+  } catch (error) {
+    console.error('Failed to load recent logins:', error)
+    recentLogins.value = []
+  }
+}
+
+const currentInsightSlide = computed(() => {
+  if (isAdminUser.value) {
+    return activeInsightSlide.value === 0 ? 'commands' : 'logins'
+  }
+
+  return 'logins'
+})
+
+const changeInsightSlide = (targetIndex) => {
+  if (!isAdminUser.value || activeInsightSlide.value === targetIndex || isInsightSwitching.value) {
+    return
+  }
+
+  isInsightSwitching.value = true
+  setTimeout(() => {
+    activeInsightSlide.value = targetIndex
+    isInsightSwitching.value = false
+  }, 260)
+}
+
+const fetchRightPanelInsights = async () => {
+  try {
+    isInsightLoading.value = true
+
+    if (isAdminUser.value) {
+      await Promise.all([fetchRecentCommands(), fetchRecentLogins()])
+    } else {
+      activeInsightSlide.value = 0
+      recentCommands.value = []
+      await fetchRecentLogins()
+    }
+  } finally {
+    isInsightLoading.value = false
+  }
+}
+
+const displayCommandOwner = (item) => {
+  const fullName = [item.first_name, item.last_name].filter(Boolean).join(' ').trim()
+  if (fullName) {
+    return fullName
+  }
+
+  if (item.username) {
+    return `@${item.username}`
+  }
+
+  return item.user_id ? `User ${item.user_id}` : 'Unknown'
 }
 
 const openFilterModal = () => {
@@ -173,18 +245,13 @@ onMounted(async () => {
   await mainStore.fetchTransactionsFromApi()
   isTransactionsLoading.value = false
   
-  // Fetch clients only if user is admin
+  // Fetch clients only if user is admin (for table section)
   if (mainStore.currentUser?.telegram_user?.level === 1) {
-    isClientsLoading.value = true
     await mainStore.fetchSampleClients()
-    isClientsLoading.value = false
   }
-})
 
-const displayClientName = (client) => {
-  const fullName = [client.first_name, client.last_name].filter(Boolean).join(' ').trim()
-  return fullName || client.username || (client.user_id ? `User ${client.user_id}` : 'Unknown')
-}
+  await fetchRightPanelInsights()
+})
 
 const formatShortDate = (value) => {
   if (!value) {
@@ -206,41 +273,44 @@ const formatShortDate = (value) => {
 
 const displayPeriod = computed(() => summary.value.period || 'N/A')
 
-const fallbackClients = Array.from({ length: 4 }, (_, index) => ({
-  id: `placeholder-${index}`,
-  name: 'N/A',
-  login: 'N/A',
-  date: 'N/A',
-  type: 'info',
-  text: 'N/A',
-}))
-
-const clientBarItems = computed(() => {
-  if (!isAdminUser.value) {
-    return []
-  }
-
-  if (!mainStore.clients.length) {
-    return fallbackClients
-  }
-
-  return mainStore.clients.slice(0, 4).map((client) => {
-    const levelLabel = client.level === 1 ? 'Admin' : 'Member'
-    const levelType = client.level === 1 ? 'success' : 'info'
-    return {
-      id: client.id,
-      name: displayClientName(client),
-      login: client.username || '-',
-      date: formatShortDate(client.last_interaction_at),
-      type: levelType,
-      text: levelLabel,
-      avatar_url: client.avatar_url ?? null,
-    }
-  })
-})
-
 const transactionBarItems = computed(() => {
   return mainStore.history.slice(0, 4)
+})
+
+const rightInsightItems = computed(() => {
+  const items = currentInsightSlide.value === 'commands'
+    ? recentCommands.value.slice(0, 4).map((command) => ({
+      id: `cmd-${command.id}`,
+      amount: command.command || 'Command',
+      date: formatShortDate(command.created_at),
+      business: displayCommandOwner(command),
+      type: 'info',
+      name: 'Telegram Command',
+      account: 'Command',
+    }))
+    : recentLogins.value.slice(0, 4).map((item, index) => ({
+      id: `login-${index}-${item.email}`,
+      amount: 'Login',
+      date: formatShortDate(item.created_at),
+      business: item.email,
+      type: 'info',
+      name: `IP: ${item.ip_address || '-'}`,
+      account: 'Login',
+    }))
+
+  while (items.length < 4) {
+    items.push({
+      id: `placeholder-${currentInsightSlide.value}-${items.length}`,
+      amount: 'N/A',
+      date: 'N/A',
+      business: 'N/A',
+      type: 'info',
+      name: 'N/A',
+      account: currentInsightSlide.value === 'commands' ? 'Command' : 'Login',
+    })
+  }
+
+  return items
 })
 
 const isAdminUser = computed(() => {
@@ -285,7 +355,7 @@ const isAdminUser = computed(() => {
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div class="flex flex-col justify-between gap-4">
+        <div class="flex flex-col gap-4">
           <div v-if="isTransactionsLoading" class="space-y-4 animate-pulse">
             <div class="flex items-center gap-4">
               <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
@@ -337,91 +407,55 @@ const isAdminUser = computed(() => {
             </CardBox>
           </template>
         </div>
-        <div class="flex flex-col justify-between gap-4">
-          <template v-if="isUserReady && isAdminUser">
-            <div v-if="isClientsLoading" class="space-y-4 animate-pulse">
-              <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-                <div class="flex-1 space-y-2">
-                  <div class="h-4 w-3/4 rounded bg-gray-200 dark:bg-slate-700"></div>
-                  <div class="h-3 w-1/2 rounded bg-gray-200 dark:bg-slate-700"></div>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-                <div class="flex-1 space-y-2">
-                  <div class="h-4 w-2/3 rounded bg-gray-200 dark:bg-slate-700"></div>
-                  <div class="h-3 w-1/3 rounded bg-gray-200 dark:bg-slate-700"></div>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-                <div class="flex-1 space-y-2">
-                  <div class="h-4 w-4/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                  <div class="h-3 w-2/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-                <div class="flex-1 space-y-2">
-                  <div class="h-4 w-3/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                  <div class="h-3 w-2/6 rounded bg-gray-200 dark:bg-slate-700"></div>
-                </div>
+        <div class="relative flex flex-col gap-4 pb-6">
+          <div v-if="isInsightLoading || !isUserReady" class="space-y-4 animate-pulse">
+            <div class="flex items-center gap-4">
+              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-4 w-3/4 rounded bg-gray-200 dark:bg-slate-700"></div>
+                <div class="h-3 w-1/2 rounded bg-gray-200 dark:bg-slate-700"></div>
               </div>
             </div>
-            <CardBoxClient
-              v-else
-              v-for="client in clientBarItems"
-              :key="client.id"
-              :name="client.name"
-              :login="client.login"
-              :date="client.date"
-              :type="client.type"
-              :text="client.text"
-              :avatar="client.avatar_url"
+            <div class="flex items-center gap-4">
+              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+              <div class="flex-1 space-y-2">
+                <div class="h-4 w-2/3 rounded bg-gray-200 dark:bg-slate-700"></div>
+                <div class="h-3 w-1/3 rounded bg-gray-200 dark:bg-slate-700"></div>
+              </div>
+            </div>
+          </div>
+
+          <template v-else>
+            <CardBoxTransaction
+              v-for="item in rightInsightItems"
+              :key="item.id"
+              :amount="item.amount"
+              :date="item.date"
+              :business="item.business"
+              :type="item.type"
+              :name="item.name"
+              :account="item.account"
+              class="transition-opacity duration-300"
+              :class="isInsightSwitching ? 'opacity-30' : 'opacity-100'"
             />
+
+            <div v-if="isAdminUser" class="absolute bottom-0 left-1/2 -translate-x-1/2">
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="h-2.5 w-2.5 rounded-full transition"
+                  :class="activeInsightSlide === 0 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'"
+                  @click="changeInsightSlide(0)"
+                ></button>
+                <button
+                  type="button"
+                  class="h-2.5 w-2.5 rounded-full transition"
+                  :class="activeInsightSlide === 1 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'"
+                  @click="changeInsightSlide(1)"
+                ></button>
+              </div>
+            </div>
           </template>
-          <CardBox v-else-if="isUserReady" class="flex-1">
-            <div class="space-y-2">
-              <h3 class="text-lg font-semibold">Need help?</h3>
-              <p class="text-sm text-gray-500 dark:text-slate-400">
-                This area is for admin insights. You can still track your transactions on the left
-                panel and the table below.
-              </p>
-            </div>
-          </CardBox>
-          <CardBox v-else class="flex-1">
-            <div class="space-y-4 animate-pulse">
-              <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-                <div class="flex-1 space-y-2">
-                  <div class="h-4 w-3/4 rounded bg-gray-200 dark:bg-slate-700"></div>
-                  <div class="h-3 w-1/2 rounded bg-gray-200 dark:bg-slate-700"></div>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-                <div class="flex-1 space-y-2">
-                  <div class="h-4 w-2/3 rounded bg-gray-200 dark:bg-slate-700"></div>
-                  <div class="h-3 w-1/3 rounded bg-gray-200 dark:bg-slate-700"></div>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-                <div class="flex-1 space-y-2">
-                  <div class="h-4 w-4/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                  <div class="h-3 w-2/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-                <div class="flex-1 space-y-2">
-                  <div class="h-4 w-3/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                  <div class="h-3 w-2/6 rounded bg-gray-200 dark:bg-slate-700"></div>
-                </div>
-              </div>
-            </div>
-          </CardBox>
         </div>
       </div>
 

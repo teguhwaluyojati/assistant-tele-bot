@@ -7,6 +7,7 @@ use App\Models\TelegramUser;
 use App\Models\LoginModel;
 use App\Models\TelegramUserCommand;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use App\Traits\ApiResponse;
 use Maatwebsite\Excel\Facades\Excel;
@@ -322,6 +323,111 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Error retrieving user detail: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while retrieving user detail.', 500);
+        }
+    }
+
+    public function getMyCommands()
+    {
+        try {
+            $currentUser = auth()->user();
+            if (!$currentUser) {
+                return $this->errorResponse('Unauthorized.', 401);
+            }
+
+            $telegramUser = $currentUser->telegramUser;
+            if (!$telegramUser) {
+                return $this->errorResponse('User not linked to Telegram account.', 403);
+            }
+
+            $commands = TelegramUserCommand::where('user_id', $telegramUser->user_id)
+                ->latest()
+                ->limit(10)
+                ->get();
+
+            return $this->successResponse($commands, 'User commands retrieved successfully.');
+        } catch (\Exception $e) {
+            Log::error('Error retrieving user commands: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while retrieving commands.', 500);
+        }
+    }
+
+    public function getRecentCommands()
+    {
+        try {
+            $currentUser = auth()->user();
+            if (!$currentUser) {
+                return $this->errorResponse('Unauthorized.', 401);
+            }
+
+            $telegramUser = $currentUser->telegramUser;
+            if (!$telegramUser) {
+                return $this->errorResponse('User not linked to Telegram account.', 403);
+            }
+
+            $query = TelegramUserCommand::query();
+
+            if ($telegramUser->isAdmin()) {
+                $commands = $query
+                    ->leftJoin('telegram_users', 'telegram_user_commands.user_id', '=', 'telegram_users.user_id')
+                    ->select([
+                        'telegram_user_commands.id',
+                        'telegram_user_commands.command',
+                        'telegram_user_commands.user_id',
+                        'telegram_user_commands.created_at',
+                        'telegram_users.username',
+                        'telegram_users.first_name',
+                        'telegram_users.last_name',
+                    ])
+                    ->latest('telegram_user_commands.created_at')
+                    ->limit(10)
+                    ->get();
+            } else {
+                $commands = $query
+                    ->where('user_id', $telegramUser->user_id)
+                    ->latest()
+                    ->limit(10)
+                    ->get();
+            }
+
+            return $this->successResponse($commands, 'Recent commands retrieved successfully.');
+        } catch (\Exception $e) {
+            Log::error('Error retrieving recent commands: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while retrieving commands.', 500);
+        }
+    }
+
+    public function getRecentLogins()
+    {
+        try {
+            $currentUser = auth()->user();
+            if (!$currentUser) {
+                return $this->errorResponse('Unauthorized.', 401);
+            }
+
+            $telegramUser = $currentUser->telegramUser;
+            if (!$telegramUser) {
+                return $this->errorResponse('User not linked to Telegram account.', 403);
+            }
+
+            if ($telegramUser->isAdmin()) {
+                $logins = DB::table('login_history')
+                    ->select('email', 'ip_address', 'created_at')
+                    ->orderByDesc('created_at')
+                    ->limit(10)
+                    ->get();
+            } else {
+                $logins = DB::table('login_history')
+                    ->select('email', 'ip_address', 'created_at')
+                    ->where('email', $currentUser->email)
+                    ->orderByDesc('created_at')
+                    ->limit(1)
+                    ->get();
+            }
+
+            return $this->successResponse($logins, 'Recent logins retrieved successfully.');
+        } catch (\Exception $e) {
+            Log::error('Error retrieving recent logins: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while retrieving logins.', 500);
         }
     }
 
