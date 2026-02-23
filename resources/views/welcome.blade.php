@@ -12,6 +12,7 @@ OLD
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Asisstant</title>
     <meta name="csrf-token" content="{{ csrf_token() }}"> 
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
     {{-- @vite('resources/js/css/main.css') --}}
 @vite('resources/js/main.js')
 </head>
