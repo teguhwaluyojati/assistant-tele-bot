@@ -1,7 +1,15 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
 import { useMainStore } from '@/stores/main'
-import { mdiEye, mdiTrashCan, mdiArrowUp, mdiArrowDown, mdiAccountSwitch } from '@mdi/js'
+import {
+  mdiEye,
+  mdiTrashCan,
+  mdiArrowUp,
+  mdiArrowDown,
+  mdiAccountSwitch,
+  mdiCheckCircle,
+  mdiAlertCircle,
+} from '@mdi/js'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import TableCheckboxCell from '@/components/TableCheckboxCell.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
@@ -129,6 +137,23 @@ const roleTarget = ref(null)
 const roleValue = ref(2)
 const roleError = ref('')
 const isUpdatingRole = ref(false)
+const roleToast = ref({
+  visible: false,
+  type: 'success',
+  message: '',
+})
+
+let roleToastTimer = null
+
+const roleToastClass = computed(() =>
+  roleToast.value.type === 'success'
+    ? 'bg-emerald-500 text-white'
+    : 'bg-red-500 text-white',
+)
+const roleToastIcon = computed(() =>
+  roleToast.value.type === 'success' ? mdiCheckCircle : mdiAlertCircle,
+)
+const roleButtonLabel = computed(() => (isUpdatingRole.value ? 'Saving...' : 'Save'))
 
 const isModalDangerActive = ref(false)
 
@@ -217,6 +242,22 @@ const openRoleModal = (client) => {
   isRoleModalActive.value = true
 }
 
+const showRoleToast = (type, message) => {
+  roleToast.value = {
+    visible: true,
+    type,
+    message,
+  }
+
+  if (roleToastTimer) {
+    clearTimeout(roleToastTimer)
+  }
+
+  roleToastTimer = setTimeout(() => {
+    roleToast.value.visible = false
+  }, 2500)
+}
+
 const updateClientLevel = (userId, level) => {
   const index = mainStore.clients.findIndex((client) => client.user_id === userId || client.id === userId)
   if (index !== -1) {
@@ -235,7 +276,7 @@ const updateClientLevel = (userId, level) => {
 }
 
 const submitRoleUpdate = async () => {
-  if (!roleTarget.value) {
+  if (!roleTarget.value || isUpdatingRole.value) {
     return
   }
 
@@ -255,16 +296,28 @@ const submitRoleUpdate = async () => {
 
     if (response.data?.success) {
       updateClientLevel(roleTarget.value.user_id, roleValue.value)
+      showRoleToast(
+        'success',
+        `Role for ${displayName(roleTarget.value)} updated to ${getLevelLabel(roleValue.value)}.`,
+      )
       isRoleModalActive.value = false
     } else {
       roleError.value = response.data?.message || 'Failed to update role.'
+      showRoleToast('error', roleError.value)
     }
   } catch (error) {
     roleError.value = error.response?.data?.message || 'Failed to update role.'
+    showRoleToast('error', roleError.value)
   } finally {
     isUpdatingRole.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  if (roleToastTimer) {
+    clearTimeout(roleToastTimer)
+  }
+})
 </script>
 
 <template>
@@ -321,7 +374,7 @@ const submitRoleUpdate = async () => {
     v-model="isRoleModalActive"
     title="Update Role"
     button="info"
-    buttonLabel="Save"
+    :buttonLabel="roleButtonLabel"
     has-cancel
     @confirm="submitRoleUpdate"
   >
@@ -337,6 +390,7 @@ const submitRoleUpdate = async () => {
         <option :value="1">Admin</option>
         <option :value="2">Member</option>
       </select>
+      <p v-if="isUpdatingRole" class="text-sm text-gray-500 dark:text-gray-400">Saving changes...</p>
       <p v-if="roleError" class="text-sm text-red-500">{{ roleError }}</p>
     </div>
   </CardBoxModal>
@@ -345,6 +399,24 @@ const submitRoleUpdate = async () => {
     <p>Lorem ipsum dolor sit amet <b>adipiscing elit</b></p>
     <p>This is sample modal</p>
   </CardBoxModal>
+
+  <transition
+    enter-active-class="transition duration-200 ease-out"
+    enter-from-class="opacity-0 translate-y-2"
+    enter-to-class="opacity-100 translate-y-0"
+    leave-active-class="transition duration-150 ease-in"
+    leave-from-class="opacity-100 translate-y-0"
+    leave-to-class="opacity-0 translate-y-2"
+  >
+    <div
+      v-if="roleToast.visible"
+      class="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2"
+      :class="roleToastClass"
+    >
+      <BaseIcon :path="roleToastIcon" size="18" />
+      <span class="text-sm font-medium">{{ roleToast.message }}</span>
+    </div>
+  </transition>
 
   <!-- Table -->
   <div class="border border-gray-100 dark:border-slate-800 rounded-lg overflow-hidden">
