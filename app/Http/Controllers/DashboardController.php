@@ -325,6 +325,36 @@ class DashboardController extends Controller
         }
     }
 
+    public function updateUserRole(Request $request, $userId)
+    {
+        if ($response = $this->requireAdmin()) {
+            return $response;
+        }
+
+        try {
+            $validated = $request->validate([
+                'level' => 'required|integer|in:1,2',
+            ]);
+
+            $user = TelegramUser::where('user_id', $userId)->firstOrFail();
+            $currentUser = auth()->user();
+
+            if ($currentUser && $currentUser->telegramUser && $currentUser->telegramUser->user_id === $user->user_id) {
+                return $this->errorResponse('You cannot change your own role.', 403);
+            }
+
+            $user->level = $validated['level'];
+            $user->save();
+
+            return $this->successResponse($user, 'User role updated successfully.');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return $this->errorResponse('Validation failed.', 422, $e->errors());
+        } catch (\Exception $e) {
+            Log::error('Error updating user role: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while updating user role.', 500);
+        }
+    }
+
     public function deleteTransaction($id)
     {
         try {

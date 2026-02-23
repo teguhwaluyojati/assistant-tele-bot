@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useMainStore } from '@/stores/main'
-import { mdiEye, mdiTrashCan, mdiArrowUp, mdiArrowDown } from '@mdi/js'
+import { mdiEye, mdiTrashCan, mdiArrowUp, mdiArrowDown, mdiAccountSwitch } from '@mdi/js'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import TableCheckboxCell from '@/components/TableCheckboxCell.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
@@ -124,6 +124,12 @@ const selectedUser = ref(null)
 const userCommands = ref([])
 const isLoadingDetail = ref(false)
 
+const isRoleModalActive = ref(false)
+const roleTarget = ref(null)
+const roleValue = ref(2)
+const roleError = ref('')
+const isUpdatingRole = ref(false)
+
 const isModalDangerActive = ref(false)
 
 const perPage = ref(5)
@@ -203,6 +209,62 @@ const viewUserDetail = async (client) => {
     isLoadingDetail.value = false
   }
 }
+
+const openRoleModal = (client) => {
+  roleTarget.value = client
+  roleValue.value = client.level ?? 2
+  roleError.value = ''
+  isRoleModalActive.value = true
+}
+
+const updateClientLevel = (userId, level) => {
+  const index = mainStore.clients.findIndex((client) => client.user_id === userId || client.id === userId)
+  if (index !== -1) {
+    mainStore.clients[index] = {
+      ...mainStore.clients[index],
+      level,
+    }
+  }
+
+  if (selectedUser.value && (selectedUser.value.user_id === userId || selectedUser.value.id === userId)) {
+    selectedUser.value = {
+      ...selectedUser.value,
+      level,
+    }
+  }
+}
+
+const submitRoleUpdate = async () => {
+  if (!roleTarget.value) {
+    return
+  }
+
+  isUpdatingRole.value = true
+  roleError.value = ''
+
+  try {
+    const token = localStorage.getItem('auth_token')
+
+    if (token && !axios.defaults.headers.common['Authorization']) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+    }
+
+    const response = await axios.put(`/api/users/${roleTarget.value.user_id}/role`, {
+      level: roleValue.value,
+    })
+
+    if (response.data?.success) {
+      updateClientLevel(roleTarget.value.user_id, roleValue.value)
+      isRoleModalActive.value = false
+    } else {
+      roleError.value = response.data?.message || 'Failed to update role.'
+    }
+  } catch (error) {
+    roleError.value = error.response?.data?.message || 'Failed to update role.'
+  } finally {
+    isUpdatingRole.value = false
+  }
+}
 </script>
 
 <template>
@@ -252,6 +314,30 @@ const viewUserDetail = async (client) => {
           </div>
         </div>
       </div>
+    </div>
+  </CardBoxModal>
+
+  <CardBoxModal
+    v-model="isRoleModalActive"
+    title="Update Role"
+    button="info"
+    buttonLabel="Save"
+    has-cancel
+    @confirm="submitRoleUpdate"
+  >
+    <div class="space-y-3">
+      <p class="text-sm text-gray-500 dark:text-gray-400">
+        Update role for <b>{{ roleTarget ? displayName(roleTarget) : '-' }}</b>
+      </p>
+      <select
+        v-model.number="roleValue"
+        class="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100"
+        :disabled="isUpdatingRole"
+      >
+        <option :value="1">Admin</option>
+        <option :value="2">Member</option>
+      </select>
+      <p v-if="roleError" class="text-sm text-red-500">{{ roleError }}</p>
     </div>
   </CardBoxModal>
 
@@ -375,6 +461,7 @@ const viewUserDetail = async (client) => {
         <td class="before:hidden lg:w-1 whitespace-nowrap">
           <BaseButtons type="justify-center" no-wrap>
             <BaseButton color="info" :icon="mdiEye" small @click="viewUserDetail(client)" />
+            <BaseButton color="warning" :icon="mdiAccountSwitch" small @click="openRoleModal(client)" />
             <BaseButton
               color="danger"
               :icon="mdiTrashCan"
