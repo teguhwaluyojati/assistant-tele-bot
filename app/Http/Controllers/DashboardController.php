@@ -38,10 +38,6 @@ class DashboardController extends Controller
         return null;
     }
 
-    public function __construct()
-    {
-        $this->model_login = new LoginModel();
-    }
     public function getUsers()
     {
         if ($response = $this->requireAdmin()) {
@@ -64,7 +60,7 @@ class DashboardController extends Controller
         Log::info('Cek: Fungsi lastLogin dipanggil');
        try{
 
-        $data = $this->model_login->lastLogin();
+        $data = (new LoginModel())->lastLogin();
         if(!$data){
             return $this->errorResponse('No login history found', 404);
 
@@ -409,20 +405,16 @@ class DashboardController extends Controller
                 return $this->errorResponse('User not linked to Telegram account.', 403);
             }
 
-            if ($telegramUser->isAdmin()) {
-                $logins = DB::table('login_history')
-                    ->select('email', 'ip_address', 'created_at')
-                    ->orderByDesc('created_at')
-                    ->limit(10)
-                    ->get();
-            } else {
-                $logins = DB::table('login_history')
-                    ->select('email', 'ip_address', 'created_at')
-                    ->where('email', $currentUser->email)
-                    ->orderByDesc('created_at')
-                    ->limit(1)
-                    ->get();
-            }
+            $isAdmin = $telegramUser->isAdmin();
+            $userEmail = $currentUser->email;
+
+            // Use cached Eloquent model (60 second cache)
+            $logins = LoginModel::getRecentLogins(
+                limit: 10,
+                isAdmin: $isAdmin,
+                userEmail: $userEmail,
+                cacheDuration: 60
+            );
 
             return $this->successResponse($logins, 'Recent logins retrieved successfully.');
         } catch (\Exception $e) {
