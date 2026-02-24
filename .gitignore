@@ -20,5 +20,6 @@ yarn-error.log
 /storage/app/public
 /storage/logs
 /storage/framework
+/storage/coverage
 /bootstrap/cache
 /webpack.mix.js
