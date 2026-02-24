@@ -49,6 +49,7 @@ const transactionFilterEndDate = ref('')
 const isUserReady = ref(false)
 const isTransactionsLoading = ref(true)
 const isInsightLoading = ref(true)
+const isClientsLoading = ref(false)
 const recentCommands = ref([])
 const recentLogins = ref([])
 const activeInsightSlide = ref(0)
@@ -247,7 +248,9 @@ onMounted(async () => {
   
   // Fetch clients only if user is admin (for table section)
   if (mainStore.currentUser?.telegram_user?.level === 1) {
+    isClientsLoading.value = true
     await mainStore.fetchSampleClients()
+    isClientsLoading.value = false
   }
 
   await fetchRightPanelInsights()
@@ -501,7 +504,7 @@ const isAdminUser = computed(() => {
       </NotificationBar>
 
       <CardBox v-if="isAdminUser" has-table class="mb-8">
-        <TableSampleClients />
+        <TableSampleClients :is-loading="isClientsLoading" />
       </CardBox>
 
       <SectionTitleLineWithButton :icon="mdiCartOutline" title="All Transactions">

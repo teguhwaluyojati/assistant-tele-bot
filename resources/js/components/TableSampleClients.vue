@@ -22,6 +22,10 @@ import axios from 'axios'
 
 defineProps({
   checkable: Boolean,
+  isLoading: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const mainStore = useMainStore()
@@ -407,7 +411,17 @@ onBeforeUnmount(() => {
 
   <!-- Table -->
   <div class="border border-gray-100 dark:border-slate-800 rounded-lg overflow-hidden">
-    <table class="min-w-full text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-900">
+    <div v-if="isLoading" class="p-6 space-y-4 animate-pulse">
+      <div v-for="row in 5" :key="row" class="flex items-center gap-4">
+        <div class="h-8 w-8 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+        <div class="flex-1 space-y-2">
+          <div class="h-4 w-1/3 rounded bg-gray-200 dark:bg-slate-700"></div>
+          <div class="h-3 w-1/4 rounded bg-gray-200 dark:bg-slate-700"></div>
+        </div>
+        <div class="h-6 w-20 rounded bg-gray-200 dark:bg-slate-700"></div>
+      </div>
+    </div>
+    <table v-else class="min-w-full text-gray-800 dark:text-gray-100 bg-white dark:bg-slate-900">
       <thead>
         <tr>
         <th v-if="checkable" />

@@ -403,8 +403,14 @@ const bulkDeleteTransactions = async () => {
     </div>
 
     <!-- Loading State -->
-    <div v-if="isLoading" class="p-6 text-center text-gray-500">
-      Loading transactions...
+    <div v-if="isLoading" class="p-6 space-y-4 animate-pulse">
+      <div v-for="row in 6" :key="row" class="flex items-center gap-4">
+        <div class="h-4 w-24 rounded bg-gray-200 dark:bg-slate-700"></div>
+        <div class="h-4 w-32 rounded bg-gray-200 dark:bg-slate-700"></div>
+        <div class="h-4 flex-1 rounded bg-gray-200 dark:bg-slate-700"></div>
+        <div class="h-4 w-20 rounded bg-gray-200 dark:bg-slate-700"></div>
+        <div class="h-4 w-16 rounded bg-gray-200 dark:bg-slate-700"></div>
+      </div>
     </div>
 
     <!-- Table -->
