@@ -55,8 +55,11 @@ Route::post('/webhook', [TelegramController::class, 'handle']);
 Route::get('/daily-expenses', [TelegramController::class, 'broadcastDailyExpenses']);
 
 //Login Register Logout
-Route::post('/register/initiate', [RegisterController::class, 'initiateRegister']);
-Route::post('/register/verify', [RegisterController::class, 'verifyAndRegister']);
-Route::post('/login', [LoginController::class, 'login']);
+Route::post('/register/initiate', [RegisterController::class, 'initiateRegister'])
+    ->middleware('throttle:auth-register-initiate');
+Route::post('/register/verify', [RegisterController::class, 'verifyAndRegister'])
+    ->middleware('throttle:auth-register-verify');
+Route::post('/login', [LoginController::class, 'login'])
+    ->middleware('throttle:auth-login');
 
 Route::post('/stocks/upload', [DashboardController::class, 'upload']);
