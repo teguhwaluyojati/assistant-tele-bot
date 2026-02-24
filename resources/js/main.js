@@ -12,6 +12,7 @@ import './css/main.css'
 const pinia = createPinia()
 
 axios.defaults.withCredentials = true
+localStorage.removeItem('auth_token')
 
 createApp(App).use(router).use(pinia).mount('#app')
 const darkStore = useDarkModeStore(pinia)

@@ -93,6 +93,17 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
+  const isPublicAuth = to.name === 'login' || to.name === 'register';
+
+  if (!requiresAuth && isPublicAuth) {
+    if (localStorage.getItem('user')) {
+      next({ name: 'dashboard' });
+      return;
+    }
+
+    next();
+    return;
+  }
   if (!requiresAuth) {
     next();
     return;
