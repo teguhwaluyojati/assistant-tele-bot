@@ -516,6 +516,47 @@ class DashboardController extends Controller
         }
     }
 
+    public function updateTransaction(Request $request, $id)
+    {
+        try {
+            $validated = $request->validate([
+                'type' => ['required', 'in:income,expense'],
+                'amount' => ['required', 'integer', 'min:1'],
+                'description' => ['required', 'string', 'max:255'],
+            ]);
+
+            $transaction = \App\Models\Transaction::findOrFail($id);
+            $currentUser = auth()->user();
+
+            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
+            $isOwner = $currentUser->telegramUser && $currentUser->telegramUser->user_id === $transaction->user_id;
+
+            if (!$isAdmin && !$isOwner) {
+                return $this->errorResponse('Unauthorized to update this transaction.', 403);
+            }
+
+            $transaction->update($validated);
+
+            activity()
+                ->causedBy($currentUser)
+                ->performedOn($transaction)
+                ->withProperties([
+                    'transaction_id' => $transaction->id,
+                    'owner_user_id' => $transaction->user_id,
+                    'type' => $validated['type'],
+                    'amount' => $validated['amount'],
+                ])
+                ->log('update_transaction');
+
+            return $this->successResponse($transaction->fresh(), 'Transaction updated successfully.');
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed.', 422, $e->errors());
+        } catch (\Exception $e) {
+            Log::error('Error updating transaction: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while updating transaction.', 500);
+        }
+    }
+
     public function deleteTransaction($id)
     {
         try {

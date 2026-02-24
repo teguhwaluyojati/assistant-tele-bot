@@ -31,7 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     Route::get('/users', [DashboardController::class, 'getUsers']);
     Route::get('/users/{userId}', [DashboardController::class, 'getUserDetail']);
-        Route::put('/users/{userId}/role', [DashboardController::class, 'updateUserRole']);
+    Route::put('/users/{userId}/role', [DashboardController::class, 'updateUserRole']);
     Route::get('/users/me/commands', [DashboardController::class, 'getMyCommands']);
     Route::get('/dashboard/recent-commands', [DashboardController::class, 'getRecentCommands']);
     Route::get('/dashboard/recent-logins', [DashboardController::class, 'getRecentLogins']);
