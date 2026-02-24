@@ -154,8 +154,11 @@ class AuthAndDashboardTest extends TestCase
             'type' => 'expense',
             'amount' => 2000,
         ]);
-        Transaction::factory()->create([
+        $otherTelegramUser = TelegramUser::factory()->create([
             'user_id' => 999999,
+        ]);
+        Transaction::factory()->create([
+            'user_id' => $otherTelegramUser->user_id,
             'type' => 'income',
             'amount' => 50,
         ]);
