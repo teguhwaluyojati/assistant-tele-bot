@@ -187,6 +187,7 @@ export default {
   },
   mounted() {
     this.typingEffect();
+    this.redirectIfAuthenticated();
   },
   beforeUnmount() {
     if (this._typingTimer) {
@@ -194,6 +195,17 @@ export default {
     }
   },
   methods: {
+    async redirectIfAuthenticated() {
+      try {
+        const response = await axios.get('/api/user');
+        if (response?.data) {
+          localStorage.setItem('user', JSON.stringify(response.data));
+          window.location.href = '/dashboard';
+        }
+      } catch (error) {
+        // Not authenticated, stay on register page.
+      }
+    },
     togglePasswordVisibility() {
       this.passwordFieldType = this.passwordFieldType === 'password' ? 'text' : 'password';
     },

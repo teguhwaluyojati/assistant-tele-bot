@@ -93,9 +93,7 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
-  const isLoginRoute = to.name === 'login';
-
-  if (!requiresAuth && !isLoginRoute) {
+  if (!requiresAuth) {
     next();
     return;
   }
@@ -108,29 +106,16 @@ router.beforeEach(async (to, from, next) => {
       localStorage.setItem('user', JSON.stringify(currentUser));
     }
 
-    if (!requiresAuth && to.name === 'login') {
+    const isAdmin = currentUser?.telegram_user?.level === 1;
+    if (requiresAdmin && !isAdmin) {
       next({ name: 'dashboard' });
       return;
-    }
-
-    if (requiresAuth) {
-      const isAdmin = currentUser?.telegram_user?.level === 1;
-      if (requiresAdmin && !isAdmin) {
-        next({ name: 'dashboard' });
-        return;
-      }
     }
 
     next();
   } catch (error) {
     localStorage.removeItem('user');
-
-    if (requiresAuth) {
-      next({ name: 'login' });
-      return;
-    }
-
-    next();
+    next({ name: 'login' });
   }
 });
 
