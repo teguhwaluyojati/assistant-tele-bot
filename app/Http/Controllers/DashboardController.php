@@ -9,6 +9,7 @@ use App\Models\TelegramUserCommand;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 use App\Traits\ApiResponse;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\StocksImport;
@@ -99,6 +100,15 @@ class DashboardController extends Controller
     public function getTransactions(Request $request)
     {
         try {
+            $validated = $request->validate([
+                'page' => ['nullable', 'integer', 'min:1'],
+                'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+                'type' => ['nullable', 'in:all,income,expense'],
+                'search' => ['nullable', 'string', 'max:255'],
+                'sort' => ['nullable', 'in:created_at,amount,type,description'],
+                'direction' => ['nullable', 'in:asc,desc'],
+            ]);
+
             $query = \App\Models\Transaction::with('user:id,user_id,username,first_name,last_name')
                 ->latest();
 
@@ -116,13 +126,13 @@ class DashboardController extends Controller
             }
 
             // Type filter
-            if ($request->has('type') && $request->type !== 'all') {
-                $query->where('type', $request->type);
+            if (!empty($validated['type']) && $validated['type'] !== 'all') {
+                $query->where('type', $validated['type']);
             }
 
             // Search filter
-            if ($request->has('search') && $request->search) {
-                $search = '%' . $request->search . '%';
+            if (!empty($validated['search'])) {
+                $search = '%' . trim($validated['search']) . '%';
                 $query->where(function ($q) use ($search) {
                     $q->where('description', 'like', $search)
                       ->orWhereHas('user', function ($subQ) use ($search) {
@@ -134,24 +144,16 @@ class DashboardController extends Controller
             }
 
             // Sorting
-            $sortField = $request->has('sort') ? $request->sort : 'created_at';
-            $sortDirection = $request->has('direction') ? $request->direction : 'desc';
-            
-            // Validate sort field to prevent injection
-            $validFields = ['created_at', 'amount', 'type', 'description'];
-            if (!in_array($sortField, $validFields)) {
-                $sortField = 'created_at';
-            }
-            
-            $sortDirection = strtolower($sortDirection) === 'asc' ? 'asc' : 'desc';
-            
-            if ($sortField === 'created_at' || in_array($sortField, $validFields)) {
-                $query->orderBy($sortField, $sortDirection);
-            }
+            $sortField = $validated['sort'] ?? 'created_at';
+            $sortDirection = $validated['direction'] ?? 'desc';
+            $query->orderBy($sortField, $sortDirection);
 
-            $transactions = $query->paginate(15);
+            $perPage = $validated['per_page'] ?? 15;
+            $transactions = $query->paginate($perPage);
 
             return $this->successResponse($transactions, 'Transactions retrieved successfully.');
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed.', 422, $e->errors());
             
         } catch (\Exception $e) {
             Log::error('Error retrieving transactions: ' . $e->getMessage());
@@ -162,8 +164,13 @@ class DashboardController extends Controller
     public function getTransactionsSummary(Request $request)
     {
         try {
-            $startDateInput = $request->query('start_date');
-            $endDateInput = $request->query('end_date');
+            $validated = $request->validate([
+                'start_date' => ['nullable', 'date_format:Y-m-d'],
+                'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            ]);
+
+            $startDateInput = $validated['start_date'] ?? null;
+            $endDateInput = $validated['end_date'] ?? null;
 
             if ($startDateInput || $endDateInput) {
                 $startDate = $startDateInput
@@ -225,6 +232,8 @@ class DashboardController extends Controller
             ];
 
             return $this->successResponse($summary, 'Transaction summary retrieved successfully.');
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed.', 422, $e->errors());
             
         } catch (\Exception $e) {
             Log::error('Error retrieving transaction summary: ' . $e->getMessage());
@@ -235,8 +244,13 @@ class DashboardController extends Controller
     public function getDailyChart(Request $request)
     {
         try {
-            $startDateInput = $request->query('start_date');
-            $endDateInput = $request->query('end_date');
+            $validated = $request->validate([
+                'start_date' => ['nullable', 'date_format:Y-m-d'],
+                'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            ]);
+
+            $startDateInput = $validated['start_date'] ?? null;
+            $endDateInput = $validated['end_date'] ?? null;
 
             if ($startDateInput || $endDateInput) {
                 $startDate = $startDateInput
@@ -252,6 +266,10 @@ class DashboardController extends Controller
 
             if ($startDate->gt($endDate)) {
                 return $this->errorResponse('Start date must be before end date.', 422);
+            }
+
+            if ($startDate->diffInDays($endDate) > 366) {
+                return $this->errorResponse('Date range cannot exceed 366 days.', 422);
             }
 
             $chatId = null;
@@ -322,6 +340,8 @@ class DashboardController extends Controller
             ];
 
             return $this->successResponse($chartData, 'Daily chart data retrieved successfully.');
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed.', 422, $e->errors());
             
         } catch (\Exception $e) {
             Log::error('Error retrieving daily chart: ' . $e->getMessage());
@@ -516,7 +536,7 @@ class DashboardController extends Controller
         try {
             $validated = $request->validate([
                 'ids' => 'required|array|min:1',
-                'ids.*' => 'required|integer',
+                'ids.*' => 'required|integer|distinct|exists:transactions,id',
             ]);
 
             $currentUser = auth()->user();
@@ -555,8 +575,8 @@ class DashboardController extends Controller
                 "{$deleteCount} transaction(s) deleted successfully."
             );
             
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return $this->errorResponse('Validation failed: ' . json_encode($e->errors()), 422);
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (\Exception $e) {
             Log::error('Error bulk deleting transactions: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while deleting transactions.', 500);
@@ -566,11 +586,16 @@ class DashboardController extends Controller
     public function exportTransactions(Request $request)
     {
         try {
+            $validated = $request->validate([
+                'start_date' => ['nullable', 'date_format:Y-m-d'],
+                'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+            ]);
+
             $currentUser = auth()->user();
             $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
             
-            $startDate = $request->query('start_date');
-            $endDate = $request->query('end_date');
+            $startDate = $validated['start_date'] ?? null;
+            $endDate = $validated['end_date'] ?? null;
 
             if (!$isAdmin) {
                 if (!$currentUser->telegramUser) {
@@ -587,6 +612,8 @@ class DashboardController extends Controller
                 new \App\Exports\TransactionsExport($userId, $isAdmin, $startDate, $endDate),
                 $fileName
             );
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed.', 422, $e->errors());
 
         } catch (\Exception $e) {
             Log::error('Error exporting transactions: ' . $e->getMessage());
