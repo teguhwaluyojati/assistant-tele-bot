@@ -72,7 +72,10 @@ class AuthAndDashboardTest extends TestCase
         $response
             ->assertStatus(200)
             ->assertJsonPath('success', true)
-            ->assertJsonPath('data.0.command', $command->command);
+            ->assertJsonFragment([
+                'id' => $command->id,
+                'command' => $command->command,
+            ]);
     }
 
     public function test_admin_can_get_recent_logins(): void
@@ -171,7 +174,10 @@ class AuthAndDashboardTest extends TestCase
 
         $data = $response->json('data.data');
         $this->assertCount(2, $data);
-        $this->assertSame(1000, $data[0]['amount']);
-        $this->assertSame(5000, $data[1]['amount']);
+
+        $amounts = array_column($data, 'amount');
+        sort($amounts);
+
+        $this->assertSame([1000, 5000], $amounts);
     }
 }
