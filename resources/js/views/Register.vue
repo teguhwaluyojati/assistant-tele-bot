@@ -235,10 +235,14 @@ export default {
       }
 
       try {
+        const name = this.form.name.trim();
+        const email = this.form.email.trim().toLowerCase();
+        const telegramUsername = this.form.telegram_username.replace('@', '').trim();
+
         const response = await axios.post('/api/register/initiate', {
-          name: this.form.name,
-          email: this.form.email,
-          telegram_username: this.form.telegram_username.replace('@', ''),
+          name,
+          email,
+          telegram_username: telegramUsername,
           password: this.form.password,
           password_confirmation: this.form.password_confirmation,
         });
@@ -268,9 +272,12 @@ export default {
       this.loading = true;
 
       try {
+        const email = this.form.email.trim().toLowerCase();
+        const code = this.verificationCode.trim();
+
         const response = await axios.post('/api/register/verify', {
-          email: this.form.email,
-          code: this.verificationCode,
+          email,
+          code,
         });
 
         localStorage.setItem('user', JSON.stringify(response.data.user));

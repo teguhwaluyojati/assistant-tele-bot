@@ -208,13 +208,6 @@ const viewUserDetail = async (client) => {
   isModalActive.value = true
 
   try {
-    const token = localStorage.getItem('auth_token')
-    
-    // Ensure axios has the auth header
-    if (token && !axios.defaults.headers.common['Authorization']) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    }
-    
     const response = await axios.get(`/api/users/${client.user_id}`)
 
     if (response.data.success) {
@@ -225,7 +218,7 @@ const viewUserDetail = async (client) => {
     console.error('Error fetching user detail:', error)
     if (error.response?.status === 401) {
       alert('Session expired. Please login again.')
-      localStorage.clear()
+      localStorage.removeItem('user')
       window.location.href = '/login'
     } else {
       alert('Failed to load user detail. Please try again.')
@@ -284,12 +277,6 @@ const submitRoleUpdate = async () => {
   roleError.value = ''
 
   try {
-    const token = localStorage.getItem('auth_token')
-
-    if (token && !axios.defaults.headers.common['Authorization']) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    }
-
     const response = await axios.put(`/api/users/${roleTarget.value.user_id}/role`, {
       level: roleValue.value,
     })

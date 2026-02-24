@@ -145,9 +145,12 @@ export default {
     this.error = null;
     this.loading = true;
         try {
+        const email = this.form.email.trim().toLowerCase();
+        const password = this.form.password;
+
             const response = await axios.post('/api/login', {
-            email: this.form.email,
-            password: this.form.password,
+        email,
+        password,
             });
 
             localStorage.setItem('user', JSON.stringify(response.data.user));

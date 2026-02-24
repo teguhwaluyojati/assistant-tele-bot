@@ -100,11 +100,6 @@ const getFullName = (user) => {
 const fetchTransactions = async () => {
   isLoading.value = true
   try {
-    const token = localStorage.getItem('auth_token')
-    if (token && !axios.defaults.headers.common['Authorization']) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    }
-
     // Server-side pagination with default per_page=15 from backend
     const params = new URLSearchParams({
       page: currentPage.value,
@@ -207,11 +202,6 @@ const updateTransaction = async () => {
   if (!transactionToEdit.value) return
 
   try {
-    const token = localStorage.getItem('auth_token')
-    if (token && !axios.defaults.headers.common['Authorization']) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    }
-
     const response = await axios.put(
       `/api/transactions/${transactionToEdit.value.id}`,
       editForm.value
@@ -252,11 +242,6 @@ const deleteTransaction = async () => {
   if (!transactionToDelete.value) return
 
   try {
-    const token = localStorage.getItem('auth_token')
-    if (token && !axios.defaults.headers.common['Authorization']) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    }
-
     const response = await axios.delete(`/api/transactions/${transactionToDelete.value.id}`)
 
     // Remove from list
@@ -331,11 +316,6 @@ const bulkDeleteTransactions = async () => {
   if (selectedCount.value === 0) return
 
   try {
-    const token = localStorage.getItem('auth_token')
-    if (token && !axios.defaults.headers.common['Authorization']) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-    }
-
     const selectedIds = Array.from(selectedTransactions.value)
     const response = await axios.post('/api/transactions/bulk-delete', {
       ids: selectedIds,
