@@ -1,5 +1,16 @@
 <?php
 
+$defaultAllowedOrigins = implode(',', [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    config('app.url'),
+]);
+
+$allowedOrigins = array_values(array_filter(array_map(
+    static fn ($origin) => trim($origin),
+    explode(',', (string) env('CORS_ALLOWED_ORIGINS', $defaultAllowedOrigins))
+)));
+
 return [
 
     /*
@@ -19,7 +30,7 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => $allowedOrigins,
 
     'allowed_origins_patterns' => [],
 
@@ -29,6 +40,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 
 ];
