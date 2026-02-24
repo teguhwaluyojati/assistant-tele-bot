@@ -48,6 +48,12 @@ const routes = [
         meta: { title: 'Tables', requiresAdmin: true },
       },
       {
+        path: 'audit-logs',
+        name: 'audit-logs',
+        component: () => import('@/views/AuditLogsView.vue'),
+        meta: { title: 'Audit Logs', requiresAdmin: true },
+      },
+      {
         path: 'forms',
         name: 'forms',
         component: () => import('@/views/FormsView.vue'),

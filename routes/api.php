@@ -8,6 +8,7 @@ use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ClientErrorController;
+use App\Http\Controllers\AuditLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -47,6 +48,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::put('/transactions/{id}', [DashboardController::class, 'updateTransaction']);
     Route::delete('/transactions/{id}', [DashboardController::class, 'deleteTransaction']);
     Route::post('/transactions/bulk-delete', [DashboardController::class, 'bulkDeleteTransactions']);
+
+    Route::get('/audit-logs', [AuditLogController::class, 'index']);
 });
 
 

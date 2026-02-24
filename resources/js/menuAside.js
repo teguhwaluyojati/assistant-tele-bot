@@ -4,6 +4,7 @@ import {
   mdiGithub,
   mdiLock,
   mdiAlertCircle,
+  mdiClipboardTextClockOutline,
   mdiSquareEditOutline,
   mdiTable,
   mdiViewList,
@@ -22,6 +23,12 @@ export default [
     to: '/tables',
     label: 'Tables',
     icon: mdiTable,
+    requiresAdmin: true,
+  },
+  {
+    to: '/audit-logs',
+    label: 'Audit Logs',
+    icon: mdiClipboardTextClockOutline,
     requiresAdmin: true,
   },
   {

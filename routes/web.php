@@ -36,6 +36,10 @@ Route::get('/dashboard', function () {
     return view('dashboard');
 });
 
+Route::get('/audit-logs', function () {
+    return view('audit-logs');
+});
+
 Route::get('/style', function () {
     return view('style');
 });
