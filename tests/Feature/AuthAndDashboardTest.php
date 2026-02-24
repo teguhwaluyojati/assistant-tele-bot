@@ -89,11 +89,11 @@ class AuthAndDashboardTest extends TestCase
 
         LoginHistory::factory()->create([
             'email' => 'older@example.com',
-            'created_at' => now()->subHours(2),
+            'created_at' => '2099-02-01 08:00:00',
         ]);
         LoginHistory::factory()->create([
             'email' => 'latest@example.com',
-            'created_at' => now()->subMinutes(5),
+            'created_at' => '2099-02-01 09:00:00',
         ]);
 
         Sanctum::actingAs($adminUser);
