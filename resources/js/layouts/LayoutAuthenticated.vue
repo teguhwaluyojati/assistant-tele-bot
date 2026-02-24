@@ -32,8 +32,7 @@ const menuAsideFiltered = computed(() =>
 )
 
 onMounted(async () => {
-  const token = localStorage.getItem('auth_token')
-  if (token && !mainStore.currentUser) {
+  if (!mainStore.currentUser) {
     await mainStore.fetchCurrentUser()
   }
 })
@@ -50,13 +49,11 @@ const handleLogout = () => {
 const confirmLogout = async () => {
   try {
     await axios.post('/api/logout')
-    localStorage.clear()
-    delete axios.defaults.headers.common['Authorization']
+    localStorage.removeItem('user')
     router.push('/')
   } catch (error) {
     console.error('Logout failed:', error)
-    localStorage.clear()
-    delete axios.defaults.headers.common['Authorization']
+    localStorage.removeItem('user')
     router.push('/')
   }
 }

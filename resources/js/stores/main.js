@@ -39,12 +39,6 @@ export const useMainStore = defineStore('main', () => {
   }
 
   function fetchSampleClients() {
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
-      return Promise.resolve([])
-    }
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-
     return axios
       .get('/api/users')
       .then((result) => {
@@ -71,12 +65,6 @@ export const useMainStore = defineStore('main', () => {
   }
 
   function fetchTransactionsFromApi() {
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
-      return Promise.resolve([])
-    }
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-
     return axios
       .get('/api/transactions')
       .then((result) => {
@@ -102,12 +90,6 @@ export const useMainStore = defineStore('main', () => {
   }
 
   function fetchCurrentUser() {
-    const token = localStorage.getItem('auth_token')
-    if (!token) {
-      return Promise.resolve()
-    }
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
-
     return axios
       .get('/api/user')
       .then((result) => {

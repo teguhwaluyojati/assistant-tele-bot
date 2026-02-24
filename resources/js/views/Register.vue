@@ -272,10 +272,8 @@ export default {
           email: this.form.email,
           code: this.verificationCode,
         });
-        
-        localStorage.setItem('auth_token', response.data.access_token);
+
         localStorage.setItem('user', JSON.stringify(response.data.user));
-        axios.defaults.headers.common['Authorization'] = `Bearer ${response.data.access_token}`;
 
         console.log('Registration successful:', response.data);
 

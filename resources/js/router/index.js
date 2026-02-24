@@ -91,49 +91,46 @@ const router = createRouter({
 
 // Navigation Guard
 router.beforeEach(async (to, from, next) => {
-  const token = localStorage.getItem('auth_token');
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
+  const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
+  const isLoginRoute = to.name === 'login';
 
-  if (requiresAuth && !token) {
-    console.log('No token found, redirecting to login.');
-    next({ name: 'login' });
-  } else if (requiresAuth && token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    try {
-      console.log('Verifying token in router...');
-      const response = await axios.get('/api/user');
-      const currentUser = response?.data || null;
-      if (currentUser) {
-        localStorage.setItem('user', JSON.stringify(currentUser));
-      }
+  if (!requiresAuth && !isLoginRoute) {
+    next();
+    return;
+  }
+
+  try {
+    const response = await axios.get('/api/user');
+    const currentUser = response?.data || null;
+
+    if (currentUser) {
+      localStorage.setItem('user', JSON.stringify(currentUser));
+    }
+
+    if (!requiresAuth && to.name === 'login') {
+      next({ name: 'dashboard' });
+      return;
+    }
+
+    if (requiresAuth) {
       const isAdmin = currentUser?.telegram_user?.level === 1;
-      const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
       if (requiresAdmin && !isAdmin) {
-        console.log('Admin role required, redirecting to dashboard.');
         next({ name: 'dashboard' });
         return;
       }
-      console.log('Token is valid, proceeding to route.');
-      next();
-    } catch (error) {
-      if (error.response && error.response.status === 401) {
-        console.log('Token is invalid, redirecting to login.');
-        localStorage.clear();
-        delete axios.defaults.headers.common['Authorization'];
-        next({ name: 'login' });
-      } else {
-        console.error('Error verifying token:', error);
-        next(false);
-      }
     }
-  } else {
-    if (to.name === 'login' && token) {
-      console.log('Already logged in, redirecting to dashboard.');
-      next({ name: 'dashboard' });
-    } else {
-      console.log('No auth required, proceeding to route.');
-      next();
+
+    next();
+  } catch (error) {
+    localStorage.removeItem('user');
+
+    if (requiresAuth) {
+      next({ name: 'login' });
+      return;
     }
+
+    next();
   }
 });
 

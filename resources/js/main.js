@@ -5,10 +5,13 @@ import App from './App.vue'
 import router from './router'
 import { useMainStore } from '@/stores/main.js'
 import { useDarkModeStore } from './stores/darkMode'
+import axios from 'axios'
 
 import './css/main.css'
 
 const pinia = createPinia()
+
+axios.defaults.withCredentials = true
 
 createApp(App).use(router).use(pinia).mount('#app')
 const darkStore = useDarkModeStore(pinia)

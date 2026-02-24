@@ -13,6 +13,21 @@ use Telegram\Bot\Laravel\Facades\Telegram;
 
 class RegisterController extends Controller
 {
+    private function buildAuthCookie(string $token)
+    {
+        return cookie(
+            'auth_token',
+            $token,
+            120,
+            '/',
+            null,
+            request()->isSecure(),
+            true,
+            false,
+            'lax'
+        );
+    }
+
     public function initiateRegister(Request $request)
     {
         try {
@@ -176,11 +191,9 @@ class RegisterController extends Controller
             
             return response()->json([
                 'message' => 'Registration successful!',
-                'access_token' => $token,
-                'token_type' => 'Bearer',
                 'user' => $user,
                 'status' => 'success'
-            ], 201);
+            ], 201)->cookie($this->buildAuthCookie($token));
             
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([

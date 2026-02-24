@@ -5,9 +5,25 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\LoginHistory;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class LoginController extends Controller
 {
+    private function buildAuthCookie(string $token)
+    {
+        return cookie(
+            'auth_token',
+            $token,
+            120,
+            '/',
+            null,
+            request()->isSecure(),
+            true,
+            false,
+            'lax'
+        );
+    }
+
     public function login (Request $request)
     {
         try{
@@ -30,10 +46,8 @@ class LoginController extends Controller
 
                 return response()->json([
                     'message'       => 'Login berhasil!',
-                    'access_token'  => $token,
-                    'token_type'    => 'Bearer',
                     'user'          => $user
-                ]);
+                ])->cookie($this->buildAuthCookie($token));
             } else {
                 return response()->json([
                     'message' => 'Email atau password yang Anda masukkan salah.'
@@ -51,9 +65,16 @@ class LoginController extends Controller
     public function logout(Request $request)
     {
         try {
-            $request->user()->currentAccessToken()->delete();
+            $plainToken = $request->cookie('auth_token');
+            if (!empty($plainToken)) {
+                $tokenModel = PersonalAccessToken::findToken($plainToken);
+                if ($tokenModel) {
+                    $tokenModel->delete();
+                }
+            }
 
-            return response()->json(['message' => 'Logout berhasil!']);
+            return response()->json(['message' => 'Logout berhasil!'])
+                ->cookie(cookie()->forget('auth_token'));
         } catch (\Exception $e) {
             return response()->json([
                 'message' => 'Terjadi kesalahan saat logout.',
