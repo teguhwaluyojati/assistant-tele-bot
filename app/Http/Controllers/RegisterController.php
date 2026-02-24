@@ -172,6 +172,13 @@ class RegisterController extends Controller
             
             // Create API token
             $token = $user->createToken('auth_token')->plainTextToken;
+
+            activity()
+                ->causedBy($user)
+                ->withProperties([
+                    'telegram_user_id' => $telegramUser->id,
+                ])
+                ->log('register');
             
             // Clean up verification record
             $verification->delete();

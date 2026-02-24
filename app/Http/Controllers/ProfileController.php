@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\Laravel\Facades\Image;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
 
 class ProfileController extends Controller
 {
@@ -46,6 +47,13 @@ class ProfileController extends Controller
 
             $user->save();
 
+            activity()
+                ->causedBy($user)
+                ->withProperties([
+                    'email' => $user->email,
+                ])
+                ->log('update_profile');
+
             return response()->json([
                 'message' => 'Profile updated successfully',
                 'user' => $user
@@ -69,12 +77,16 @@ class ProfileController extends Controller
 
             $user = $request->user();
 
-            if (!\Hash::check($validatedData['current_password'], $user->password)) {
+            if (!Hash::check($validatedData['current_password'], $user->password)) {
                 return response()->json(['message' => 'Current password is incorrect'], 400);
             }
 
             $user->password = $validatedData['new_password'];
             $user->save();
+
+            activity()
+                ->causedBy($user)
+                ->log('change_password');
 
             return response()->json([
                 'message' => 'Password changed successfully'

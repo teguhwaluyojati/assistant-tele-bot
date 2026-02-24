@@ -7,6 +7,7 @@ use App\Http\Controllers\LoginController;
 use App\Http\Controllers\RegisterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ClientErrorController;
 
 /*
 |--------------------------------------------------------------------------
@@ -61,5 +62,8 @@ Route::post('/register/verify', [RegisterController::class, 'verifyAndRegister']
     ->middleware('throttle:auth-register-verify');
 Route::post('/login', [LoginController::class, 'login'])
     ->middleware('throttle:auth-login');
+
+Route::post('/client-error', [ClientErrorController::class, 'store'])
+    ->middleware('throttle:client-error');
 
 Route::post('/stocks/upload', [DashboardController::class, 'upload']);

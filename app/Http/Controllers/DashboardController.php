@@ -498,6 +498,15 @@ class DashboardController extends Controller
             $user->level = $validated['level'];
             $user->save();
 
+            activity()
+                ->causedBy($currentUser)
+                ->performedOn($user)
+                ->withProperties([
+                    'target_user_id' => $user->user_id,
+                    'level' => $validated['level'],
+                ])
+                ->log('update_role');
+
             return $this->successResponse($user, 'User role updated successfully.');
         } catch (\Illuminate\Validation\ValidationException $e) {
             return $this->errorResponse('Validation failed.', 422, $e->errors());
@@ -522,6 +531,15 @@ class DashboardController extends Controller
             }
             
             $transaction->delete();
+
+            activity()
+                ->causedBy($currentUser)
+                ->performedOn($transaction)
+                ->withProperties([
+                    'transaction_id' => $transaction->id,
+                    'owner_user_id' => $transaction->user_id,
+                ])
+                ->log('delete_transaction');
             
             return $this->successResponse(null, 'Transaction deleted successfully.');
             
@@ -569,6 +587,14 @@ class DashboardController extends Controller
             
             // Delete transactions
             \App\Models\Transaction::whereIn('id', $transactionsToDelete->pluck('id'))->delete();
+
+            activity()
+                ->causedBy($currentUser)
+                ->withProperties([
+                    'count' => $deleteCount,
+                    'transaction_ids' => $transactionsToDelete->pluck('id')->all(),
+                ])
+                ->log('bulk_delete_transactions');
             
             return $this->successResponse(
                 ['deleted' => $deleteCount],
@@ -607,6 +633,16 @@ class DashboardController extends Controller
             $userId = $isAdmin ? null : $currentUser->telegramUser->user_id;
 
             $fileName = 'transactions-' . now()->format('Y-m-d-H-i-s') . '.xlsx';
+
+            activity()
+                ->causedBy($currentUser)
+                ->withProperties([
+                    'user_id' => $userId,
+                    'start_date' => $startDate,
+                    'end_date' => $endDate,
+                    'file' => $fileName,
+                ])
+                ->log('export_transactions');
 
             return Excel::download(
                 new \App\Exports\TransactionsExport($userId, $isAdmin, $startDate, $endDate),

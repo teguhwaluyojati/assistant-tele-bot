@@ -44,6 +44,13 @@ class LoginController extends Controller
                     'ip_address' => $request->ip(),
                 ]);
 
+                activity()
+                    ->causedBy($user)
+                    ->withProperties([
+                        'ip' => $request->ip(),
+                    ])
+                    ->log('login');
+
                 return response()->json([
                     'message'       => 'Login berhasil!',
                     'user'          => $user
@@ -65,12 +72,22 @@ class LoginController extends Controller
     public function logout(Request $request)
     {
         try {
+            $user = $request->user();
             $plainToken = $request->cookie('auth_token');
             if (!empty($plainToken)) {
                 $tokenModel = PersonalAccessToken::findToken($plainToken);
                 if ($tokenModel) {
                     $tokenModel->delete();
                 }
+            }
+
+            if ($user) {
+                activity()
+                    ->causedBy($user)
+                    ->withProperties([
+                        'ip' => $request->ip(),
+                    ])
+                    ->log('logout');
             }
 
             return response()->json(['message' => 'Logout berhasil!'])
