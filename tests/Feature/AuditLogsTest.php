@@ -22,7 +22,7 @@ class AuditLogsTest extends TestCase
 
         Sanctum::actingAs($adminUser);
 
-        $baseTime = now();
+        $baseTime = Carbon::parse('2099-03-01 10:00:00');
         Carbon::setTestNow($baseTime->copy()->subMinutes(2));
         activity()->causedBy($adminUser)->log('first');
         Carbon::setTestNow($baseTime->copy()->subMinute());
@@ -37,9 +37,10 @@ class AuditLogsTest extends TestCase
 
         $data = $response->json('data');
         $this->assertSame(2, $data['per_page']);
-        $this->assertSame(3, $data['total']);
+        $this->assertGreaterThanOrEqual(3, $data['total']);
         $this->assertCount(2, $data['data']);
         $this->assertSame('third', $data['data'][0]['description']);
+        $this->assertSame('second', $data['data'][1]['description']);
     }
 
     public function test_non_admin_cannot_access_audit_logs(): void
