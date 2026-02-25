@@ -166,6 +166,59 @@ class WebFocusedApiEndpointsTest extends TestCase
         ]);
     }
 
+    public function test_admin_can_get_all_user_commands_endpoint(): void
+    {
+        [$adminUser, $adminTelegramUser] = $this->createUserWithTelegram(level: 1);
+        $otherTelegramUser = TelegramUser::factory()->create();
+
+        TelegramUserCommand::factory()->create([
+            'user_id' => $adminTelegramUser->user_id,
+            'command' => '/start',
+            'created_at' => '2099-03-03 09:00:00',
+        ]);
+        TelegramUserCommand::factory()->create([
+            'user_id' => $otherTelegramUser->user_id,
+            'command' => '/help',
+            'created_at' => '2099-03-03 10:00:00',
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->getJson('/api/users/commands?per_page=10');
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['data' => ['data', 'current_page', 'per_page', 'total']]);
+
+        $rows = $response->json('data.data');
+        $this->assertGreaterThanOrEqual(2, count($rows));
+        $this->assertTrue(collect($rows)->contains(fn ($row) => ($row['command'] ?? null) === '/start'));
+        $this->assertTrue(collect($rows)->contains(fn ($row) => ($row['command'] ?? null) === '/help'));
+    }
+
+    public function test_admin_can_export_all_user_commands_xlsx(): void
+    {
+        [$adminUser, $adminTelegramUser] = $this->createUserWithTelegram(level: 1);
+
+        TelegramUserCommand::factory()->create([
+            'user_id' => $adminTelegramUser->user_id,
+            'command' => '/export-target',
+            'created_at' => '2099-03-03 11:00:00',
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->get('/api/users/commands/export?search=export-target');
+
+        $response->assertStatus(200);
+
+        $contentDisposition = (string) $response->headers->get('content-disposition');
+        $this->assertStringContainsString('attachment;', $contentDisposition);
+        $this->assertStringContainsString('user-commands-', $contentDisposition);
+        $this->assertStringContainsString('.xlsx', $contentDisposition);
+    }
+
     public function test_user_can_submit_transaction_via_web_endpoint(): void
     {
         [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);
