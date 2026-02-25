@@ -7,7 +7,6 @@ import {
   mdiChartTimelineVariant,
   mdiCog,
   mdiReload,
-  mdiChartPie,
   mdiWallet,
 } from '@mdi/js'
 import LineChart from '@/components/Charts/LineChart.vue'
@@ -44,6 +43,8 @@ const recentCommands = ref([])
 const recentLogins = ref([])
 const activeInsightSlide = ref(0)
 const isInsightSwitching = ref(false)
+const dashboardSwipeRef = ref(null)
+const activeDashboardSlide = ref(0)
 
 const buildDateParams = () => {
   const params = {}
@@ -254,6 +255,28 @@ const rightInsightItems = computed(() => {
 const isAdminUser = computed(() => {
   return mainStore.currentUser?.telegram_user?.level === 1
 })
+
+const goToDashboardSlide = (index) => {
+  const container = dashboardSwipeRef.value
+  if (!container) {
+    return
+  }
+
+  const width = container.clientWidth
+  container.scrollTo({
+    left: width * index,
+    behavior: 'smooth',
+  })
+}
+
+const handleDashboardScroll = () => {
+  const container = dashboardSwipeRef.value
+  if (!container || container.clientWidth === 0) {
+    return
+  }
+
+  activeDashboardSlide.value = Math.round(container.scrollLeft / container.clientWidth)
+}
 </script>
 
 <template>
@@ -292,145 +315,172 @@ const isAdminUser = computed(() => {
         />
       </div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-        <div class="flex flex-col gap-4">
-          <div v-if="isTransactionsLoading" class="space-y-4 animate-pulse">
-            <div class="flex items-center gap-4">
-              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-              <div class="flex-1 space-y-2">
-                <div class="h-4 w-3/4 rounded bg-gray-200 dark:bg-slate-700"></div>
-                <div class="h-3 w-1/2 rounded bg-gray-200 dark:bg-slate-700"></div>
+      <div class="mb-8">
+        <div
+          ref="dashboardSwipeRef"
+          class="flex gap-4 overflow-x-auto snap-x snap-mandatory scroll-smooth"
+          @scroll="handleDashboardScroll"
+        >
+          <div class="min-w-full snap-start">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div class="flex flex-col gap-4">
+                <div v-if="isTransactionsLoading" class="space-y-4 animate-pulse">
+                  <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+                    <div class="flex-1 space-y-2">
+                      <div class="h-4 w-3/4 rounded bg-gray-200 dark:bg-slate-700"></div>
+                      <div class="h-3 w-1/2 rounded bg-gray-200 dark:bg-slate-700"></div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+                    <div class="flex-1 space-y-2">
+                      <div class="h-4 w-2/3 rounded bg-gray-200 dark:bg-slate-700"></div>
+                      <div class="h-3 w-1/3 rounded bg-gray-200 dark:bg-slate-700"></div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+                    <div class="flex-1 space-y-2">
+                      <div class="h-4 w-4/5 rounded bg-gray-200 dark:bg-slate-700"></div>
+                      <div class="h-3 w-2/5 rounded bg-gray-200 dark:bg-slate-700"></div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+                    <div class="flex-1 space-y-2">
+                      <div class="h-4 w-3/5 rounded bg-gray-200 dark:bg-slate-700"></div>
+                      <div class="h-3 w-2/6 rounded bg-gray-200 dark:bg-slate-700"></div>
+                    </div>
+                  </div>
+                </div>
+                <template v-else>
+                  <CardBoxTransaction
+                    v-for="(transaction, index) in transactionBarItems"
+                    :key="index"
+                    :amount="transaction.amount"
+                    :date="transaction.date"
+                    :business="transaction.business"
+                    :type="transaction.type"
+                    :name="transaction.name"
+                    :account="transaction.account"
+                  />
+                  <CardBox v-if="!transactionBarItems.length" class="flex-1">
+                    <div class="space-y-2">
+                      <h3 class="text-lg font-semibold">No transactions yet</h3>
+                      <p class="text-sm text-gray-500 dark:text-slate-400">
+                        New activity will appear here once transactions are recorded.
+                      </p>
+                    </div>
+                  </CardBox>
+                </template>
               </div>
-            </div>
-            <div class="flex items-center gap-4">
-              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-              <div class="flex-1 space-y-2">
-                <div class="h-4 w-2/3 rounded bg-gray-200 dark:bg-slate-700"></div>
-                <div class="h-3 w-1/3 rounded bg-gray-200 dark:bg-slate-700"></div>
-              </div>
-            </div>
-            <div class="flex items-center gap-4">
-              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-              <div class="flex-1 space-y-2">
-                <div class="h-4 w-4/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                <div class="h-3 w-2/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-              </div>
-            </div>
-            <div class="flex items-center gap-4">
-              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-              <div class="flex-1 space-y-2">
-                <div class="h-4 w-3/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                <div class="h-3 w-2/6 rounded bg-gray-200 dark:bg-slate-700"></div>
+              <div class="relative flex flex-col gap-4 pb-6">
+                <div v-if="isInsightLoading || !isUserReady" class="space-y-4 animate-pulse">
+                  <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+                    <div class="flex-1 space-y-2">
+                      <div class="h-4 w-3/4 rounded bg-gray-200 dark:bg-slate-700"></div>
+                      <div class="h-3 w-1/2 rounded bg-gray-200 dark:bg-slate-700"></div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+                    <div class="flex-1 space-y-2">
+                      <div class="h-4 w-2/3 rounded bg-gray-200 dark:bg-slate-700"></div>
+                      <div class="h-3 w-1/3 rounded bg-gray-200 dark:bg-slate-700"></div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+                    <div class="flex-1 space-y-2">
+                      <div class="h-4 w-4/5 rounded bg-gray-200 dark:bg-slate-700"></div>
+                      <div class="h-3 w-2/5 rounded bg-gray-200 dark:bg-slate-700"></div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
+                    <div class="flex-1 space-y-2">
+                      <div class="h-4 w-3/5 rounded bg-gray-200 dark:bg-slate-700"></div>
+                      <div class="h-3 w-2/6 rounded bg-gray-200 dark:bg-slate-700"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <template v-else>
+                  <CardBoxTransaction
+                    v-for="item in rightInsightItems"
+                    :key="item.id"
+                    :amount="item.amount"
+                    :date="item.date"
+                    :business="item.business"
+                    :type="item.type"
+                    :name="item.name"
+                    :account="item.account"
+                    class="transition-opacity duration-300"
+                    :class="isInsightSwitching ? 'opacity-30' : 'opacity-100'"
+                  />
+
+                  <div v-if="isAdminUser" class="absolute bottom-0 left-1/2 -translate-x-1/2">
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        class="h-2.5 w-2.5 rounded-full transition"
+                        :class="activeInsightSlide === 0 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'"
+                        @click="changeInsightSlide(0)"
+                      ></button>
+                      <button
+                        type="button"
+                        class="h-2.5 w-2.5 rounded-full transition"
+                        :class="activeInsightSlide === 1 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'"
+                        @click="changeInsightSlide(1)"
+                      ></button>
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
-          <template v-else>
-            <CardBoxTransaction
-              v-for="(transaction, index) in transactionBarItems"
-              :key="index"
-              :amount="transaction.amount"
-              :date="transaction.date"
-              :business="transaction.business"
-              :type="transaction.type"
-              :name="transaction.name"
-              :account="transaction.account"
-            />
-            <CardBox v-if="!transactionBarItems.length" class="flex-1">
-              <div class="space-y-2">
-                <h3 class="text-lg font-semibold">No transactions yet</h3>
-                <p class="text-sm text-gray-500 dark:text-slate-400">
-                  New activity will appear here once transactions are recorded.
-                </p>
+
+          <div class="min-w-full snap-start">
+            <CardBox>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold">Trends overview</h3>
+                <BaseButton
+                  :icon="mdiReload"
+                  color="whiteDark"
+                  @click="fetchChartData(buildDateParams())"
+                />
+              </div>
+
+              <div v-if="chartData">
+                <line-chart :data="chartData" class="h-[500px]" />
+              </div>
+              <div
+                v-else
+                class="h-[500px] flex items-center justify-center text-gray-500 dark:text-slate-400"
+              >
+                N/A
               </div>
             </CardBox>
-          </template>
-        </div>
-        <div class="relative flex flex-col gap-4 pb-6">
-          <div v-if="isInsightLoading || !isUserReady" class="space-y-4 animate-pulse">
-            <div class="flex items-center gap-4">
-              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-              <div class="flex-1 space-y-2">
-                <div class="h-4 w-3/4 rounded bg-gray-200 dark:bg-slate-700"></div>
-                <div class="h-3 w-1/2 rounded bg-gray-200 dark:bg-slate-700"></div>
-              </div>
-            </div>
-            <div class="flex items-center gap-4">
-              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-              <div class="flex-1 space-y-2">
-                <div class="h-4 w-2/3 rounded bg-gray-200 dark:bg-slate-700"></div>
-                <div class="h-3 w-1/3 rounded bg-gray-200 dark:bg-slate-700"></div>
-              </div>
-            </div>
-            <div class="flex items-center gap-4">
-              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-              <div class="flex-1 space-y-2">
-                <div class="h-4 w-4/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                <div class="h-3 w-2/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-              </div>
-            </div>
-            <div class="flex items-center gap-4">
-              <div class="h-12 w-12 rounded-full bg-gray-200 dark:bg-slate-700"></div>
-              <div class="flex-1 space-y-2">
-                <div class="h-4 w-3/5 rounded bg-gray-200 dark:bg-slate-700"></div>
-                <div class="h-3 w-2/6 rounded bg-gray-200 dark:bg-slate-700"></div>
-              </div>
-            </div>
           </div>
+        </div>
 
-          <template v-else>
-            <CardBoxTransaction
-              v-for="item in rightInsightItems"
-              :key="item.id"
-              :amount="item.amount"
-              :date="item.date"
-              :business="item.business"
-              :type="item.type"
-              :name="item.name"
-              :account="item.account"
-              class="transition-opacity duration-300"
-              :class="isInsightSwitching ? 'opacity-30' : 'opacity-100'"
-            />
-
-            <div v-if="isAdminUser" class="absolute bottom-0 left-1/2 -translate-x-1/2">
-              <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  class="h-2.5 w-2.5 rounded-full transition"
-                  :class="activeInsightSlide === 0 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'"
-                  @click="changeInsightSlide(0)"
-                ></button>
-                <button
-                  type="button"
-                  class="h-2.5 w-2.5 rounded-full transition"
-                  :class="activeInsightSlide === 1 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'"
-                  @click="changeInsightSlide(1)"
-                ></button>
-              </div>
-            </div>
-          </template>
+        <div class="flex items-center justify-center gap-2 mt-4">
+          <button
+            type="button"
+            class="h-2.5 w-2.5 rounded-full transition"
+            :class="activeDashboardSlide === 0 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'"
+            @click="goToDashboardSlide(0)"
+          ></button>
+          <button
+            type="button"
+            class="h-2.5 w-2.5 rounded-full transition"
+            :class="activeDashboardSlide === 1 ? 'bg-blue-600' : 'bg-gray-300 dark:bg-slate-600'"
+            @click="goToDashboardSlide(1)"
+          ></button>
         </div>
       </div>
-
-
-      <SectionTitleLineWithButton :icon="mdiChartPie" title="Trends overview">
-        <BaseButton
-          :icon="mdiReload"
-          color="whiteDark"
-          @click="fetchChartData(buildDateParams())"
-        />
-      </SectionTitleLineWithButton>
-
-      <CardBox class="mb-8">
-        <div v-if="chartData">
-          <line-chart :data="chartData" class="h-[500px]" />
-        </div>
-        <div
-          v-else
-          class="h-[500px] flex items-center justify-center text-gray-500 dark:text-slate-400"
-        >
-          N/A
-        </div>
-      </CardBox>
 
       <CardBoxModal
         v-model="isFilterModalOpen"
