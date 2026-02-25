@@ -45,7 +45,7 @@ const activeInsightSlide = ref(0)
 const isInsightSwitching = ref(false)
 const dashboardSwipeRef = ref(null)
 const activeDashboardSlide = ref(0)
-const activeOverviewMetric = ref('income')
+const activeOverviewMetric = ref('')
 const isOverviewDetailModalOpen = ref(false)
 
 const buildDateParams = () => {
@@ -381,7 +381,7 @@ const handleDashboardScroll = () => {
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-3 mb-8">
         <button
           type="button"
-          class="text-left rounded-sm transition ring-offset-2"
+          class="w-full p-0 bg-transparent border-0 appearance-none text-left rounded-sm transition ring-offset-2 focus:outline-none"
           :class="activeOverviewMetric === 'income' ? 'ring-2 ring-emerald-500' : ''"
           @click="openOverviewDetail('income')"
         >
@@ -395,7 +395,7 @@ const handleDashboardScroll = () => {
         </button>
         <button
           type="button"
-          class="text-left rounded-sm transition ring-offset-2"
+          class="w-full p-0 bg-transparent border-0 appearance-none text-left rounded-sm transition ring-offset-2 focus:outline-none"
           :class="activeOverviewMetric === 'expense' ? 'ring-2 ring-red-500' : ''"
           @click="openOverviewDetail('expense')"
         >
@@ -409,7 +409,7 @@ const handleDashboardScroll = () => {
         </button>
         <button
           type="button"
-          class="text-left rounded-sm transition ring-offset-2"
+          class="w-full p-0 bg-transparent border-0 appearance-none text-left rounded-sm transition ring-offset-2 focus:outline-none"
           :class="activeOverviewMetric === 'balance' ? 'ring-2 ring-blue-500' : ''"
           @click="openOverviewDetail('balance')"
         >
