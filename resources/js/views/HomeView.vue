@@ -11,7 +11,6 @@ import {
   mdiReload,
   mdiChartPie,
   mdiWallet,
-  mdiDownload,
 } from '@mdi/js'
 import LineChart from '@/components/Charts/LineChart.vue'
 import SectionMain from '@/components/SectionMain.vue'
@@ -21,7 +20,6 @@ import TableSampleClients from '@/components/TableSampleClients.vue'
 import NotificationBar from '@/components/NotificationBar.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import CardBoxTransaction from '@/components/CardBoxTransaction.vue'
-import TableTransactions from '@/components/TableTransactions.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
@@ -43,9 +41,6 @@ const activeDateFilter = ref({
   start_date: '',
   end_date: '',
 })
-const isTransactionFilterModalOpen = ref(false)
-const transactionFilterStartDate = ref('')
-const transactionFilterEndDate = ref('')
 const isUserReady = ref(false)
 const isTransactionsLoading = ref(true)
 const isInsightLoading = ref(true)
@@ -181,54 +176,6 @@ const applyDateFilter = () => {
   fetchSummary(params)
   fetchChartData(params)
   isFilterModalOpen.value = false
-}
-
-const openTransactionFilterModal = () => {
-  isTransactionFilterModalOpen.value = true
-}
-
-const applyTransactionDateFilter = () => {
-  if (transactionFilterStartDate.value && transactionFilterEndDate.value) {
-    if (transactionFilterStartDate.value > transactionFilterEndDate.value) {
-      console.error('Start date must be before end date')
-      return
-    }
-  }
-  isTransactionFilterModalOpen.value = false
-}
-
-const clearTransactionFilter = () => {
-  transactionFilterStartDate.value = ''
-  transactionFilterEndDate.value = ''
-}
-
-const exportTransactions = async () => {
-  try {
-    const params = {}
-    if (transactionFilterStartDate.value) {
-      params.start_date = transactionFilterStartDate.value
-    }
-    if (transactionFilterEndDate.value) {
-      params.end_date = transactionFilterEndDate.value
-    }
-
-    const response = await axios.get('/api/transactions/export', {
-      params,
-      responseType: 'blob'
-    })
-
-    // Create blob link to download
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `transactions-${new Date().toISOString().split('T')[0]}.xlsx`)
-    document.body.appendChild(link)
-    link.click()
-    link.parentNode.removeChild(link)
-    window.URL.revokeObjectURL(url)
-  } catch (error) {
-    console.error('Error exporting transactions:', error)
-  }
 }
 
 const mainStore = useMainStore()
@@ -507,19 +454,6 @@ const isAdminUser = computed(() => {
         <TableSampleClients :is-loading="isClientsLoading" />
       </CardBox>
 
-      <SectionTitleLineWithButton :icon="mdiCartOutline" title="All Transactions">
-        <div class="flex gap-2">
-          <BaseButton :icon="mdiDownload" color="whiteDark" @click="exportTransactions" />
-          <BaseButton :icon="mdiCog" color="whiteDark" @click="openTransactionFilterModal" />
-        </div>
-      </SectionTitleLineWithButton>
-
-      <CardBox has-table>
-        <TableTransactions 
-          :date-start="transactionFilterStartDate" 
-          :date-end="transactionFilterEndDate"
-        />
-      </CardBox>
       <CardBoxModal
         v-model="isFilterModalOpen"
         title="Filter Period"
@@ -544,37 +478,6 @@ const isAdminUser = computed(() => {
         </FormField>
       </CardBoxModal>
 
-      <CardBoxModal
-        v-model="isTransactionFilterModalOpen"
-        title="Filter Transactions by Date"
-        button-label="Apply"
-        :has-cancel="true"
-        @confirm="applyTransactionDateFilter"
-        @cancel="isTransactionFilterModalOpen = false"
-      >
-        <FormField label="Start date" label-for="transaction-filter-start-date">
-          <FormControl
-            id="transaction-filter-start-date"
-            v-model="transactionFilterStartDate"
-            type="date"
-          />
-        </FormField>
-        <FormField label="End date" label-for="transaction-filter-end-date">
-          <FormControl
-            id="transaction-filter-end-date"
-            v-model="transactionFilterEndDate"
-            type="date"
-          />
-        </FormField>
-        <div class="mt-4">
-          <BaseButton
-            label="Clear Filter"
-            color="whiteDark"
-            outline
-            @click="clearTransactionFilter"
-          />
-        </div>
-      </CardBoxModal>
     </SectionMain>
   </LayoutAuthenticated>
 </template>

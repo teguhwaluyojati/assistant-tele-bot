@@ -36,6 +36,12 @@ const routes = [
         meta: { title: 'Dashboard' },
       },
       {
+        path: 'transactions',
+        name: 'transactions',
+        component: () => import('@/views/TransactionsView.vue'),
+        meta: { title: 'Transactions' },
+      },
+      {
         path: 'profile',
         name: 'profile',
         component: () => import('@/views/ProfileView.vue'),
