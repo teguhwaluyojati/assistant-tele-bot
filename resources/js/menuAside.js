@@ -35,21 +35,25 @@ export default [
     to: '/forms',
     label: 'Forms',
     icon: mdiSquareEditOutline,
+    hideForNonAdmin: true,
   },
   {
     to: '/ui',
     label: 'UI',
     icon: mdiTelevisionGuide,
+    hideForNonAdmin: true,
   },
   {
     to: '/responsive',
     label: 'Responsive',
     icon: mdiResponsive,
+    hideForNonAdmin: true,
   },
   {
     to: '/',
     label: 'Styles',
     icon: mdiPalette,
+    hideForNonAdmin: true,
   },
   {
     to: '/profile',
@@ -60,15 +64,18 @@ export default [
     to: '/login',
     label: 'Login',
     icon: mdiLock,
+    hideForNonAdmin: true,
   },
   {
     to: '/error',
     label: 'Error',
     icon: mdiAlertCircle,
+    hideForNonAdmin: true,
   },
   {
     label: 'Dropdown',
     icon: mdiViewList,
+    hideForNonAdmin: true,
     menu: [
       {
         label: 'Item One',

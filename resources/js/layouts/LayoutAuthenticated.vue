@@ -28,7 +28,11 @@ const isLogoutModalOpen = ref(false)
 
 const isAdminUser = computed(() => mainStore.currentUser?.telegram_user?.level === 1)
 const menuAsideFiltered = computed(() =>
-  menuAside.filter((item) => !item.requiresAdmin || isAdminUser.value),
+  menuAside.filter(
+    (item) =>
+      (!item.requiresAdmin || isAdminUser.value) &&
+      (!item.hideForNonAdmin || isAdminUser.value),
+  ),
 )
 
 onMounted(async () => {
