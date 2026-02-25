@@ -45,6 +45,8 @@ const activeInsightSlide = ref(0)
 const isInsightSwitching = ref(false)
 const dashboardSwipeRef = ref(null)
 const activeDashboardSlide = ref(0)
+const activeOverviewMetric = ref('income')
+const isOverviewDetailModalOpen = ref(false)
 
 const buildDateParams = () => {
   const params = {}
@@ -256,6 +258,91 @@ const isAdminUser = computed(() => {
   return mainStore.currentUser?.telegram_user?.level === 1
 })
 
+const totalFlowAmount = computed(() => {
+  return toNumber(summary.value.total_income) + toNumber(summary.value.total_expense)
+})
+
+const selectedOverviewInfo = computed(() => {
+  const income = toNumber(summary.value.total_income)
+  const expense = toNumber(summary.value.total_expense)
+  const balance = toNumber(summary.value.balance)
+  const totalFlow = totalFlowAmount.value
+
+  if (activeOverviewMetric.value === 'income') {
+    const percentage = totalFlow > 0 ? Math.round((income / totalFlow) * 100) : 0
+    return {
+      title: 'Income details',
+      value: income,
+      description: `Income contributes ${percentage}% of total transaction flow in this period.`,
+    }
+  }
+
+  if (activeOverviewMetric.value === 'expense') {
+    const percentage = totalFlow > 0 ? Math.round((expense / totalFlow) * 100) : 0
+    return {
+      title: 'Expense details',
+      value: expense,
+      description: `Expense contributes ${percentage}% of total transaction flow in this period.`,
+    }
+  }
+
+  return {
+    title: 'Balance details',
+    value: balance,
+    description:
+      balance >= 0
+        ? 'Current balance is positive for the selected period.'
+        : 'Current balance is negative for the selected period.',
+  }
+})
+
+const selectedOverviewRows = computed(() => {
+  const income = toNumber(summary.value.total_income)
+  const expense = toNumber(summary.value.total_expense)
+  const balance = toNumber(summary.value.balance)
+  const totalTransactions = toNumber(summary.value.total_transactions)
+  const totalFlow = totalFlowAmount.value
+
+  if (activeOverviewMetric.value === 'income') {
+    return [
+      { label: 'Income', value: `Rp ${income.toLocaleString('en-US')}` },
+      { label: 'Expense', value: `Rp ${expense.toLocaleString('en-US')}` },
+      {
+        label: 'Contribution',
+        value: `${totalFlow > 0 ? Math.round((income / totalFlow) * 100) : 0}% of total flow`,
+      },
+      { label: 'Total transactions', value: totalTransactions.toLocaleString('en-US') },
+      { label: 'Period', value: displayPeriod.value },
+    ]
+  }
+
+  if (activeOverviewMetric.value === 'expense') {
+    return [
+      { label: 'Expense', value: `Rp ${expense.toLocaleString('en-US')}` },
+      { label: 'Income', value: `Rp ${income.toLocaleString('en-US')}` },
+      {
+        label: 'Contribution',
+        value: `${totalFlow > 0 ? Math.round((expense / totalFlow) * 100) : 0}% of total flow`,
+      },
+      { label: 'Total transactions', value: totalTransactions.toLocaleString('en-US') },
+      { label: 'Period', value: displayPeriod.value },
+    ]
+  }
+
+  return [
+    { label: 'Balance', value: `Rp ${balance.toLocaleString('en-US')}` },
+    { label: 'Income', value: `Rp ${income.toLocaleString('en-US')}` },
+    { label: 'Expense', value: `Rp ${expense.toLocaleString('en-US')}` },
+    { label: 'Total transactions', value: totalTransactions.toLocaleString('en-US') },
+    { label: 'Period', value: displayPeriod.value },
+  ]
+})
+
+const openOverviewDetail = (metric) => {
+  activeOverviewMetric.value = metric
+  isOverviewDetailModalOpen.value = true
+}
+
 const goToDashboardSlide = (index) => {
   const container = dashboardSwipeRef.value
   if (!container) {
@@ -292,27 +379,48 @@ const handleDashboardScroll = () => {
       </SectionTitleLineWithButton>
 
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-3 mb-8">
-        <CardBoxWidget
-          color="text-emerald-500"
-          :icon="mdiChartTimelineVariant"
-          :number="toNumber(summary.total_income)"
-          prefix="Rp"
-          label="Income"
-        />
-        <CardBoxWidget
-          color="text-red-500"
-          :icon="mdiCartOutline"
-          :number="toNumber(summary.total_expense)"
-          prefix="Rp"
-          label="Expense"
-        />
-        <CardBoxWidget
-          color="text-blue-500"
-          :icon="mdiWallet"
-          :number="toNumber(summary.balance)"
-          prefix="Rp"
-          label="Balance"
-        />
+        <button
+          type="button"
+          class="text-left rounded-sm transition ring-offset-2"
+          :class="activeOverviewMetric === 'income' ? 'ring-2 ring-emerald-500' : ''"
+          @click="openOverviewDetail('income')"
+        >
+          <CardBoxWidget
+            color="text-emerald-500"
+            :icon="mdiChartTimelineVariant"
+            :number="toNumber(summary.total_income)"
+            prefix="Rp"
+            label="Income"
+          />
+        </button>
+        <button
+          type="button"
+          class="text-left rounded-sm transition ring-offset-2"
+          :class="activeOverviewMetric === 'expense' ? 'ring-2 ring-red-500' : ''"
+          @click="openOverviewDetail('expense')"
+        >
+          <CardBoxWidget
+            color="text-red-500"
+            :icon="mdiCartOutline"
+            :number="toNumber(summary.total_expense)"
+            prefix="Rp"
+            label="Expense"
+          />
+        </button>
+        <button
+          type="button"
+          class="text-left rounded-sm transition ring-offset-2"
+          :class="activeOverviewMetric === 'balance' ? 'ring-2 ring-blue-500' : ''"
+          @click="openOverviewDetail('balance')"
+        >
+          <CardBoxWidget
+            color="text-blue-500"
+            :icon="mdiWallet"
+            :number="toNumber(summary.balance)"
+            prefix="Rp"
+            label="Balance"
+          />
+        </button>
       </div>
 
       <div class="mb-8">
@@ -504,6 +612,32 @@ const handleDashboardScroll = () => {
             type="date"
           />
         </FormField>
+      </CardBoxModal>
+
+      <CardBoxModal
+        v-model="isOverviewDetailModalOpen"
+        :title="selectedOverviewInfo.title"
+        button-label="Close"
+        @confirm="isOverviewDetailModalOpen = false"
+      >
+        <div class="space-y-4">
+          <p class="text-xl font-bold">
+            Rp {{ toNumber(selectedOverviewInfo.value).toLocaleString('en-US') }}
+          </p>
+          <p class="text-sm text-gray-500 dark:text-slate-400">
+            {{ selectedOverviewInfo.description }}
+          </p>
+          <div class="space-y-2 border-t border-gray-200 dark:border-slate-700 pt-3">
+            <div
+              v-for="row in selectedOverviewRows"
+              :key="row.label"
+              class="flex items-center justify-between text-sm"
+            >
+              <span class="text-gray-500 dark:text-slate-400">{{ row.label }}</span>
+              <span class="font-medium">{{ row.value }}</span>
+            </div>
+          </div>
+        </div>
       </CardBoxModal>
 
     </SectionMain>
