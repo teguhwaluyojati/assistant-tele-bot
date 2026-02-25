@@ -516,6 +516,52 @@ class DashboardController extends Controller
         }
     }
 
+    public function storeTransaction(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'type' => ['required', 'in:income,expense'],
+                'amount' => ['required', 'integer', 'min:1'],
+                'description' => ['required', 'string', 'max:255'],
+            ]);
+
+            $currentUser = auth()->user();
+            $telegramUser = $currentUser?->telegramUser;
+
+            if (!$telegramUser) {
+                return $this->errorResponse('User not linked to Telegram account.', 403);
+            }
+
+            $transaction = \App\Models\Transaction::create([
+                'user_id' => $telegramUser->user_id,
+                'type' => $validated['type'],
+                'amount' => $validated['amount'],
+                'description' => $validated['description'],
+            ]);
+
+            activity()
+                ->causedBy($currentUser)
+                ->performedOn($transaction)
+                ->withProperties([
+                    'transaction_id' => $transaction->id,
+                    'owner_user_id' => $transaction->user_id,
+                    'type' => $transaction->type,
+                    'amount' => $transaction->amount,
+                ])
+                ->log('create_transaction');
+
+            return $this->successResponse(
+                $transaction->load('user:id,user_id,username,first_name,last_name'),
+                'Transaction created successfully.'
+            );
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed.', 422, $e->errors());
+        } catch (\Exception $e) {
+            Log::error('Error creating transaction: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while creating transaction.', 500);
+        }
+    }
+
     public function updateTransaction(Request $request, $id)
     {
         try {

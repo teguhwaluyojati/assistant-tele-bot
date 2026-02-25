@@ -166,6 +166,34 @@ class WebFocusedApiEndpointsTest extends TestCase
         ]);
     }
 
+    public function test_user_can_submit_transaction_via_web_endpoint(): void
+    {
+        [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/transactions', [
+            'type' => 'expense',
+            'amount' => 12500,
+            'description' => 'Lunch',
+        ]);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.type', 'expense')
+            ->assertJsonPath('data.amount', 12500)
+            ->assertJsonPath('data.description', 'Lunch')
+            ->assertJsonPath('data.user_id', $telegramUser->user_id);
+
+        $this->assertDatabaseHas('transactions', [
+            'user_id' => $telegramUser->user_id,
+            'type' => 'expense',
+            'amount' => 12500,
+            'description' => 'Lunch',
+        ]);
+    }
+
     private function createUserWithTelegram(int $level = 2): array
     {
         $telegramUser = TelegramUser::factory()->create(['level' => $level]);

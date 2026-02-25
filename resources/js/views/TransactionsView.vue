@@ -1,7 +1,7 @@
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import axios from 'axios'
-import { mdiCartOutline, mdiCog, mdiDownload } from '@mdi/js'
+import { mdiCartOutline, mdiCog, mdiDownload, mdiPlus } from '@mdi/js'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
@@ -15,6 +15,40 @@ import FormControl from '@/components/FormControl.vue'
 const isTransactionFilterModalOpen = ref(false)
 const transactionFilterStartDate = ref('')
 const transactionFilterEndDate = ref('')
+const transactionsTableKey = ref(0)
+
+const isCreateTransactionModalOpen = ref(false)
+const createTransactionForm = ref({
+  type: 'expense',
+  amount: '',
+  description: '',
+})
+const isSubmittingTransaction = ref(false)
+
+const isMessageModalOpen = ref(false)
+const messageModalTitle = ref('')
+const messageModalContent = ref('')
+const messageModalType = ref('success')
+
+const formattedAmount = computed({
+  get: () => {
+    const raw = createTransactionForm.value.amount
+    if (!raw) {
+      return ''
+    }
+
+    const numeric = Number(raw)
+    if (!Number.isFinite(numeric)) {
+      return ''
+    }
+
+    return `Rp ${numeric.toLocaleString('en-US')}`
+  },
+  set: (value) => {
+    const digitsOnly = String(value ?? '').replace(/\D/g, '')
+    createTransactionForm.value.amount = digitsOnly
+  },
+})
 
 const openTransactionFilterModal = () => {
   isTransactionFilterModalOpen.value = true
@@ -34,6 +68,62 @@ const applyTransactionDateFilter = () => {
 const clearTransactionFilter = () => {
   transactionFilterStartDate.value = ''
   transactionFilterEndDate.value = ''
+}
+
+const openCreateTransactionModal = () => {
+  isCreateTransactionModalOpen.value = true
+}
+
+const resetCreateTransactionForm = () => {
+  createTransactionForm.value = {
+    type: 'expense',
+    amount: '',
+    description: '',
+  }
+}
+
+const submitTransaction = async () => {
+  if (!createTransactionForm.value.amount || Number(createTransactionForm.value.amount) <= 0) {
+    messageModalTitle.value = 'Error'
+    messageModalContent.value = 'Amount must be greater than 0.'
+    messageModalType.value = 'danger'
+    isMessageModalOpen.value = true
+    return
+  }
+
+  if (!createTransactionForm.value.description?.trim()) {
+    messageModalTitle.value = 'Error'
+    messageModalContent.value = 'Description is required.'
+    messageModalType.value = 'danger'
+    isMessageModalOpen.value = true
+    return
+  }
+
+  isSubmittingTransaction.value = true
+  try {
+    await axios.post('/api/transactions', {
+      type: createTransactionForm.value.type,
+      amount: Number(createTransactionForm.value.amount),
+      description: createTransactionForm.value.description.trim(),
+    })
+
+    isCreateTransactionModalOpen.value = false
+    resetCreateTransactionForm()
+    transactionsTableKey.value += 1
+
+    messageModalTitle.value = 'Success'
+    messageModalContent.value = 'Transaction created successfully!'
+    messageModalType.value = 'success'
+    isMessageModalOpen.value = true
+  } catch (error) {
+    const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
+    messageModalTitle.value = 'Error'
+    messageModalContent.value = `Failed to create transaction: ${errorMsg}`
+    messageModalType.value = 'danger'
+    isMessageModalOpen.value = true
+  } finally {
+    isSubmittingTransaction.value = false
+  }
 }
 
 const exportTransactions = async () => {
@@ -70,6 +160,7 @@ const exportTransactions = async () => {
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiCartOutline" title="Transactions" main>
         <div class="flex gap-2">
+          <BaseButton :icon="mdiPlus" color="success" @click="openCreateTransactionModal" />
           <BaseButton :icon="mdiDownload" color="whiteDark" @click="exportTransactions" />
           <BaseButton :icon="mdiCog" color="whiteDark" @click="openTransactionFilterModal" />
         </div>
@@ -77,10 +168,62 @@ const exportTransactions = async () => {
 
       <CardBox has-table>
         <TableTransactions
+          :key="transactionsTableKey"
           :date-start="transactionFilterStartDate"
           :date-end="transactionFilterEndDate"
         />
       </CardBox>
+
+      <CardBoxModal
+        v-model="isCreateTransactionModalOpen"
+        title="Create Transaction"
+        button="success"
+        :button-label="isSubmittingTransaction ? 'Submitting...' : 'Submit'"
+        :has-cancel="true"
+        @confirm="submitTransaction"
+        @cancel="isCreateTransactionModalOpen = false"
+      >
+        <FormField label="Type">
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                v-model="createTransactionForm.type"
+                type="radio"
+                value="income"
+                class="w-4 h-4 text-green-600 focus:ring-green-500"
+              />
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Income</span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                v-model="createTransactionForm.type"
+                type="radio"
+                value="expense"
+                class="w-4 h-4 text-red-600 focus:ring-red-500"
+              />
+              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Expense</span>
+            </label>
+          </div>
+        </FormField>
+
+        <FormField label="Amount">
+          <FormControl
+            v-model="formattedAmount"
+            type="text"
+            inputmode="numeric"
+            placeholder="e.g. Rp 1,000,000"
+          />
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Nominal dalam IDR</p>
+        </FormField>
+
+        <FormField label="Description">
+          <FormControl
+            v-model="createTransactionForm.description"
+            type="textarea"
+            placeholder="Enter description"
+          />
+        </FormField>
+      </CardBoxModal>
 
       <CardBoxModal
         v-model="isTransactionFilterModalOpen"
@@ -112,6 +255,16 @@ const exportTransactions = async () => {
             @click="clearTransactionFilter"
           />
         </div>
+      </CardBoxModal>
+
+      <CardBoxModal
+        v-model="isMessageModalOpen"
+        :title="messageModalTitle"
+        :button="messageModalType"
+        button-label="OK"
+        @confirm="isMessageModalOpen = false"
+      >
+        <p>{{ messageModalContent }}</p>
       </CardBoxModal>
     </SectionMain>
   </LayoutAuthenticated>

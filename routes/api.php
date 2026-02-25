@@ -42,6 +42,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/history-login', [DashboardController::class, 'lastLogin']);
     
     Route::get('/transactions', [DashboardController::class, 'getTransactions']);
+    Route::post('/transactions', [DashboardController::class, 'storeTransaction']);
     Route::get('/transactions/summary', [DashboardController::class, 'getTransactionsSummary']);
     Route::get('/transactions/daily-chart', [DashboardController::class, 'getDailyChart']);
     Route::get('/transactions/export', [DashboardController::class, 'exportTransactions']);
