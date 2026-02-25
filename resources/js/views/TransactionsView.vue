@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import axios from 'axios'
-import { mdiCartOutline, mdiCog, mdiDownload, mdiPlus } from '@mdi/js'
+import { mdiCartOutline, mdiCog, mdiDownload, mdiPlus, mdiReload } from '@mdi/js'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
@@ -68,6 +68,10 @@ const applyTransactionDateFilter = () => {
 const clearTransactionFilter = () => {
   transactionFilterStartDate.value = ''
   transactionFilterEndDate.value = ''
+}
+
+const refreshTransactionsTable = () => {
+  transactionsTableKey.value += 1
 }
 
 const openCreateTransactionModal = () => {
@@ -163,6 +167,7 @@ const exportTransactions = async () => {
           <BaseButton :icon="mdiPlus" color="success" @click="openCreateTransactionModal" />
           <BaseButton :icon="mdiDownload" color="whiteDark" @click="exportTransactions" />
           <BaseButton :icon="mdiCog" color="whiteDark" @click="openTransactionFilterModal" />
+          <BaseButton :icon="mdiReload" color="whiteDark" @click="refreshTransactionsTable" />
         </div>
       </SectionTitleLineWithButton>
 
