@@ -123,7 +123,7 @@ class LoginModelTransactionTest extends TestCase
             'created_at' => now()->setTime(12, 0),
         ]);
 
-        $rows = (new Transaction())->DailyExpenses();
+        $rows = (new Transaction())->DailyExpenses($telegramUser->user_id);
 
         $this->assertCount(1, $rows);
         $this->assertSame($expected->id, $rows[0]->id);

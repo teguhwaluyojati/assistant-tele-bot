@@ -27,12 +27,17 @@ class Transaction extends Model
         return $this->belongsTo(TelegramUser::class, 'user_id', 'user_id');
     }
 
-    public function DailyExpenses()
+    public function DailyExpenses(?int $userId = null)
     {
-        return DB::table($this->transaction)
+        $query = DB::table($this->transaction)
             ->select('*')
             ->where('type', 'expense')
-            ->whereDate('created_at', now()->subDay()->toDateString())
-            ->get();
+            ->whereDate('created_at', now()->subDay()->toDateString());
+
+        if ($userId !== null) {
+            $query->where('user_id', $userId);
+        }
+
+        return $query->get();
     }
 }
