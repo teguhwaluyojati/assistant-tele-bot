@@ -1,5 +1,6 @@
 import {
   mdiAccountCircle,
+  mdiAccountMultiple,
   mdiMonitor,
   mdiGithub,
   mdiLock,
@@ -23,6 +24,12 @@ export default [
     to: '/transactions',
     label: 'Transactions',
     icon: mdiTable,
+  },
+  {
+    to: '/users',
+    label: 'Users',
+    icon: mdiAccountMultiple,
+    requiresAdmin: true,
   },
   {
     to: '/tables',

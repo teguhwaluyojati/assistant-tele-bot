@@ -3,11 +3,9 @@ import { computed, ref, onMounted } from 'vue'
 import axios from 'axios'
 import { useMainStore } from '@/stores/main'
 import {
-  mdiAccountMultiple,
   mdiCartOutline,
   mdiChartTimelineVariant,
   mdiCog,
-  mdiMonitorCellphone,
   mdiReload,
   mdiChartPie,
   mdiWallet,
@@ -16,8 +14,6 @@ import LineChart from '@/components/Charts/LineChart.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBoxWidget from '@/components/CardBoxWidget.vue'
 import CardBox from '@/components/CardBox.vue'
-import TableSampleClients from '@/components/TableSampleClients.vue'
-import NotificationBar from '@/components/NotificationBar.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import CardBoxTransaction from '@/components/CardBoxTransaction.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
@@ -44,7 +40,6 @@ const activeDateFilter = ref({
 const isUserReady = ref(false)
 const isTransactionsLoading = ref(true)
 const isInsightLoading = ref(true)
-const isClientsLoading = ref(false)
 const recentCommands = ref([])
 const recentLogins = ref([])
 const activeInsightSlide = ref(0)
@@ -192,13 +187,6 @@ onMounted(async () => {
   isTransactionsLoading.value = true
   await mainStore.fetchTransactionsFromApi()
   isTransactionsLoading.value = false
-  
-  // Fetch clients only if user is admin (for table section)
-  if (mainStore.currentUser?.telegram_user?.level === 1) {
-    isClientsLoading.value = true
-    await mainStore.fetchSampleClients()
-    isClientsLoading.value = false
-  }
 
   await fetchRightPanelInsights()
 })
@@ -442,16 +430,6 @@ const isAdminUser = computed(() => {
         >
           N/A
         </div>
-      </CardBox>
-
-      <SectionTitleLineWithButton v-if="isAdminUser" :icon="mdiAccountMultiple" title="Clients" />
-
-      <NotificationBar v-if="isAdminUser" color="info" :icon="mdiMonitorCellphone" class="mb-4">
-        <b>Users Telegram Only</b>
-      </NotificationBar>
-
-      <CardBox v-if="isAdminUser" has-table class="mb-8">
-        <TableSampleClients :is-loading="isClientsLoading" />
       </CardBox>
 
       <CardBoxModal
