@@ -5,7 +5,6 @@ import {
   mdiCrop,
   mdiAccount,
   mdiCogOutline,
-  mdiEmail,
   mdiLogout,
   mdiThemeLightDark,
 } from '@mdi/js'
@@ -22,10 +21,6 @@ export default [
       {
         icon: mdiCogOutline,
         label: 'Settings',
-      },
-      {
-        icon: mdiEmail,
-        label: 'Messages',
       },
       {
         isDivider: true,
