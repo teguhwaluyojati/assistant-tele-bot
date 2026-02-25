@@ -1,7 +1,7 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import axios from 'axios'
-import { mdiClipboardTextClockOutline, mdiReload } from '@mdi/js'
+import { mdiClipboardTextClockOutline, mdiReload, mdiDownload, mdiCog } from '@mdi/js'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
@@ -9,21 +9,42 @@ import CardBox from '@/components/CardBox.vue'
 import BaseButton from '@/components/BaseButton.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
+import CardBoxModal from '@/components/CardBoxModal.vue'
+import FormField from '@/components/FormField.vue'
+import FormControl from '@/components/FormControl.vue'
 
 const logs = ref([])
 const isLoading = ref(true)
 const currentPage = ref(1)
 const lastPage = ref(1)
 const total = ref(0)
+const searchKeyword = ref('')
+const filterStartDate = ref('')
+const filterEndDate = ref('')
+const isFilterModalOpen = ref(false)
 
 const fetchLogs = async () => {
   isLoading.value = true
   try {
+    const params = {
+      page: currentPage.value,
+      per_page: 20,
+    }
+
+    if (searchKeyword.value?.trim()) {
+      params.search = searchKeyword.value.trim()
+    }
+
+    if (filterStartDate.value) {
+      params.start_date = filterStartDate.value
+    }
+
+    if (filterEndDate.value) {
+      params.end_date = filterEndDate.value
+    }
+
     const response = await axios.get('/api/audit-logs', {
-      params: {
-        page: currentPage.value,
-        per_page: 20,
-      },
+      params,
     })
 
     const paginated = response.data?.data
@@ -60,6 +81,70 @@ const changePage = (page) => {
   fetchLogs()
 }
 
+watch(searchKeyword, () => {
+  currentPage.value = 1
+  fetchLogs()
+})
+
+const openFilterModal = () => {
+  isFilterModalOpen.value = true
+}
+
+const applyDateFilter = () => {
+  if (filterStartDate.value && filterEndDate.value && filterStartDate.value > filterEndDate.value) {
+    return
+  }
+
+  isFilterModalOpen.value = false
+  currentPage.value = 1
+  fetchLogs()
+}
+
+const clearDateFilter = () => {
+  filterStartDate.value = ''
+  filterEndDate.value = ''
+  currentPage.value = 1
+  fetchLogs()
+}
+
+const clearSearch = () => {
+  searchKeyword.value = ''
+}
+
+const exportLogs = async () => {
+  try {
+    const params = {}
+
+    if (searchKeyword.value?.trim()) {
+      params.search = searchKeyword.value.trim()
+    }
+
+    if (filterStartDate.value) {
+      params.start_date = filterStartDate.value
+    }
+
+    if (filterEndDate.value) {
+      params.end_date = filterEndDate.value
+    }
+
+    const response = await axios.get('/api/audit-logs/export', {
+      params,
+      responseType: 'blob',
+    })
+
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `audit-logs-${new Date().toISOString().split('T')[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    link.parentNode.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('Error exporting audit logs:', error)
+  }
+}
+
 const formatDate = (value) => {
   if (!value) return '-'
   const date = new Date(value)
@@ -83,10 +168,26 @@ const displayCauser = (log) => {
   <LayoutAuthenticated>
     <SectionMain>
       <SectionTitleLineWithButton :icon="mdiClipboardTextClockOutline" title="Audit Logs" main>
-        <BaseButton :icon="mdiReload" color="whiteDark" @click="fetchLogs" />
+        <div class="flex gap-2">
+          <BaseButton :icon="mdiDownload" color="whiteDark" @click="exportLogs" />
+          <BaseButton :icon="mdiCog" color="whiteDark" @click="openFilterModal" />
+          <BaseButton :icon="mdiReload" color="whiteDark" @click="fetchLogs" />
+        </div>
       </SectionTitleLineWithButton>
 
       <CardBox>
+        <div class="mb-4 flex items-center justify-end gap-2">
+          <input
+            v-model="searchKeyword"
+            type="text"
+            placeholder="Search..."
+            class="w-full max-w-xs px-3 py-1.5 text-sm border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          <div v-if="searchKeyword" class="shrink-0">
+            <BaseButton label="Clear" color="whiteDark" outline @click="clearSearch" />
+          </div>
+        </div>
+
         <div v-if="isLoading" class="space-y-4 animate-pulse">
           <div v-for="row in 6" :key="row" class="flex items-center gap-4">
             <div class="h-4 w-32 rounded bg-gray-200 dark:bg-slate-700"></div>
@@ -160,6 +261,25 @@ const displayCauser = (log) => {
           </div>
         </div>
       </CardBox>
+
+      <CardBoxModal
+        v-model="isFilterModalOpen"
+        title="Filter Audit Logs by Date"
+        button-label="Apply"
+        :has-cancel="true"
+        @confirm="applyDateFilter"
+        @cancel="isFilterModalOpen = false"
+      >
+        <FormField label="Start date" label-for="audit-filter-start-date">
+          <FormControl id="audit-filter-start-date" v-model="filterStartDate" type="date" />
+        </FormField>
+        <FormField label="End date" label-for="audit-filter-end-date">
+          <FormControl id="audit-filter-end-date" v-model="filterEndDate" type="date" />
+        </FormField>
+        <div class="mt-4">
+          <BaseButton label="Clear Filter" color="whiteDark" outline @click="clearDateFilter" />
+        </div>
+      </CardBoxModal>
     </SectionMain>
   </LayoutAuthenticated>
 </template>

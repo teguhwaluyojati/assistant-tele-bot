@@ -81,4 +81,74 @@ class AuditLogsTest extends TestCase
 
         $response->assertStatus(422)->assertJsonValidationErrors(['per_page']);
     }
+
+    public function test_admin_can_filter_audit_logs_by_search(): void
+    {
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+            'email' => 'search-admin@example.com',
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        activity()->causedBy($adminUser)->log('create_transaction');
+        activity()->causedBy($adminUser)->log('delete_transaction');
+
+        $response = $this->getJson('/api/audit-logs?search=create_transaction');
+
+        $response->assertStatus(200)->assertJsonPath('success', true);
+
+        $rows = $response->json('data.data');
+        $this->assertNotEmpty($rows);
+        $this->assertTrue(collect($rows)->every(fn ($row) => str_contains($row['description'], 'create_transaction')));
+    }
+
+    public function test_admin_can_filter_audit_logs_by_date_range(): void
+    {
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        Carbon::setTestNow(Carbon::parse('2099-04-01 09:00:00'));
+        activity()->causedBy($adminUser)->log('old_log');
+
+        Carbon::setTestNow(Carbon::parse('2099-04-10 09:00:00'));
+        activity()->causedBy($adminUser)->log('new_log');
+        Carbon::setTestNow();
+
+        $response = $this->getJson('/api/audit-logs?start_date=2099-04-05&end_date=2099-04-12');
+
+        $response->assertStatus(200)->assertJsonPath('success', true);
+
+        $rows = $response->json('data.data');
+        $descriptions = collect($rows)->pluck('description')->all();
+
+        $this->assertContains('new_log', $descriptions);
+        $this->assertNotContains('old_log', $descriptions);
+    }
+
+    public function test_admin_can_export_audit_logs_csv(): void
+    {
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        activity()->causedBy($adminUser)->log('export_target');
+
+        $response = $this->get('/api/audit-logs/export?search=export_target');
+
+        $response->assertStatus(200);
+
+        $contentDisposition = (string) $response->headers->get('content-disposition');
+        $this->assertStringContainsString('attachment;', $contentDisposition);
+        $this->assertStringContainsString('audit-logs-', $contentDisposition);
+        $this->assertStringContainsString('.csv', $contentDisposition);
+    }
 }
