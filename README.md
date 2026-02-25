@@ -1,66 +1,169 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Assistant Tele Bot
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Assistant Tele Bot is a Laravel + Vue application for managing financial transactions and user activity across two main channels:
 
-## About Laravel
+- Web Dashboard (login, profile, audit logs, transaction analytics)
+- Telegram Bot (money tracker, command center, and daily utilities)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+The project is currently running with Sanctum-based APIs, activity logging, and automated tests (Feature + Unit).
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Key Features
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Web Dashboard
 
-## Learning Laravel
+- Login/logout authentication using `auth_token` cookie
+- Two-step registration flow (`/api/register/initiate` + `/api/register/verify`)
+- Profile management (update profile and change password)
+- Transaction monitoring:
+  - list/filter/sort transactions
+  - income vs expense summary
+  - daily chart
+  - edit, delete, and bulk delete
+  - Excel export (`.xlsx`)
+- User management (admin only):
+  - list Telegram users
+  - user detail + command history
+  - update user role
+- Audit logs (admin only) with pagination
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Telegram Bot
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- Webhook endpoint for incoming Telegram updates
+- Telegram user command logging to database
+- Interactive menu and stateful flow
+- Finance features: quick transaction input (`+/-`), summaries, delete/edit
+- Additional features: stock analysis, poop tracker, AI chat mode, and other utilities
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Technology Stack
 
-## Laravel Sponsors
+### Backend
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+- PHP 8.2
+- Laravel 10
+- Laravel Sanctum (API auth)
+- Spatie Activitylog (audit trail)
+- Maatwebsite Excel (export/import)
+- irazasyed/telegram-bot-sdk (Telegram integration)
 
-### Premium Partners
+### Frontend
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+- Vue 3
+- Pinia
+- Vue Router
+- Axios
+- Tailwind CSS
+- Vite
+- Chart.js
 
-## Contributing
+### Database & Infrastructure
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- PostgreSQL
+- Standard Laravel queue/cache/session components
 
-## Code of Conduct
+## Architecture Summary
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+- `routes/web.php` for web pages (Blade mount points + signed avatar)
+- `routes/api.php` for app APIs and Telegram webhook
+- Main controllers:
+  - `DashboardController` for analytics, user management, and transactions
+  - `LoginController`, `RegisterController`, `ProfileController`
+  - `AuditLogController`
+  - `TelegramController` (bot flow orchestrator)
 
-## Security Vulnerabilities
+## API Highlights
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+This README intentionally avoids listing every endpoint to keep it concise.
+
+Main API groups in this project:
+
+- Auth & Registration
+- Profile Management
+- Dashboard Analytics
+- User & Role Management
+- Transaction CRUD + Export
+- Audit Logs
+- Telegram Webhook
+
+For the complete endpoint list, see `routes/api.php`.
+
+## Local Setup
+
+1. Clone the project
+2. Install backend and frontend dependencies
+
+```bash
+composer install
+npm install
+```
+
+3. Prepare environment
+
+```bash
+cp .env.example .env
+php artisan key:generate
+```
+
+4. Minimum `.env` configuration:
+
+- `APP_URL`
+- `DB_CONNECTION=pgsql`
+- `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_WEBHOOK_URL` (optional for webhook deployment)
+
+5. Run migrations and seeders
+
+```bash
+php artisan migrate --seed
+```
+
+6. Start the application
+
+```bash
+npm run dev
+php artisan serve
+```
+
+## Testing & Quality
+
+Run all tests:
+
+```bash
+php artisan test
+```
+
+Run test coverage:
+
+```bash
+php artisan test --coverage --min=20
+```
+
+### Quality Snapshot (local, Feb 25, 2026)
+
+- Total tests: **55 passed**
+- Assertions: **168**
+- Coverage suite duration: **20.96s**
+- Total line coverage: **24.5%**
+
+High-coverage areas:
+
+- `Http/Controllers/UserController`: 100%
+- `Http/Controllers/AuditLogController`: 95%
+- `Http/Controllers/DashboardController`: 68%
+- `Exports/TransactionsExport`: 96.7%
+
+## Performance Notes
+
+- Frequently used dashboard endpoints already use pagination (e.g. audit logs, users, transactions).
+- Recent login data uses short-window caching to reduce repeated queries.
+- Transaction export uses query-based retrieval + streamed response via Laravel Excel.
+
+## Short Roadmap
+
+- Increase backend coverage progressively for Telegram and scheduler-related areas.
+- Improve observability for Telegram webhook flow (alerting + structured logs).
+- Harden validation and authorization in areas that are not fully covered yet.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+This project follows the license model used by the Laravel/composer dependencies (MIT).
