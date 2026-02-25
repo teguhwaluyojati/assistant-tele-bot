@@ -166,12 +166,33 @@ const numPages = computed(() => lastPage.value)
 
 const currentPageHuman = computed(() => currentPage.value)
 
-const pagesList = computed(() => {
-  const pagesList = []
-  for (let i = 1; i <= numPages.value; i++) {
-    pagesList.push(i)
+const paginationItems = computed(() => {
+  const totalPages = numPages.value
+  const current = currentPage.value
+
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
   }
-  return pagesList
+
+  const pages = [1]
+  const windowStart = Math.max(2, current - 1)
+  const windowEnd = Math.min(totalPages - 1, current + 1)
+
+  if (windowStart > 2) {
+    pages.push('...')
+  }
+
+  for (let page = windowStart; page <= windowEnd; page += 1) {
+    pages.push(page)
+  }
+
+  if (windowEnd < totalPages - 1) {
+    pages.push('...')
+  }
+
+  pages.push(totalPages)
+
+  return pages
 })
 
 const viewTransactionDetail = (transaction) => {
@@ -573,13 +594,14 @@ const bulkDeleteTransactions = async () => {
             @click="currentPage = Math.max(currentPage - 1, 1); fetchTransactions()"
           />
           <BaseButton
-            v-for="page in pagesList"
-            :key="page"
-            :active="page === currentPage"
-            :label="String(page)"
-            :color="page === currentPage ? 'lightDark' : 'whiteDark'"
+            v-for="(item, index) in paginationItems"
+            :key="`${item}-${index}`"
+            :active="item === currentPage"
+            :label="String(item)"
+            :color="item === currentPage ? 'lightDark' : 'whiteDark'"
+            :disabled="item === '...'"
             small
-            @click="currentPage = page; fetchTransactions()"
+            @click="item !== '...' && (currentPage = item, fetchTransactions())"
           />
           <BaseButton
             label="Next"

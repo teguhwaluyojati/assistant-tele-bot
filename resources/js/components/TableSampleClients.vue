@@ -175,14 +175,33 @@ const numPages = computed(() => Math.ceil(filteredAndSortedItems.value.length / 
 
 const currentPageHuman = computed(() => currentPage.value + 1)
 
-const pagesList = computed(() => {
-  const pagesList = []
+const paginationItems = computed(() => {
+  const totalPages = numPages.value
+  const current = currentPage.value + 1
 
-  for (let i = 0; i < numPages.value; i++) {
-    pagesList.push(i)
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
   }
 
-  return pagesList
+  const pages = [1]
+  const windowStart = Math.max(2, current - 1)
+  const windowEnd = Math.min(totalPages - 1, current + 1)
+
+  if (windowStart > 2) {
+    pages.push('...')
+  }
+
+  for (let page = windowStart; page <= windowEnd; page += 1) {
+    pages.push(page)
+  }
+
+  if (windowEnd < totalPages - 1) {
+    pages.push('...')
+  }
+
+  pages.push(totalPages)
+
+  return pages
 })
 
 const remove = (arr, cb) => {
@@ -558,13 +577,14 @@ onBeforeUnmount(() => {
           @click="currentPage = Math.max(currentPage - 1, 0)"
         />
         <BaseButton
-          v-for="page in pagesList"
-          :key="page"
-          :active="page === currentPage"
-          :label="page + 1"
-          :color="page === currentPage ? 'lightDark' : 'whiteDark'"
+          v-for="(item, index) in paginationItems"
+          :key="`${item}-${index}`"
+          :active="item !== '...' && item - 1 === currentPage"
+          :label="String(item)"
+          :color="item !== '...' && item - 1 === currentPage ? 'lightDark' : 'whiteDark'"
+          :disabled="item === '...'"
           small
-          @click="currentPage = page"
+          @click="item !== '...' && (currentPage = item - 1)"
         />
         <BaseButton
           label="Next"
