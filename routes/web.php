@@ -44,6 +44,10 @@ Route::get('/transactions', function () {
     return view('transactions');
 });
 
+Route::get('/users', function () {
+    return view('users');
+});
+
 Route::get('/style', function () {
     return view('style');
 });
