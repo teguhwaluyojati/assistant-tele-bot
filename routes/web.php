@@ -40,6 +40,10 @@ Route::get('/audit-logs', function () {
     return view('audit-logs');
 });
 
+Route::get('/transactions', function () {
+    return view('transactions');
+});
+
 Route::get('/style', function () {
     return view('style');
 });
