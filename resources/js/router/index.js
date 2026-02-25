@@ -18,6 +18,12 @@ const routes = [
     component: () => import('@/views/Register.vue'),
   },
   {
+    path: '/forgot-password',
+    name: 'forgot-password',
+    meta: { title: 'Forgot Password' },
+    component: () => import('@/views/ForgotPassword.vue'),
+  },
+  {
     path: '/error',
     name: 'error',
     meta: { title: 'Error' },
@@ -111,7 +117,7 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
-  const isPublicAuth = to.name === 'login' || to.name === 'register';
+  const isPublicAuth = to.name === 'login' || to.name === 'register' || to.name === 'forgot-password';
 
   if (!requiresAuth && isPublicAuth) {
     if (localStorage.getItem('user')) {

@@ -56,6 +56,10 @@
           </button>
 
           <p class="register-link">
+            <router-link to="/forgot-password">Forgot password?</router-link>
+          </p>
+
+          <p class="register-link">
             Did not have an account? 
             <router-link to="/register">Register here!</router-link>
           </p>

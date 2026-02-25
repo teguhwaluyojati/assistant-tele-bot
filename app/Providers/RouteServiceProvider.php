@@ -49,6 +49,20 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(6)->by($key);
         });
 
+        RateLimiter::for('auth-forgot-initiate', function (Request $request) {
+            $email = (string) $request->input('email', '');
+            $key = strtolower($email) . '|' . $request->ip();
+
+            return Limit::perMinute(3)->by($key);
+        });
+
+        RateLimiter::for('auth-forgot-verify', function (Request $request) {
+            $email = (string) $request->input('email', '');
+            $key = strtolower($email) . '|' . $request->ip();
+
+            return Limit::perMinute(6)->by($key);
+        });
+
         RateLimiter::for('client-error', function (Request $request) {
             return Limit::perMinute(10)->by($request->ip());
         });

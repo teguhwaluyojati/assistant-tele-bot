@@ -9,6 +9,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\ForgotPasswordController;
 
 /*
 |--------------------------------------------------------------------------
@@ -67,6 +68,10 @@ Route::post('/register/verify', [RegisterController::class, 'verifyAndRegister']
     ->middleware('throttle:auth-register-verify');
 Route::post('/login', [LoginController::class, 'login'])
     ->middleware('throttle:auth-login');
+Route::post('/forgot-password/initiate', [ForgotPasswordController::class, 'initiate'])
+    ->middleware('throttle:auth-forgot-initiate');
+Route::post('/forgot-password/verify', [ForgotPasswordController::class, 'verify'])
+    ->middleware('throttle:auth-forgot-verify');
 
 Route::post('/client-error', [ClientErrorController::class, 'store'])
     ->middleware('throttle:client-error');
