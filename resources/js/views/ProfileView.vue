@@ -9,7 +9,6 @@ import FormField from '@/components/FormField.vue'
 import FormControl from '@/components/FormControl.vue'
 import FormFilePicker from '@/components/FormFilePicker.vue'
 import BaseButton from '@/components/BaseButton.vue'
-import BaseButtons from '@/components/BaseButtons.vue'
 import UserCard from '@/components/UserCard.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
@@ -176,10 +175,7 @@ const submitPass = async() => {
           </FormField>
 
           <template #footer>
-            <BaseButtons>
-              <BaseButton color="info" type="submit" label="Submit" />
-              <BaseButton color="info" label="Options" outline />
-            </BaseButtons>
+            <BaseButton color="info" type="submit" label="Submit" />
           </template>
         </CardBox>
 
@@ -220,10 +216,7 @@ const submitPass = async() => {
           </FormField>
 
           <template #footer>
-            <BaseButtons>
-              <BaseButton type="submit" color="info" label="Submit" />
-              <BaseButton color="info" label="Options" outline />
-            </BaseButtons>
+            <BaseButton type="submit" color="info" label="Submit" />
           </template>
         </CardBox>
       </div>
