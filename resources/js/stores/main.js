@@ -73,7 +73,7 @@ export const useMainStore = defineStore('main', () => {
           history.value = transactions.map((t) => ({
             id: t.id,
             amount: t.amount,
-            date: new Date(t.created_at).toLocaleDateString('id-ID'),
+            date: new Date(t.created_at).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' }),
             business: t.user?.username || 'Unknown',
             type: t.type,
             name: t.description,
