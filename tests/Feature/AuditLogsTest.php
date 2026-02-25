@@ -149,6 +149,6 @@ class AuditLogsTest extends TestCase
         $contentDisposition = (string) $response->headers->get('content-disposition');
         $this->assertStringContainsString('attachment;', $contentDisposition);
         $this->assertStringContainsString('audit-logs-', $contentDisposition);
-        $this->assertStringContainsString('.csv', $contentDisposition);
+        $this->assertStringContainsString('.xlsx', $contentDisposition);
     }
 }

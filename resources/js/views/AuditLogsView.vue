@@ -135,7 +135,7 @@ const exportLogs = async () => {
     const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
     link.href = url
-    link.setAttribute('download', `audit-logs-${new Date().toISOString().split('T')[0]}.csv`)
+    link.setAttribute('download', `audit-logs-${new Date().toISOString().split('T')[0]}.xlsx`)
     document.body.appendChild(link)
     link.click()
     link.parentNode.removeChild(link)
