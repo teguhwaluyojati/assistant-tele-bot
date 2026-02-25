@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { useMainStore } from '@/stores/main'
 import {
@@ -343,6 +343,12 @@ const openOverviewDetail = (metric) => {
   isOverviewDetailModalOpen.value = true
 }
 
+watch(isOverviewDetailModalOpen, (isOpen) => {
+  if (!isOpen) {
+    activeOverviewMetric.value = ''
+  }
+})
+
 const goToDashboardSlide = (index) => {
   const container = dashboardSwipeRef.value
   if (!container) {
@@ -381,8 +387,8 @@ const handleDashboardScroll = () => {
       <div class="grid grid-cols-1 gap-8 lg:grid-cols-3 mb-8">
         <button
           type="button"
-          class="w-full p-0 bg-transparent border-0 appearance-none text-left rounded-sm transition ring-offset-2 focus:outline-none"
-          :class="activeOverviewMetric === 'income' ? 'ring-2 ring-emerald-500' : ''"
+          class="w-full p-0 bg-transparent border-0 appearance-none text-left rounded-sm transition ring-offset-2 focus:outline-none cursor-pointer hover:opacity-95"
+          :class="isOverviewDetailModalOpen && activeOverviewMetric === 'income' ? 'ring-2 ring-emerald-500' : ''"
           @click="openOverviewDetail('income')"
         >
           <CardBoxWidget
@@ -395,8 +401,8 @@ const handleDashboardScroll = () => {
         </button>
         <button
           type="button"
-          class="w-full p-0 bg-transparent border-0 appearance-none text-left rounded-sm transition ring-offset-2 focus:outline-none"
-          :class="activeOverviewMetric === 'expense' ? 'ring-2 ring-red-500' : ''"
+          class="w-full p-0 bg-transparent border-0 appearance-none text-left rounded-sm transition ring-offset-2 focus:outline-none cursor-pointer hover:opacity-95"
+          :class="isOverviewDetailModalOpen && activeOverviewMetric === 'expense' ? 'ring-2 ring-red-500' : ''"
           @click="openOverviewDetail('expense')"
         >
           <CardBoxWidget
@@ -409,8 +415,8 @@ const handleDashboardScroll = () => {
         </button>
         <button
           type="button"
-          class="w-full p-0 bg-transparent border-0 appearance-none text-left rounded-sm transition ring-offset-2 focus:outline-none"
-          :class="activeOverviewMetric === 'balance' ? 'ring-2 ring-blue-500' : ''"
+          class="w-full p-0 bg-transparent border-0 appearance-none text-left rounded-sm transition ring-offset-2 focus:outline-none cursor-pointer hover:opacity-95"
+          :class="isOverviewDetailModalOpen && activeOverviewMetric === 'balance' ? 'ring-2 ring-blue-500' : ''"
           @click="openOverviewDetail('balance')"
         >
           <CardBoxWidget
