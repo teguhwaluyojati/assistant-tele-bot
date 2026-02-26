@@ -636,14 +636,16 @@ class DashboardController extends Controller
                 ? Carbon::createFromFormat('Y-m-d\\TH:i', $validated['transaction_date'], config('app.timezone'))
                 : now();
 
-            $transaction = \App\Models\Transaction::create([
+            $transaction = new \App\Models\Transaction([
                 'user_id' => $telegramUser->user_id,
                 'type' => $validated['type'],
                 'amount' => $validated['amount'],
                 'description' => $validated['description'],
-                'created_at' => $transactionTimestamp,
-                'updated_at' => $transactionTimestamp,
             ]);
+
+            $transaction->created_at = $transactionTimestamp;
+            $transaction->updated_at = $transactionTimestamp;
+            $transaction->save();
 
             activity()
                 ->causedBy($currentUser)
