@@ -228,6 +228,7 @@ class WebFocusedApiEndpointsTest extends TestCase
         $response = $this->postJson('/api/transactions', [
             'type' => 'expense',
             'amount' => 12500,
+            'transaction_date' => '2099-03-04T08:30',
             'description' => 'Lunch',
         ]);
 
@@ -244,6 +245,7 @@ class WebFocusedApiEndpointsTest extends TestCase
             'type' => 'expense',
             'amount' => 12500,
             'description' => 'Lunch',
+            'created_at' => '2099-03-04 08:30:00',
         ]);
     }
 

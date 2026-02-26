@@ -18,9 +18,18 @@ const transactionFilterEndDate = ref('')
 const transactionsTableKey = ref(0)
 
 const isCreateTransactionModalOpen = ref(false)
+
+const getCurrentLocalDateTime = () => {
+  const now = new Date()
+  const timezoneOffset = now.getTimezoneOffset() * 60000
+  const localISO = new Date(now.getTime() - timezoneOffset).toISOString()
+  return localISO.slice(0, 16)
+}
+
 const createTransactionForm = ref({
   type: 'expense',
   amount: '',
+  transaction_date: getCurrentLocalDateTime(),
   description: '',
 })
 const isSubmittingTransaction = ref(false)
@@ -82,6 +91,7 @@ const resetCreateTransactionForm = () => {
   createTransactionForm.value = {
     type: 'expense',
     amount: '',
+    transaction_date: getCurrentLocalDateTime(),
     description: '',
   }
 }
@@ -108,6 +118,7 @@ const submitTransaction = async () => {
     await axios.post('/api/transactions', {
       type: createTransactionForm.value.type,
       amount: Number(createTransactionForm.value.amount),
+      transaction_date: createTransactionForm.value.transaction_date,
       description: createTransactionForm.value.description.trim(),
     })
 
@@ -226,6 +237,13 @@ const exportTransactions = async () => {
             v-model="createTransactionForm.description"
             type="textarea"
             placeholder="Enter description"
+          />
+        </FormField>
+
+        <FormField label="Date & Time">
+          <FormControl
+            v-model="createTransactionForm.transaction_date"
+            type="datetime-local"
           />
         </FormField>
       </CardBoxModal>

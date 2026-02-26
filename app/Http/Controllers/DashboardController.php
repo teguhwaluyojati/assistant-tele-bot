@@ -621,6 +621,7 @@ class DashboardController extends Controller
             $validated = $request->validate([
                 'type' => ['required', 'in:income,expense'],
                 'amount' => ['required', 'integer', 'min:1'],
+                'transaction_date' => ['nullable', 'date_format:Y-m-d\\TH:i'],
                 'description' => ['required', 'string', 'max:255'],
             ]);
 
@@ -631,11 +632,17 @@ class DashboardController extends Controller
                 return $this->errorResponse('User not linked to Telegram account.', 403);
             }
 
+            $transactionTimestamp = isset($validated['transaction_date']) && $validated['transaction_date']
+                ? Carbon::createFromFormat('Y-m-d\\TH:i', $validated['transaction_date'], config('app.timezone'))
+                : now();
+
             $transaction = \App\Models\Transaction::create([
                 'user_id' => $telegramUser->user_id,
                 'type' => $validated['type'],
                 'amount' => $validated['amount'],
                 'description' => $validated['description'],
+                'created_at' => $transactionTimestamp,
+                'updated_at' => $transactionTimestamp,
             ]);
 
             activity()
