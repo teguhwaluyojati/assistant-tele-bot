@@ -63,6 +63,12 @@
             Did not have an account? 
             <router-link to="/register">Register here!</router-link>
           </p>
+
+          <div class="login-meta">
+            <p class="creator-credit">
+              <a href="https://teguhwaluyojati.github.io" target="_blank" rel="noopener noreferrer">Built by Teguh Waluyojati</a>
+            </p>
+          </div>
         </form>
       </div>
     </div>
@@ -431,6 +437,30 @@ button[type="submit"]:disabled {
 
 .register-link a:hover {
   color: #71b5e6;
+  text-decoration: underline;
+}
+
+.login-meta {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #e6eaf0;
+}
+
+.creator-credit {
+  text-align: center;
+  margin: 0;
+  font-size: 0.82rem;
+  color: #8a94a6;
+}
+
+.creator-credit a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.creator-credit a:hover {
+  color: #2c5aa0;
   text-decoration: underline;
 }
 
