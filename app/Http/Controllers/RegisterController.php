@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules\Password;
 use Telegram\Bot\Laravel\Facades\Telegram;
+use Throwable;
 
 class RegisterController extends Controller
 {
@@ -86,9 +87,11 @@ class RegisterController extends Controller
                 Log::error('Failed to send verification code: ' . $e->getMessage());
                 
                 $verification->delete();
+
+                $reason = $this->resolveTelegramSendErrorReason($e);
                 
                 return response()->json([
-                    'message' => 'Failed to send verification code. Make sure the telegram bot is configured correctly.',
+                    'message' => 'Failed to send verification code. ' . $reason,
                     'status' => 'error'
                 ], 500);
             }
@@ -215,5 +218,32 @@ class RegisterController extends Controller
                 'status' => 'error'
             ], 500);
         }
+    }
+
+    private function resolveTelegramSendErrorReason(Throwable $e): string
+    {
+        $message = strtolower($e->getMessage());
+
+        if (str_contains($message, 'unauthorized') || str_contains($message, 'invalid token')) {
+            return 'Telegram bot token is invalid. Check TELEGRAM_BOT_TOKEN on Railway.';
+        }
+
+        if (str_contains($message, 'chat not found')) {
+            return 'Telegram chat not found. User must open the bot and send /start first.';
+        }
+
+        if (str_contains($message, 'bot was blocked by the user')) {
+            return 'Bot is blocked by user. Unblock the bot and send /start again.';
+        }
+
+        if (str_contains($message, 'forbidden')) {
+            return 'Telegram rejected the request (forbidden). Ensure user has started the bot.';
+        }
+
+        if (str_contains($message, 'too many requests')) {
+            return 'Too many requests to Telegram. Please retry in a moment.';
+        }
+
+        return 'Please verify TELEGRAM_BOT_TOKEN and make sure the user has started the bot.';
     }
 }
