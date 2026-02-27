@@ -21,7 +21,28 @@ use App\Models\PageVisit;
 
 Route::get('/', function (Request $request) {
     try {
-        $ipAddress = (string) $request->ip();
+        $resolveClientIp = static function (Request $request): string {
+            $candidates = [];
+
+            $forwardedFor = (string) $request->header('x-forwarded-for', '');
+            if ($forwardedFor !== '') {
+                $candidates = array_merge($candidates, array_map('trim', explode(',', $forwardedFor)));
+            }
+
+            $candidates[] = (string) $request->header('cf-connecting-ip', '');
+            $candidates[] = (string) $request->header('x-real-ip', '');
+            $candidates[] = (string) $request->ip();
+
+            foreach ($candidates as $ip) {
+                if ($ip !== '' && filter_var($ip, FILTER_VALIDATE_IP)) {
+                    return $ip;
+                }
+            }
+
+            return '0.0.0.0';
+        };
+
+        $ipAddress = $resolveClientIp($request);
         $userAgent = mb_substr((string) $request->userAgent(), 0, 1000);
         $userAgentHash = $userAgent !== '' ? hash('sha256', $userAgent) : null;
         $windowStart = now()->subMinutes(30);
