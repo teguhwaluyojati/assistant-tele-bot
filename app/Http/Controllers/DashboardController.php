@@ -91,10 +91,10 @@ class DashboardController extends Controller
         try {
             Excel::import(new StocksImport, $request->file('file'));
             
-            return $this->successResponse(null, 'Data saham berhasil diimport!');
+            return $this->successResponse(null, 'Stock data imported successfully.');
             
         } catch (\Exception $e) {
-            return $this->errorResponse('Gagal import: ' . $e->getMessage(), 500);
+            return $this->errorResponse('Import failed: ' . $e->getMessage(), 500);
         }
     }
 

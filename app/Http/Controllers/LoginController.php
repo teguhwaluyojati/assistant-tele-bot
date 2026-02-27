@@ -52,18 +52,18 @@ class LoginController extends Controller
                     ->log('login');
 
                 return response()->json([
-                    'message'       => 'Login berhasil!',
+                    'message'       => 'Login successful!',
                     'user'          => $user
                 ])->cookie($this->buildAuthCookie($token));
             } else {
                 return response()->json([
-                    'message' => 'Email atau password yang Anda masukkan salah.'
+                    'message' => 'The email or password you entered is incorrect.'
                 ], 401);
             }
 
         }catch(\Illuminate\Validation\ValidationException $e){
             return response()->json([
-                'message' => 'Validasi gagal.',
+                'message' => 'Validation failed.',
                 'errors' => $e->errors()
             ], 422);
         }
@@ -90,11 +90,11 @@ class LoginController extends Controller
                     ->log('logout');
             }
 
-            return response()->json(['message' => 'Logout berhasil!'])
+            return response()->json(['message' => 'Logout successful!'])
                 ->cookie(cookie()->forget('auth_token'));
         } catch (\Exception $e) {
             return response()->json([
-                'message' => 'Terjadi kesalahan saat logout.',
+                'message' => 'An error occurred during logout.',
                 'error' => $e->getMessage()
             ], 500);
         }
