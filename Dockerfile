@@ -13,12 +13,13 @@ RUN apt-get update && apt-get install -y \
     unzip \
     libpng-dev \
     libjpeg62-turbo-dev \
+    libwebp-dev \
     libfreetype6-dev \
     libonig-dev \
     libzip-dev \
     libicu-dev \
     libpq-dev \
-    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install \
         bcmath \
         gd \
