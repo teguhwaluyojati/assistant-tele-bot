@@ -211,10 +211,13 @@ class RegisterController extends Controller
                 'errors' => $e->errors(),
                 'status' => 'error'
             ], 422);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             Log::error('Verify error: ' . $e->getMessage());
+
+            $reason = $this->resolveVerificationErrorReason($e);
+
             return response()->json([
-                'message' => 'An error occurred during verification.',
+                'message' => 'An error occurred during verification. ' . $reason,
                 'status' => 'error'
             ], 500);
         }
@@ -245,5 +248,36 @@ class RegisterController extends Controller
         }
 
         return 'Please verify TELEGRAM_BOT_TOKEN and make sure the user has started the bot.';
+    }
+
+    private function resolveVerificationErrorReason(Throwable $e): string
+    {
+        $message = strtolower($e->getMessage());
+
+        if (str_contains($message, 'personal_access_tokens') && str_contains($message, 'does not exist')) {
+            return 'Migration for personal_access_tokens has not been applied. Run php artisan migrate --force on Railway.';
+        }
+
+        if (str_contains($message, 'verification_codes') && str_contains($message, 'does not exist')) {
+            return 'verification_codes table is missing. Run php artisan migrate --force on Railway.';
+        }
+
+        if (str_contains($message, 'telegram_user_id') && (str_contains($message, 'column') || str_contains($message, 'does not exist'))) {
+            return 'users.telegram_user_id column is missing. Run latest migrations on Railway.';
+        }
+
+        if (str_contains($message, 'duplicate key value violates unique constraint') && str_contains($message, 'users_email_unique')) {
+            return 'Email is already registered. Please login or use forgot password.';
+        }
+
+        if (str_contains($message, 'duplicate key value violates unique constraint') && str_contains($message, 'users_telegram_user_id_unique')) {
+            return 'Telegram account is already linked to another user.';
+        }
+
+        if (str_contains($message, 'password authentication failed')) {
+            return 'Database credentials are invalid. Check DB_* variables on Railway.';
+        }
+
+        return 'Check Railway logs for details and ensure database migrations are up to date.';
     }
 }
