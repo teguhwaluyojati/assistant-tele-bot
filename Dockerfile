@@ -1,14 +1,14 @@
 FROM node:20-alpine AS frontend
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
 FROM php:8.2-cli AS app
 WORKDIR /var/www/html
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     unzip \
     libpng-dev \
@@ -25,7 +25,6 @@ RUN apt-get update && apt-get install -y \
         gd \
         intl \
         pdo \
-        pdo_mysql \
         pdo_pgsql \
         zip \
     && rm -rf /var/lib/apt/lists/*
@@ -33,7 +32,7 @@ RUN apt-get update && apt-get install -y \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+RUN composer install --no-dev --optimize-autoloader --classmap-authoritative --no-interaction --no-scripts --prefer-dist --no-progress
 
 COPY . .
 COPY --from=frontend /app/public/build ./public/build
@@ -46,4 +45,4 @@ ENV APP_DEBUG=false
 
 EXPOSE 8080
 
-CMD sh -c "php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force || true; php -S 0.0.0.0:${PORT:-8080} -t public"
+CMD sh -c "php artisan config:cache && php artisan route:cache && php artisan view:cache && php -S 0.0.0.0:${PORT:-8080} -t public"
