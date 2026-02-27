@@ -333,6 +333,7 @@ const displayCauser = (log) => {
             <thead>
               <tr class="text-left border-b border-gray-100 dark:border-slate-800">
                 <th class="py-2 px-3">Path</th>
+                <th class="py-2 px-3">Visitor ID</th>
                 <th class="py-2 px-3">IP</th>
                 <th class="py-2 px-3">Hits</th>
                 <th class="py-2 px-3">Last Seen</th>
@@ -341,6 +342,7 @@ const displayCauser = (log) => {
             <tbody>
               <tr v-for="visit in pageVisits" :key="visit.id" class="border-b border-gray-100 dark:border-slate-800">
                 <td class="py-2 px-3 font-medium">{{ visit.path }}</td>
+                <td class="py-2 px-3 text-sm text-gray-500 dark:text-slate-400">{{ visit.visitor_id || '-' }}</td>
                 <td class="py-2 px-3 text-sm text-gray-500 dark:text-slate-400">{{ visit.ip_address || '-' }}</td>
                 <td class="py-2 px-3">{{ visit.hit_count }}</td>
                 <td class="py-2 px-3 text-sm text-gray-500 dark:text-slate-400">{{ formatDate(visit.last_seen_at) }}</td>

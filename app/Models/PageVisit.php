@@ -11,6 +11,7 @@ class PageVisit extends Model
 
     protected $fillable = [
         'path',
+        'visitor_id',
         'ip_address',
         'user_agent',
         'user_agent_hash',

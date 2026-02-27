@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use App\Http\Controllers\TelegramController;
 use App\Http\Controllers\UserController;
 use App\Models\PageVisit;
@@ -20,6 +21,14 @@ use App\Models\PageVisit;
 */
 
 Route::get('/', function (Request $request) {
+    $visitorId = trim((string) $request->cookie('visitor_id', ''));
+    $shouldSetVisitorCookie = false;
+
+    if ($visitorId === '') {
+        $visitorId = (string) Str::uuid();
+        $shouldSetVisitorCookie = true;
+    }
+
     try {
         $resolveClientIp = static function (Request $request): string {
             $candidates = [];
@@ -49,19 +58,29 @@ Route::get('/', function (Request $request) {
 
         $existingVisit = PageVisit::query()
             ->where('path', '/')
-            ->where('ip_address', $ipAddress)
-            ->where('user_agent_hash', $userAgentHash)
-            ->where('last_seen_at', '>=', $windowStart)
+            ->where('visitor_id', $visitorId)
             ->latest('last_seen_at')
             ->first();
 
+        if (!$existingVisit) {
+            $existingVisit = PageVisit::query()
+                ->where('path', '/')
+                ->where('ip_address', $ipAddress)
+                ->where('user_agent_hash', $userAgentHash)
+                ->where('last_seen_at', '>=', $windowStart)
+                ->latest('last_seen_at')
+                ->first();
+        }
+
         if ($existingVisit) {
+            $existingVisit->visitor_id = $existingVisit->visitor_id ?: $visitorId;
             $existingVisit->hit_count = $existingVisit->hit_count + 1;
             $existingVisit->last_seen_at = now();
             $existingVisit->save();
         } else {
             PageVisit::create([
                 'path' => '/',
+                'visitor_id' => $visitorId,
                 'ip_address' => $ipAddress,
                 'user_agent' => $userAgent,
                 'user_agent_hash' => $userAgentHash,
@@ -74,7 +93,23 @@ Route::get('/', function (Request $request) {
         Log::warning('Failed to record root page visit: ' . $e->getMessage());
     }
 
-    return view('login');
+    $response = response()->view('login');
+
+    if ($shouldSetVisitorCookie) {
+        $response->cookie(cookie(
+            'visitor_id',
+            $visitorId,
+            60 * 24 * 365,
+            '/',
+            null,
+            $request->isSecure(),
+            true,
+            false,
+            'lax'
+        ));
+    }
+
+    return $response;
 });
 
 Route::get('/avatar/{filename}', [UserController::class, 'showAvatar'])
