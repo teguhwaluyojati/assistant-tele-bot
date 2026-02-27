@@ -706,7 +706,10 @@ class DashboardController extends Controller
                 ])
                 ->log('update_transaction');
 
-            return $this->successResponse($transaction->fresh(), 'Transaction updated successfully.');
+            return $this->successResponse(
+                $transaction->fresh()->load('user:id,user_id,username,first_name,last_name'),
+                'Transaction updated successfully.'
+            );
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (\Exception $e) {
