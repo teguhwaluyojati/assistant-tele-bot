@@ -101,16 +101,17 @@ const getFullName = (user) => {
 const fetchTransactions = async () => {
   isLoading.value = true
   try {
-    // Server-side pagination with default per_page=15 from backend
-    const params = new URLSearchParams({
+    const params = {
       page: currentPage.value,
       sort: sortField.value,
       direction: sortDirection.value,
       ...(typeFilter.value !== 'all' && { type: typeFilter.value }),
       ...(searchQuery.value && { search: searchQuery.value }),
-    })
+      ...(props.dateStart && { start_date: props.dateStart }),
+      ...(props.dateEnd && { end_date: props.dateEnd }),
+    }
 
-    const response = await axios.get(`/api/transactions?${params.toString()}`)
+    const response = await axios.get('/api/transactions', { params })
     if (response.data.success || response.data.data) {
       const paginatedData = response.data.data
       transactions.value = Array.isArray(paginatedData.data) ? paginatedData.data : []
@@ -137,6 +138,10 @@ const refetchTransactions = () => {
 
 // Watch for filter/search changes and refetch
 watch([searchQuery, typeFilter], () => {
+  refetchTransactions()
+})
+
+watch([() => props.dateStart, () => props.dateEnd], () => {
   refetchTransactions()
 })
 
