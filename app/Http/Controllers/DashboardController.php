@@ -189,23 +189,18 @@ class DashboardController extends Controller
                 return $this->errorResponse('Start date must be before end date.', 422);
             }
 
-            $chatId = null;
-            
-            // Filter by telegram user if not admin
-            if (!auth()->user()->isAdmin()) {
-                $telegramUserId = auth()->user()->telegram_user_id;
-                
-                if (!$telegramUserId) {
-                    return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
-                }
-                
-                $telegramUser = \App\Models\TelegramUser::find($telegramUserId);
-                if (!$telegramUser) {
-                    return $this->errorResponse('Telegram user not found.', 404);
-                }
-                
-                $chatId = $telegramUser->user_id;
+            $telegramUserId = auth()->user()->telegram_user_id;
+
+            if (!$telegramUserId) {
+                return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
             }
+
+            $telegramUser = \App\Models\TelegramUser::find($telegramUserId);
+            if (!$telegramUser) {
+                return $this->errorResponse('Telegram user not found.', 404);
+            }
+
+            $chatId = $telegramUser->user_id;
             
             $incomeQuery = \App\Models\Transaction::where('type', 'income')
                 ->whereBetween('created_at', [$startDate, $endDate]);
@@ -213,11 +208,9 @@ class DashboardController extends Controller
                 ->whereBetween('created_at', [$startDate, $endDate]);
             $countQuery = \App\Models\Transaction::whereBetween('created_at', [$startDate, $endDate]);
             
-            if ($chatId) {
-                $incomeQuery->where('user_id', $chatId);
-                $expenseQuery->where('user_id', $chatId);
-                $countQuery->where('user_id', $chatId);
-            }
+            $incomeQuery->where('user_id', $chatId);
+            $expenseQuery->where('user_id', $chatId);
+            $countQuery->where('user_id', $chatId);
             
             $totalIncome = $incomeQuery->sum('amount');
             $totalExpense = $expenseQuery->sum('amount');
