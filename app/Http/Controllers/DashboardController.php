@@ -106,6 +106,8 @@ class DashboardController extends Controller
                 'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
                 'type' => ['nullable', 'in:all,income,expense'],
                 'search' => ['nullable', 'string', 'max:255'],
+                'start_date' => ['nullable', 'date_format:Y-m-d'],
+                'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
                 'sort' => ['nullable', 'in:created_at,amount,type,description'],
                 'direction' => ['nullable', 'in:asc,desc'],
             ]);
@@ -142,6 +144,15 @@ class DashboardController extends Controller
                                ->orWhere('last_name', 'like', $search);
                       });
                 });
+            }
+
+            // Date range filter
+            if (!empty($validated['start_date'])) {
+                $query->whereDate('created_at', '>=', $validated['start_date']);
+            }
+
+            if (!empty($validated['end_date'])) {
+                $query->whereDate('created_at', '<=', $validated['end_date']);
             }
 
             // Sorting
