@@ -1,8 +1,11 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\TelegramController;
 use App\Http\Controllers\UserController;
+use App\Models\PageVisit;
 
 
 /*
@@ -16,7 +19,40 @@ use App\Http\Controllers\UserController;
 |
 */
 
-Route::get('/', function () {
+Route::get('/', function (Request $request) {
+    try {
+        $ipAddress = (string) $request->ip();
+        $userAgent = mb_substr((string) $request->userAgent(), 0, 1000);
+        $userAgentHash = $userAgent !== '' ? hash('sha256', $userAgent) : null;
+        $windowStart = now()->subMinutes(30);
+
+        $existingVisit = PageVisit::query()
+            ->where('path', '/')
+            ->where('ip_address', $ipAddress)
+            ->where('user_agent_hash', $userAgentHash)
+            ->where('last_seen_at', '>=', $windowStart)
+            ->latest('last_seen_at')
+            ->first();
+
+        if ($existingVisit) {
+            $existingVisit->hit_count = $existingVisit->hit_count + 1;
+            $existingVisit->last_seen_at = now();
+            $existingVisit->save();
+        } else {
+            PageVisit::create([
+                'path' => '/',
+                'ip_address' => $ipAddress,
+                'user_agent' => $userAgent,
+                'user_agent_hash' => $userAgentHash,
+                'hit_count' => 1,
+                'first_seen_at' => now(),
+                'last_seen_at' => now(),
+            ]);
+        }
+    } catch (\Throwable $e) {
+        Log::warning('Failed to record root page visit: ' . $e->getMessage());
+    }
+
     return view('login');
 });
 
