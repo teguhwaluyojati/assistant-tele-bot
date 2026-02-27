@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Exports\AuditLogsExport;
+use App\Models\PageVisit;
 use App\Traits\ApiResponse;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -111,5 +112,25 @@ class AuditLogController extends Controller
             new AuditLogsExport($startDate, $endDate, $search),
             $filename
         );
+    }
+
+    public function pageVisits(Request $request)
+    {
+        if ($response = $this->requireAdmin()) {
+            return $response;
+        }
+
+        $validated = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+
+        $perPage = $validated['per_page'] ?? 20;
+
+        $visits = PageVisit::query()
+            ->latest('last_seen_at')
+            ->paginate($perPage);
+
+        return $this->successResponse($visits, 'Page visits retrieved successfully.');
     }
 }

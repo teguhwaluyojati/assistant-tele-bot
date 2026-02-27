@@ -14,7 +14,9 @@ import FormField from '@/components/FormField.vue'
 import FormControl from '@/components/FormControl.vue'
 
 const logs = ref([])
+const pageVisits = ref([])
 const isLoading = ref(true)
+const isLoadingPageVisits = ref(true)
 const currentPage = ref(1)
 const lastPage = ref(1)
 const total = ref(0)
@@ -58,8 +60,31 @@ const fetchLogs = async () => {
   }
 }
 
+const fetchPageVisits = async () => {
+  isLoadingPageVisits.value = true
+  try {
+    const response = await axios.get('/api/audit-logs/page-visits', {
+      params: {
+        page: 1,
+        per_page: 20,
+      },
+    })
+
+    const paginated = response.data?.data
+    pageVisits.value = paginated?.data || []
+  } catch (error) {
+    pageVisits.value = []
+  } finally {
+    isLoadingPageVisits.value = false
+  }
+}
+
+const refreshAll = async () => {
+  await Promise.all([fetchLogs(), fetchPageVisits()])
+}
+
 onMounted(() => {
-  fetchLogs()
+  refreshAll()
 })
 
 const numPages = computed(() => lastPage.value)
@@ -193,7 +218,7 @@ const displayCauser = (log) => {
         <div class="flex gap-2">
           <BaseButton :icon="mdiDownload" color="whiteDark" @click="exportLogs" />
           <BaseButton :icon="mdiCog" color="whiteDark" @click="openFilterModal" />
-          <BaseButton :icon="mdiReload" color="whiteDark" @click="fetchLogs" />
+          <BaseButton :icon="mdiReload" color="whiteDark" @click="refreshAll" />
         </div>
       </SectionTitleLineWithButton>
 
@@ -282,6 +307,46 @@ const displayCauser = (log) => {
               <small>Page {{ currentPageHuman }} of {{ numPages }} (Total: {{ total }})</small>
             </BaseLevel>
           </div>
+        </div>
+      </CardBox>
+
+      <CardBox class="mt-6">
+        <div class="mb-4">
+          <h3 class="text-base font-semibold text-gray-800 dark:text-gray-100">Landing Page Visits (/)</h3>
+        </div>
+
+        <div v-if="isLoadingPageVisits" class="space-y-4 animate-pulse">
+          <div v-for="row in 4" :key="`visit-${row}`" class="flex items-center gap-4">
+            <div class="h-4 w-24 rounded bg-gray-200 dark:bg-slate-700"></div>
+            <div class="h-4 w-32 rounded bg-gray-200 dark:bg-slate-700"></div>
+            <div class="h-4 w-20 rounded bg-gray-200 dark:bg-slate-700"></div>
+            <div class="h-4 flex-1 rounded bg-gray-200 dark:bg-slate-700"></div>
+          </div>
+        </div>
+
+        <div v-else>
+          <div v-if="pageVisits.length === 0" class="text-center text-gray-500 dark:text-slate-400 p-6">
+            No landing-page visits yet.
+          </div>
+
+          <table v-else class="min-w-full text-gray-800 dark:text-gray-100">
+            <thead>
+              <tr class="text-left border-b border-gray-100 dark:border-slate-800">
+                <th class="py-2 px-3">Path</th>
+                <th class="py-2 px-3">IP</th>
+                <th class="py-2 px-3">Hits</th>
+                <th class="py-2 px-3">Last Seen</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="visit in pageVisits" :key="visit.id" class="border-b border-gray-100 dark:border-slate-800">
+                <td class="py-2 px-3 font-medium">{{ visit.path }}</td>
+                <td class="py-2 px-3 text-sm text-gray-500 dark:text-slate-400">{{ visit.ip_address || '-' }}</td>
+                <td class="py-2 px-3">{{ visit.hit_count }}</td>
+                <td class="py-2 px-3 text-sm text-gray-500 dark:text-slate-400">{{ formatDate(visit.last_seen_at) }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </CardBox>
 

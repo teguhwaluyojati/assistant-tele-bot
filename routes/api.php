@@ -55,6 +55,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/audit-logs', [AuditLogController::class, 'index']);
     Route::get('/audit-logs/export', [AuditLogController::class, 'export']);
+    Route::get('/audit-logs/page-visits', [AuditLogController::class, 'pageVisits']);
 });
 
 
