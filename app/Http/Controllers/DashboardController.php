@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Database\QueryException;
 use App\Traits\ApiResponse;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\StocksImport;
@@ -636,6 +637,10 @@ class DashboardController extends Controller
                 return $this->errorResponse('User not linked to Telegram account.', 403);
             }
 
+            if (empty($telegramUser->user_id)) {
+                return $this->errorResponse('Telegram account is not fully initialized. Please open the bot and send /start, then try again.', 422);
+            }
+
             $transactionTimestamp = isset($validated['transaction_date']) && $validated['transaction_date']
                 ? Carbon::createFromFormat('Y-m-d\\TH:i', $validated['transaction_date'], config('app.timezone'))
                 : now();
@@ -649,7 +654,24 @@ class DashboardController extends Controller
 
             $transaction->created_at = $transactionTimestamp;
             $transaction->updated_at = $transactionTimestamp;
-            $transaction->save();
+
+            try {
+                $transaction->save();
+            } catch (QueryException $e) {
+                $dbMessage = strtolower((string) ($e->errorInfo[2] ?? $e->getMessage()));
+                $isDuplicateTransactionPk = str_contains($dbMessage, 'transactions_pkey')
+                    || str_contains($dbMessage, 'duplicate key value violates unique constraint');
+
+                if (!$isDuplicateTransactionPk) {
+                    throw $e;
+                }
+
+                DB::statement(
+                    "SELECT setval(pg_get_serial_sequence('transactions', 'id'), COALESCE((SELECT MAX(id) FROM transactions), 1), true)"
+                );
+
+                $transaction->save();
+            }
 
             try {
                 activity()
@@ -675,6 +697,15 @@ class DashboardController extends Controller
             );
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed.', 422, $e->errors());
+        } catch (QueryException $e) {
+            Log::error('Database error creating transaction: ' . $e->getMessage(), [
+                'sql_state' => $e->errorInfo[0] ?? null,
+                'db_code' => $e->errorInfo[1] ?? null,
+                'db_detail' => $e->errorInfo[2] ?? null,
+                'user_id' => auth()->id(),
+            ]);
+
+            return $this->errorResponse('Transaction failed due to database constraint. Please verify your Telegram account linkage and try again.', 422);
         } catch (\Exception $e) {
             Log::error('Error creating transaction: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
