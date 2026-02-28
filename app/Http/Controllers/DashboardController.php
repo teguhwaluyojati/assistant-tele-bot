@@ -651,16 +651,23 @@ class DashboardController extends Controller
             $transaction->updated_at = $transactionTimestamp;
             $transaction->save();
 
-            activity()
-                ->causedBy($currentUser)
-                ->performedOn($transaction)
-                ->withProperties([
+            try {
+                activity()
+                    ->causedBy($currentUser)
+                    ->performedOn($transaction)
+                    ->withProperties([
+                        'transaction_id' => $transaction->id,
+                        'owner_user_id' => $transaction->user_id,
+                        'type' => $transaction->type,
+                        'amount' => $transaction->amount,
+                    ])
+                    ->log('create_transaction');
+            } catch (\Throwable $activityException) {
+                Log::warning('Transaction created but activity log failed: ' . $activityException->getMessage(), [
                     'transaction_id' => $transaction->id,
-                    'owner_user_id' => $transaction->user_id,
-                    'type' => $transaction->type,
-                    'amount' => $transaction->amount,
-                ])
-                ->log('create_transaction');
+                    'user_id' => $transaction->user_id,
+                ]);
+            }
 
             return $this->successResponse(
                 $transaction->load('user:id,user_id,username,first_name,last_name'),
@@ -669,7 +676,10 @@ class DashboardController extends Controller
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (\Exception $e) {
-            Log::error('Error creating transaction: ' . $e->getMessage());
+            Log::error('Error creating transaction: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'payload' => $request->only(['type', 'amount', 'transaction_date', 'description']),
+            ]);
             return $this->errorResponse('An error occurred while creating transaction.', 500);
         }
     }
