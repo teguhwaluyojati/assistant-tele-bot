@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted, watch } from 'vue'
 import axios from 'axios'
-import { mdiEye, mdiTrashCan, mdiPencil, mdiArrowUp, mdiArrowDown } from '@mdi/js'
+import { mdiEye, mdiTrashCan, mdiPencil, mdiArrowUp, mdiArrowDown, mdiCheckCircle, mdiAlertCircle } from '@mdi/js'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
@@ -54,6 +54,30 @@ const isMessageModalActive = ref(false)
 const messageModalTitle = ref('')
 const messageModalContent = ref('')
 const messageModalType = ref('success') // 'success' or 'error'
+
+const editToast = ref({
+  visible: false,
+  type: 'success',
+  message: '',
+})
+
+let editToastTimer = null
+
+const showEditToast = (type, message) => {
+  editToast.value = {
+    visible: true,
+    type,
+    message,
+  }
+
+  if (editToastTimer) {
+    clearTimeout(editToastTimer)
+  }
+
+  editToastTimer = setTimeout(() => {
+    editToast.value.visible = false
+  }, 2600)
+}
 
 const isBulkDeleteConfirmActive = ref(false)
 
@@ -242,21 +266,13 @@ const updateTransaction = async () => {
 
     isEditModalActive.value = false
     transactionToEdit.value = null
-    
-    // Show success modal
-    messageModalTitle.value = 'Success'
-    messageModalContent.value = 'Transaction updated successfully!'
-    messageModalType.value = 'success'
-    isMessageModalActive.value = true
+
+    showEditToast('success', 'Transaction updated successfully!')
   } catch (error) {
     console.error('Error updating transaction:', error)
     const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
-    
-    // Show error modal
-    messageModalTitle.value = 'Error'
-    messageModalContent.value = `Failed to update transaction: ${errorMsg}`
-    messageModalType.value = 'danger'
-    isMessageModalActive.value = true
+
+    showEditToast('error', `Failed to update transaction: ${errorMsg}`)
   }
 }
 
@@ -768,4 +784,22 @@ const bulkDeleteTransactions = async () => {
   >
     <p>{{ messageModalContent }}</p>
   </CardBoxModal>
+
+  <transition
+    enter-active-class="transition duration-200 ease-out"
+    enter-from-class="opacity-0 translate-y-2"
+    enter-to-class="opacity-100 translate-y-0"
+    leave-active-class="transition duration-150 ease-in"
+    leave-from-class="opacity-100 translate-y-0"
+    leave-to-class="opacity-0 translate-y-2"
+  >
+    <div
+      v-if="editToast.visible"
+      class="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white"
+      :class="editToast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'"
+    >
+      <BaseIcon :path="editToast.type === 'success' ? mdiCheckCircle : mdiAlertCircle" size="18" />
+      <span class="text-sm font-medium">{{ editToast.message }}</span>
+    </div>
+  </transition>
 </template>
