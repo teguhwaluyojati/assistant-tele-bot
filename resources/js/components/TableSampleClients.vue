@@ -155,6 +155,9 @@ const roleToastIcon = computed(() => (
 const roleButtonLabel = computed(() => (isUpdatingRole.value ? 'Saving...' : 'Save'))
 
 const isModalDangerActive = ref(false)
+const deleteTarget = ref(null)
+const isDeletingUser = ref(false)
+const deleteButtonLabel = computed(() => (isDeletingUser.value ? 'Deleting...' : 'Delete'))
 
 const perPage = ref(5)
 
@@ -307,6 +310,56 @@ const submitRoleUpdate = async () => {
     isUpdatingRole.value = false
   }
 }
+
+const openDeleteConfirm = (client) => {
+  deleteTarget.value = client
+  isModalDangerActive.value = true
+}
+
+const removeClientFromState = (userId) => {
+  const index = mainStore.clients.findIndex((client) => client.user_id === userId || client.id === userId)
+  if (index !== -1) {
+    mainStore.clients.splice(index, 1)
+  }
+
+  if (selectedUser.value && (selectedUser.value.user_id === userId || selectedUser.value.id === userId)) {
+    isModalActive.value = false
+    selectedUser.value = null
+    userCommands.value = []
+  }
+}
+
+const submitDeleteUser = async () => {
+  if (!deleteTarget.value || isDeletingUser.value) {
+    return
+  }
+
+  isDeletingUser.value = true
+
+  try {
+    const userId = deleteTarget.value.user_id
+    const userName = displayName(deleteTarget.value)
+
+    const { ok } = await runAction(
+      () => axios.delete(`/api/users/${userId}`),
+      {
+        errorPrefix: 'Failed to delete user',
+        fallbackMessage: 'Failed to delete user.',
+      }
+    )
+
+    if (!ok) {
+      return
+    }
+
+    removeClientFromState(userId)
+    notifyRoleSuccess(`User ${userName} deleted successfully.`)
+    isModalDangerActive.value = false
+    deleteTarget.value = null
+  } finally {
+    isDeletingUser.value = false
+  }
+}
 </script>
 
 <template>
@@ -384,9 +437,20 @@ const submitRoleUpdate = async () => {
     </div>
   </CardBoxModal>
 
-  <CardBoxModal v-model="isModalDangerActive" title="Please confirm" button="danger" has-cancel>
-    <p>Lorem ipsum dolor sit amet <b>adipiscing elit</b></p>
-    <p>This is sample modal</p>
+  <CardBoxModal
+    v-model="isModalDangerActive"
+    title="Delete User"
+    button="danger"
+    :button-label="deleteButtonLabel"
+    has-cancel
+    @confirm="submitDeleteUser"
+  >
+    <p v-if="deleteTarget" class="mb-3">
+      Are you sure you want to delete <b>{{ displayName(deleteTarget) }}</b>?
+    </p>
+    <p class="text-sm text-gray-500 dark:text-gray-400">
+      Related transactions and activity records tied to this Telegram user will be removed.
+    </p>
   </CardBoxModal>
 
   <transition
@@ -537,7 +601,7 @@ const submitRoleUpdate = async () => {
               color="danger"
               :icon="mdiTrashCan"
               small
-              @click="isModalDangerActive = true"
+              @click="openDeleteConfirm(client)"
             />
           </BaseButtons>
         </td>

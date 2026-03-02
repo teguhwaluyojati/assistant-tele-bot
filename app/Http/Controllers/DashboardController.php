@@ -620,6 +620,51 @@ class DashboardController extends Controller
         }
     }
 
+    public function deleteUser($userId)
+    {
+        if ($response = $this->requireAdmin()) {
+            return $response;
+        }
+
+        try {
+            $currentUser = auth()->user();
+            $targetUser = TelegramUser::where('user_id', $userId)->firstOrFail();
+
+            if ($currentUser && $currentUser->telegramUser && $currentUser->telegramUser->user_id === $targetUser->user_id) {
+                return $this->errorResponse('You cannot delete your own account.', 403);
+            }
+
+            $deletedSummary = DB::transaction(function () use ($targetUser) {
+                $deletedCommands = TelegramUserCommand::where('user_id', $targetUser->user_id)->delete();
+                $deletedPoopTrackers = DB::table('poop_tracker')->where('user_id', $targetUser->user_id)->delete();
+                $targetUser->delete();
+
+                return [
+                    'commands' => $deletedCommands,
+                    'poop_tracker' => $deletedPoopTrackers,
+                ];
+            });
+
+            activity()
+                ->causedBy($currentUser)
+                ->withProperties([
+                    'target_user_id' => $userId,
+                    'deleted_related' => $deletedSummary,
+                ])
+                ->log('delete_user');
+
+            return $this->successResponse([
+                'user_id' => (int) $userId,
+                'deleted_related' => $deletedSummary,
+            ], 'User deleted successfully.');
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return $this->errorResponse('User not found.', 404);
+        } catch (\Exception $e) {
+            Log::error('Error deleting user: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while deleting user.', 500);
+        }
+    }
+
     public function storeTransaction(Request $request)
     {
         try {
