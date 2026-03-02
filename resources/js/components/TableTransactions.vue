@@ -294,21 +294,13 @@ const deleteTransaction = async () => {
 
     isDeleteConfirmActive.value = false
     transactionToDelete.value = null
-    
-    // Show success modal
-    messageModalTitle.value = 'Success'
-    messageModalContent.value = 'Transaction deleted successfully!'
-    messageModalType.value = 'success'
-    isMessageModalActive.value = true
+
+    showEditToast('success', 'Transaction deleted successfully!')
   } catch (error) {
     console.error('Error deleting transaction:', error)
     const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
-    
-    // Show error modal
-    messageModalTitle.value = 'Error'
-    messageModalContent.value = `Failed to delete transaction: ${errorMsg}`
-    messageModalType.value = 'danger'
-    isMessageModalActive.value = true
+
+    showEditToast('error', `Failed to delete transaction: ${errorMsg}`)
   }
 }
 
