@@ -1,13 +1,14 @@
 <script setup>
 import { computed, ref } from 'vue'
 import axios from 'axios'
-import { mdiCartOutline, mdiCog, mdiDownload, mdiPlus, mdiReload } from '@mdi/js'
+import { mdiCartOutline, mdiCog, mdiDownload, mdiPlus, mdiReload, mdiCheckCircle, mdiAlertCircle } from '@mdi/js'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import CardBox from '@/components/CardBox.vue'
 import TableTransactions from '@/components/TableTransactions.vue'
 import BaseButton from '@/components/BaseButton.vue'
+import BaseIcon from '@/components/BaseIcon.vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import FormField from '@/components/FormField.vue'
 import FormControl from '@/components/FormControl.vue'
@@ -34,10 +35,29 @@ const createTransactionForm = ref({
 })
 const isSubmittingTransaction = ref(false)
 
-const isMessageModalOpen = ref(false)
-const messageModalTitle = ref('')
-const messageModalContent = ref('')
-const messageModalType = ref('success')
+const transactionToast = ref({
+  visible: false,
+  type: 'success',
+  message: '',
+})
+
+let transactionToastTimer = null
+
+const showTransactionToast = (type, message) => {
+  transactionToast.value = {
+    visible: true,
+    type,
+    message,
+  }
+
+  if (transactionToastTimer) {
+    clearTimeout(transactionToastTimer)
+  }
+
+  transactionToastTimer = setTimeout(() => {
+    transactionToast.value.visible = false
+  }, 2600)
+}
 
 const formattedAmount = computed({
   get: () => {
@@ -98,18 +118,12 @@ const resetCreateTransactionForm = () => {
 
 const submitTransaction = async () => {
   if (!createTransactionForm.value.amount || Number(createTransactionForm.value.amount) <= 0) {
-    messageModalTitle.value = 'Error'
-    messageModalContent.value = 'Amount must be greater than 0.'
-    messageModalType.value = 'danger'
-    isMessageModalOpen.value = true
+    showTransactionToast('error', 'Amount must be greater than 0.')
     return
   }
 
   if (!createTransactionForm.value.description?.trim()) {
-    messageModalTitle.value = 'Error'
-    messageModalContent.value = 'Description is required.'
-    messageModalType.value = 'danger'
-    isMessageModalOpen.value = true
+    showTransactionToast('error', 'Description is required.')
     return
   }
 
@@ -125,17 +139,10 @@ const submitTransaction = async () => {
     isCreateTransactionModalOpen.value = false
     resetCreateTransactionForm()
     transactionsTableKey.value += 1
-
-    messageModalTitle.value = 'Success'
-    messageModalContent.value = 'Transaction created successfully!'
-    messageModalType.value = 'success'
-    isMessageModalOpen.value = true
+    showTransactionToast('success', 'Transaction created successfully!')
   } catch (error) {
     const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
-    messageModalTitle.value = 'Error'
-    messageModalContent.value = `Failed to create transaction: ${errorMsg}`
-    messageModalType.value = 'danger'
-    isMessageModalOpen.value = true
+    showTransactionToast('error', `Failed to create transaction: ${errorMsg}`)
   } finally {
     isSubmittingTransaction.value = false
   }
@@ -280,15 +287,23 @@ const exportTransactions = async () => {
         </div>
       </CardBoxModal>
 
-      <CardBoxModal
-        v-model="isMessageModalOpen"
-        :title="messageModalTitle"
-        :button="messageModalType"
-        button-label="OK"
-        @confirm="isMessageModalOpen = false"
+      <transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 translate-y-2"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 translate-y-2"
       >
-        <p>{{ messageModalContent }}</p>
-      </CardBoxModal>
+        <div
+          v-if="transactionToast.visible"
+          class="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white"
+          :class="transactionToast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'"
+        >
+          <BaseIcon :path="transactionToast.type === 'success' ? mdiCheckCircle : mdiAlertCircle" size="18" />
+          <span class="text-sm font-medium">{{ transactionToast.message }}</span>
+        </div>
+      </transition>
     </SectionMain>
   </LayoutAuthenticated>
 </template>
