@@ -365,20 +365,12 @@ const bulkDeleteTransactions = async () => {
 
     isBulkDeleteConfirmActive.value = false
 
-    // Show success modal
-    messageModalTitle.value = 'Success'
-    messageModalContent.value = `${response.data.data.deleted} transaction(s) deleted successfully!`
-    messageModalType.value = 'success'
-    isMessageModalActive.value = true
+    showEditToast('success', `${response.data.data.deleted} transaction(s) deleted successfully!`)
   } catch (error) {
     console.error('Error bulk deleting transactions:', error)
     const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
 
-    // Show error modal
-    messageModalTitle.value = 'Error'
-    messageModalContent.value = `Failed to delete transactions: ${errorMsg}`
-    messageModalType.value = 'danger'
-    isMessageModalActive.value = true
+    showEditToast('error', `Failed to delete transactions: ${errorMsg}`)
   }
 }
 </script>
