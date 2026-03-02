@@ -250,6 +250,7 @@ onMounted(async () => {
       <CardBoxModal
         v-model="isCreateUserModalOpen"
         title="Add New User"
+        :wide="true"
         button="success"
         :button-label="isSubmittingUser ? 'Submitting...' : 'Submit'"
         :has-cancel="true"

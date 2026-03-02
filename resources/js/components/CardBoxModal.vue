@@ -25,6 +25,10 @@ const props = defineProps({
     type: [String, Number, Boolean],
     default: null,
   },
+  wide: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const emit = defineEmits(['update:modelValue', 'cancel', 'confirm'])
@@ -33,6 +37,12 @@ const value = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value),
 })
+
+const modalWidthClass = computed(() => (
+  props.wide
+    ? 'w-11/12 md:w-4/5 lg:w-3/5 xl:w-1/2'
+    : 'w-11/12 md:w-3/5 lg:w-2/5 xl:w-4/12'
+))
 
 const confirmCancel = (mode) => {
   value.value = false
@@ -54,7 +64,8 @@ window.addEventListener('keydown', (e) => {
   <OverlayLayer v-show="value" @overlay-click="cancel">
     <CardBox
       v-show="value"
-      class="shadow-lg max-h-modal w-11/12 md:w-3/5 lg:w-2/5 xl:w-4/12 z-50 rounded-2xl overflow-hidden"
+      class="shadow-lg max-h-modal z-50 rounded-2xl overflow-hidden"
+      :class="modalWidthClass"
       is-modal
     >
       <CardBoxComponentTitle :title="title">
