@@ -12,6 +12,7 @@ import BaseIcon from '@/components/BaseIcon.vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import FormField from '@/components/FormField.vue'
 import FormControl from '@/components/FormControl.vue'
+import { useToast } from '@/composables/useToast'
 
 const isTransactionFilterModalOpen = ref(false)
 const transactionFilterStartDate = ref('')
@@ -35,29 +36,7 @@ const createTransactionForm = ref({
 })
 const isSubmittingTransaction = ref(false)
 
-const transactionToast = ref({
-  visible: false,
-  type: 'success',
-  message: '',
-})
-
-let transactionToastTimer = null
-
-const showTransactionToast = (type, message) => {
-  transactionToast.value = {
-    visible: true,
-    type,
-    message,
-  }
-
-  if (transactionToastTimer) {
-    clearTimeout(transactionToastTimer)
-  }
-
-  transactionToastTimer = setTimeout(() => {
-    transactionToast.value.visible = false
-  }, 2600)
-}
+const { toast: transactionToast, showToast: showTransactionToast } = useToast(2600)
 
 const formattedAmount = computed({
   get: () => {

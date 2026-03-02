@@ -9,6 +9,7 @@ import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
 import FormField from '@/components/FormField.vue'
 import FormControl from '@/components/FormControl.vue'
+import { useToast } from '@/composables/useToast'
 
 const props = defineProps({
   dateStart: {
@@ -55,29 +56,7 @@ const messageModalTitle = ref('')
 const messageModalContent = ref('')
 const messageModalType = ref('success') // 'success' or 'error'
 
-const transactionToast = ref({
-  visible: false,
-  type: 'success',
-  message: '',
-})
-
-let transactionToastTimer = null
-
-const showTransactionToast = (type, message) => {
-  transactionToast.value = {
-    visible: true,
-    type,
-    message,
-  }
-
-  if (transactionToastTimer) {
-    clearTimeout(transactionToastTimer)
-  }
-
-  transactionToastTimer = setTimeout(() => {
-    transactionToast.value.visible = false
-  }, 2600)
-}
+const { toast: transactionToast, showToast: showTransactionToast } = useToast(2600)
 
 const isBulkDeleteConfirmActive = ref(false)
 
