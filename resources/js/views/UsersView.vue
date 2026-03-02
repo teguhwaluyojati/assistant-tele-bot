@@ -256,6 +256,7 @@ onMounted(async () => {
         @confirm="submitCreateUser"
         @cancel="isCreateUserModalOpen = false"
       >
+        <div class="max-h-[60vh] overflow-y-auto pr-1">
         <FormField label="Full Name" label-for="new-user-name">
           <FormControl
             id="new-user-name"
@@ -311,6 +312,7 @@ onMounted(async () => {
             placeholder="Repeat password"
           />
         </FormField>
+        </div>
       </CardBoxModal>
 
       <CardBoxModal
