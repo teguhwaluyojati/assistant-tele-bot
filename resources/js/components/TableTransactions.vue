@@ -55,27 +55,27 @@ const messageModalTitle = ref('')
 const messageModalContent = ref('')
 const messageModalType = ref('success') // 'success' or 'error'
 
-const editToast = ref({
+const transactionToast = ref({
   visible: false,
   type: 'success',
   message: '',
 })
 
-let editToastTimer = null
+let transactionToastTimer = null
 
-const showEditToast = (type, message) => {
-  editToast.value = {
+const showTransactionToast = (type, message) => {
+  transactionToast.value = {
     visible: true,
     type,
     message,
   }
 
-  if (editToastTimer) {
-    clearTimeout(editToastTimer)
+  if (transactionToastTimer) {
+    clearTimeout(transactionToastTimer)
   }
 
-  editToastTimer = setTimeout(() => {
-    editToast.value.visible = false
+  transactionToastTimer = setTimeout(() => {
+    transactionToast.value.visible = false
   }, 2600)
 }
 
@@ -267,12 +267,12 @@ const updateTransaction = async () => {
     isEditModalActive.value = false
     transactionToEdit.value = null
 
-    showEditToast('success', 'Transaction updated successfully!')
+    showTransactionToast('success', 'Transaction updated successfully!')
   } catch (error) {
     console.error('Error updating transaction:', error)
     const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
 
-    showEditToast('error', `Failed to update transaction: ${errorMsg}`)
+    showTransactionToast('error', `Failed to update transaction: ${errorMsg}`)
   }
 }
 
@@ -295,12 +295,12 @@ const deleteTransaction = async () => {
     isDeleteConfirmActive.value = false
     transactionToDelete.value = null
 
-    showEditToast('success', 'Transaction deleted successfully!')
+    showTransactionToast('success', 'Transaction deleted successfully!')
   } catch (error) {
     console.error('Error deleting transaction:', error)
     const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
 
-    showEditToast('error', `Failed to delete transaction: ${errorMsg}`)
+    showTransactionToast('error', `Failed to delete transaction: ${errorMsg}`)
   }
 }
 
@@ -365,12 +365,12 @@ const bulkDeleteTransactions = async () => {
 
     isBulkDeleteConfirmActive.value = false
 
-    showEditToast('success', `${response.data.data.deleted} transaction(s) deleted successfully!`)
+    showTransactionToast('success', `${response.data.data.deleted} transaction(s) deleted successfully!`)
   } catch (error) {
     console.error('Error bulk deleting transactions:', error)
     const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
 
-    showEditToast('error', `Failed to delete transactions: ${errorMsg}`)
+    showTransactionToast('error', `Failed to delete transactions: ${errorMsg}`)
   }
 }
 </script>
@@ -778,12 +778,12 @@ const bulkDeleteTransactions = async () => {
     leave-to-class="opacity-0 translate-y-2"
   >
     <div
-      v-if="editToast.visible"
+      v-if="transactionToast.visible"
       class="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white"
-      :class="editToast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'"
+      :class="transactionToast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'"
     >
-      <BaseIcon :path="editToast.type === 'success' ? mdiCheckCircle : mdiAlertCircle" size="18" />
-      <span class="text-sm font-medium">{{ editToast.message }}</span>
+      <BaseIcon :path="transactionToast.type === 'success' ? mdiCheckCircle : mdiAlertCircle" size="18" />
+      <span class="text-sm font-medium">{{ transactionToast.message }}</span>
     </div>
   </transition>
 </template>
