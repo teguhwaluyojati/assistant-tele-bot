@@ -1,7 +1,7 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
-import { mdiAccountMultiple, mdiMonitorCellphone, mdiCog, mdiReload, mdiDownload } from '@mdi/js'
+import { mdiAccountMultiple, mdiMonitorCellphone, mdiCog, mdiReload, mdiDownload, mdiCheckCircle, mdiAlertCircle, mdiInformation } from '@mdi/js'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
@@ -13,7 +13,9 @@ import BaseButton from '@/components/BaseButton.vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import FormField from '@/components/FormField.vue'
 import FormControl from '@/components/FormControl.vue'
+import BaseIcon from '@/components/BaseIcon.vue'
 import { useMainStore } from '@/stores/main'
+import { useActionToast } from '@/composables/useActionToast'
 
 const mainStore = useMainStore()
 const isClientsLoading = ref(false)
@@ -22,6 +24,31 @@ const commandFilterStartDate = ref('')
 const commandFilterEndDate = ref('')
 const commandsRefreshKey = ref(0)
 const commandSearchQuery = ref('')
+const { toast: usersToast, error: notifyUsersError, runAction } = useActionToast(2600)
+
+const usersToastClass = computed(() => {
+  if (usersToast.value.type === 'success') {
+    return 'bg-emerald-500'
+  }
+
+  if (usersToast.value.type === 'info') {
+    return 'bg-blue-500'
+  }
+
+  return 'bg-red-500'
+})
+
+const usersToastIcon = computed(() => {
+  if (usersToast.value.type === 'success') {
+    return mdiCheckCircle
+  }
+
+  if (usersToast.value.type === 'info') {
+    return mdiInformation
+  }
+
+  return mdiAlertCircle
+})
 
 const openCommandFilterModal = () => {
   isCommandFilterModalOpen.value = true
@@ -30,6 +57,7 @@ const openCommandFilterModal = () => {
 const applyCommandDateFilter = () => {
   if (commandFilterStartDate.value && commandFilterEndDate.value) {
     if (commandFilterStartDate.value > commandFilterEndDate.value) {
+      notifyUsersError('Start date must be before end date.')
       return
     }
   }
@@ -49,35 +77,42 @@ const refreshCommands = () => {
 }
 
 const exportUserCommands = async () => {
-  try {
-    const params = {}
+  const params = {}
 
-    if (commandFilterStartDate.value) {
-      params.start_date = commandFilterStartDate.value
-    }
-    if (commandFilterEndDate.value) {
-      params.end_date = commandFilterEndDate.value
-    }
-    if (commandSearchQuery.value?.trim()) {
-      params.search = commandSearchQuery.value.trim()
-    }
-
-    const response = await axios.get('/api/users/commands/export', {
-      params,
-      responseType: 'blob',
-    })
-
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.setAttribute('download', `user-commands-${new Date().toISOString().split('T')[0]}.xlsx`)
-    document.body.appendChild(link)
-    link.click()
-    link.parentNode.removeChild(link)
-    window.URL.revokeObjectURL(url)
-  } catch (error) {
-    console.error('Error exporting user commands:', error)
+  if (commandFilterStartDate.value) {
+    params.start_date = commandFilterStartDate.value
   }
+  if (commandFilterEndDate.value) {
+    params.end_date = commandFilterEndDate.value
+  }
+  if (commandSearchQuery.value?.trim()) {
+    params.search = commandSearchQuery.value.trim()
+  }
+
+  await runAction(
+    async () => {
+      const response = await axios.get('/api/users/commands/export', {
+        params,
+        responseType: 'blob',
+      })
+
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', `user-commands-${new Date().toISOString().split('T')[0]}.xlsx`)
+      document.body.appendChild(link)
+      link.click()
+      link.parentNode.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    },
+    {
+      successMessage: 'User commands exported successfully!',
+      errorPrefix: 'Failed to export user commands',
+      onError: (error) => {
+        console.error('Error exporting user commands:', error)
+      },
+    }
+  )
 }
 
 onMounted(async () => {
@@ -135,6 +170,24 @@ onMounted(async () => {
           <BaseButton label="Clear Filter" color="whiteDark" outline @click="clearCommandFilter" />
         </div>
       </CardBoxModal>
+
+      <transition
+        enter-active-class="transition duration-200 ease-out"
+        enter-from-class="opacity-0 translate-y-2"
+        enter-to-class="opacity-100 translate-y-0"
+        leave-active-class="transition duration-150 ease-in"
+        leave-from-class="opacity-100 translate-y-0"
+        leave-to-class="opacity-0 translate-y-2"
+      >
+        <div
+          v-if="usersToast.visible"
+          class="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white"
+          :class="usersToastClass"
+        >
+          <BaseIcon :path="usersToastIcon" size="18" />
+          <span class="text-sm font-medium">{{ usersToast.message }}</span>
+        </div>
+      </transition>
     </SectionMain>
   </LayoutAuthenticated>
 </template>

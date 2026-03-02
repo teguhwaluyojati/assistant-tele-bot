@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onBeforeUnmount } from 'vue'
+import { computed, ref } from 'vue'
 import { useMainStore } from '@/stores/main'
 import {
   mdiEye,
@@ -19,6 +19,7 @@ import BaseIcon from '@/components/BaseIcon.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import FormControl from '@/components/FormControl.vue'
 import axios from 'axios'
+import { useActionToast } from '@/composables/useActionToast'
 
 defineProps({
   checkable: Boolean,
@@ -141,22 +142,16 @@ const roleTarget = ref(null)
 const roleValue = ref(2)
 const roleError = ref('')
 const isUpdatingRole = ref(false)
-const roleToast = ref({
-  visible: false,
-  type: 'success',
-  message: '',
-})
+const { toast: roleToast, success: notifyRoleSuccess, error: notifyRoleError, runAction } = useActionToast(2500)
 
-let roleToastTimer = null
-
-const roleToastClass = computed(() =>
+const roleToastClass = computed(() => (
   roleToast.value.type === 'success'
     ? 'bg-emerald-500 text-white'
-    : 'bg-red-500 text-white',
-)
-const roleToastIcon = computed(() =>
-  roleToast.value.type === 'success' ? mdiCheckCircle : mdiAlertCircle,
-)
+    : 'bg-red-500 text-white'
+))
+const roleToastIcon = computed(() => (
+  roleToast.value.type === 'success' ? mdiCheckCircle : mdiAlertCircle
+))
 const roleButtonLabel = computed(() => (isUpdatingRole.value ? 'Saving...' : 'Save'))
 
 const isModalDangerActive = ref(false)
@@ -258,22 +253,6 @@ const openRoleModal = (client) => {
   isRoleModalActive.value = true
 }
 
-const showRoleToast = (type, message) => {
-  roleToast.value = {
-    visible: true,
-    type,
-    message,
-  }
-
-  if (roleToastTimer) {
-    clearTimeout(roleToastTimer)
-  }
-
-  roleToastTimer = setTimeout(() => {
-    roleToast.value.visible = false
-  }, 2500)
-}
-
 const updateClientLevel = (userId, level) => {
   const index = mainStore.clients.findIndex((client) => client.user_id === userId || client.id === userId)
   if (index !== -1) {
@@ -300,34 +279,34 @@ const submitRoleUpdate = async () => {
   roleError.value = ''
 
   try {
-    const response = await axios.put(`/api/users/${roleTarget.value.user_id}/role`, {
-      level: roleValue.value,
-    })
+    const { ok, result } = await runAction(
+      () => axios.put(`/api/users/${roleTarget.value.user_id}/role`, {
+        level: roleValue.value,
+      }),
+      {
+        errorPrefix: 'Failed to update role',
+        fallbackMessage: 'Failed to update role.',
+      }
+    )
 
-    if (response.data?.success) {
-      updateClientLevel(roleTarget.value.user_id, roleValue.value)
-      showRoleToast(
-        'success',
-        `Role for ${displayName(roleTarget.value)} updated to ${getLevelLabel(roleValue.value)}.`,
-      )
-      isRoleModalActive.value = false
-    } else {
-      roleError.value = response.data?.message || 'Failed to update role.'
-      showRoleToast('error', roleError.value)
+    if (!ok) {
+      roleError.value = 'Failed to update role.'
+      return
     }
-  } catch (error) {
-    roleError.value = error.response?.data?.message || 'Failed to update role.'
-    showRoleToast('error', roleError.value)
+
+    if (result.data?.success) {
+      updateClientLevel(roleTarget.value.user_id, roleValue.value)
+      notifyRoleSuccess(`Role for ${displayName(roleTarget.value)} updated to ${getLevelLabel(roleValue.value)}.`)
+      isRoleModalActive.value = false
+      return
+    }
+
+    roleError.value = result.data?.message || 'Failed to update role.'
+    notifyRoleError(roleError.value)
   } finally {
     isUpdatingRole.value = false
   }
 }
-
-onBeforeUnmount(() => {
-  if (roleToastTimer) {
-    clearTimeout(roleToastTimer)
-  }
-})
 </script>
 
 <template>

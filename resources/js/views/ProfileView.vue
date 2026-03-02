@@ -1,7 +1,7 @@
 <script setup>
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useMainStore } from '@/stores/main'
-import { mdiAccount, mdiMail, mdiAsterisk, mdiFormTextboxPassword, mdiGithub } from '@mdi/js'
+import { mdiAccount, mdiMail, mdiAsterisk, mdiFormTextboxPassword, mdiCheckCircle, mdiAlertCircle, mdiInformation } from '@mdi/js'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBox from '@/components/CardBox.vue'
 import BaseDivider from '@/components/BaseDivider.vue'
@@ -9,10 +9,12 @@ import FormField from '@/components/FormField.vue'
 import FormControl from '@/components/FormControl.vue'
 import FormFilePicker from '@/components/FormFilePicker.vue'
 import BaseButton from '@/components/BaseButton.vue'
+import BaseIcon from '@/components/BaseIcon.vue'
 import UserCard from '@/components/UserCard.vue'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
 import axios from 'axios'
+import { useActionToast } from '@/composables/useActionToast'
 
 const mainStore = useMainStore()
 
@@ -33,28 +35,31 @@ const handleFileUpload = (event) => {
 };
 
 const isLoading = ref(false);
+const { toast: profileToast, runAction } = useActionToast(3000)
 
-const alertState = reactive({
-  show: false,
-  message: '',
-  type: 'success', 
-  title: '',
-});
+const profileToastClass = computed(() => {
+  if (profileToast.value.type === 'success') {
+    return 'bg-emerald-500'
+  }
 
-const showAlert = (message, type = 'success', title = '') => {
-  alertState.message = message;
-  alertState.type = type;
-  alertState.title = title;
-  alertState.show = true;
+  if (profileToast.value.type === 'info') {
+    return 'bg-blue-500'
+  }
 
-  setTimeout(() => {
-    alertState.show = false;
-  }, 5000); 
-};
+  return 'bg-red-500'
+})
 
-const closeAlert = () => {
-  alertState.show = false;
-};
+const profileToastIcon = computed(() => {
+  if (profileToast.value.type === 'success') {
+    return mdiCheckCircle
+  }
+
+  if (profileToast.value.type === 'info') {
+    return mdiInformation
+  }
+
+  return mdiAlertCircle
+})
 
 const submitProfile = async () => {
   
@@ -62,7 +67,7 @@ const submitProfile = async () => {
 
   try {
     const formData = new FormData()
-    
+
     formData.append('name', profileForm.name)
     formData.append('email', profileForm.email)
 
@@ -72,34 +77,30 @@ const submitProfile = async () => {
 
     formData.append('_method', 'PUT')
 
-    const response = await axios.post('/api/update-profile', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
+    const { ok, result } = await runAction(
+      () => axios.post('/api/update-profile', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }),
+      {
+        successMessage: 'Profile updated successfully.',
+        errorPrefix: 'Failed to update profile',
+        fallbackMessage: 'Terjadi kesalahan saat memperbarui profil.',
+        onError: (error) => {
+          console.error('Error updating profile:', error)
+        },
       }
-    })
+    )
 
-    console.log('Profile updated successfully:', response.data)
-
-    mainStore.setUser(response.data.user)
-
-    localStorage.setItem('user', JSON.stringify(response.data.user))
-    
-    avatarFile.value = null
-
-    showAlert('Profile updated successfully.', 'success', 'Success')
-
-  } catch (error) {
-    console.error('Error updating profile:', error)
-    let errorMessage = 'Terjadi kesalahan saat memperbarui profil.'
-    
-    if (error.response) {
-      if (error.response.status === 422) {
-        errorMessage = error.response.data.message || 'Data not valid.'
-      } else {
-        errorMessage = error.response.data.message || errorMessage
-      }
+    if (!ok) {
+      return
     }
-    showAlert(errorMessage, 'error', 'Error')
+
+    console.log('Profile updated successfully:', result.data)
+    mainStore.setUser(result.data.user)
+    localStorage.setItem('user', JSON.stringify(result.data.user))
+    avatarFile.value = null
   } finally {
     isLoading.value = false;
   }
@@ -110,26 +111,30 @@ const submitPass = async() => {
   isLoading.value = true;
 
   try{
-    const response = await axios.post('/api/change-password',{
-      current_password: passwordForm.password_current,
-      new_password: passwordForm.password,
-      new_password_confirmation: passwordForm.password_confirmation,
-    })
-
-    console.log('Password changed successfully:', response.data)
-    showAlert('Password updated successfully.', 'success', 'Success')
-
-  }catch(error){
-    console.error('Error changing password:', error)
-    let errorMessage = 'Something went wrong while changing password.';
-    if(error.response){
-      if(error.response.status === 422){
-        errorMessage = error.response.data.message || 'Data not valid.';
-      }else {
-        errorMessage = error.response.data.message || errorMessage;
+    const { ok, result } = await runAction(
+      () => axios.post('/api/change-password',{
+        current_password: passwordForm.password_current,
+        new_password: passwordForm.password,
+        new_password_confirmation: passwordForm.password_confirmation,
+      }),
+      {
+        successMessage: 'Password updated successfully.',
+        errorPrefix: 'Failed to update password',
+        fallbackMessage: 'Something went wrong while changing password.',
+        onError: (error) => {
+          console.error('Error changing password:', error)
+        },
       }
+    )
+
+    if (!ok) {
+      return
     }
-    alert(errorMessage);
+
+    console.log('Password changed successfully:', result.data)
+    passwordForm.password_current = ''
+    passwordForm.password = ''
+    passwordForm.password_confirmation = ''
   } finally{
     isLoading.value = false;
   }
@@ -232,22 +237,21 @@ const submitPass = async() => {
       </div>
     </div>
 
-    <div v-if="alertState.show" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm">
-      <div class="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl flex flex-col items-center text-center max-w-sm w-full border border-gray-100 dark:border-slate-700">
-        
-        <div v-if="alertState.type === 'success'" class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-          <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-        </div>
-        <div v-else class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-          <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-        </div>
-
-        <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-2">{{ alertState.title }}</h3>
-        <p class="text-gray-500 dark:text-gray-400 mb-6">{{ alertState.message }}</p>
-
-        <button @click="closeAlert" class="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition">
-          Ok, got it!
-        </button>
+    <transition
+      enter-active-class="transition duration-200 ease-out"
+      enter-from-class="opacity-0 translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition duration-150 ease-in"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 translate-y-2"
+    >
+      <div
+        v-if="profileToast.visible"
+        class="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white"
+        :class="profileToastClass"
+      >
+        <BaseIcon :path="profileToastIcon" size="18" />
+        <span class="text-sm font-medium">{{ profileToast.message }}</span>
       </div>
-    </div>
+    </transition>
 </template>

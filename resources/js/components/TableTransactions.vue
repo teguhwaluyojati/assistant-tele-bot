@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted, watch } from 'vue'
 import axios from 'axios'
-import { mdiEye, mdiTrashCan, mdiPencil, mdiArrowUp, mdiArrowDown, mdiCheckCircle, mdiAlertCircle } from '@mdi/js'
+import { mdiEye, mdiTrashCan, mdiPencil, mdiArrowUp, mdiArrowDown, mdiCheckCircle, mdiAlertCircle, mdiInformation } from '@mdi/js'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import BaseLevel from '@/components/BaseLevel.vue'
 import BaseButtons from '@/components/BaseButtons.vue'
@@ -9,7 +9,7 @@ import BaseButton from '@/components/BaseButton.vue'
 import BaseIcon from '@/components/BaseIcon.vue'
 import FormField from '@/components/FormField.vue'
 import FormControl from '@/components/FormControl.vue'
-import { useToast } from '@/composables/useToast'
+import { useActionToast } from '@/composables/useActionToast'
 
 const props = defineProps({
   dateStart: {
@@ -50,15 +50,33 @@ const editForm = ref({
 
 const isDeleteConfirmActive = ref(false)
 const transactionToDelete = ref(null)
-
-const isMessageModalActive = ref(false)
-const messageModalTitle = ref('')
-const messageModalContent = ref('')
-const messageModalType = ref('success') // 'success' or 'error'
-
-const { toast: transactionToast, showToast: showTransactionToast } = useToast(2600)
+const { toast: transactionToast, success: notifyTransactionSuccess, runAction } = useActionToast(2600)
 
 const isBulkDeleteConfirmActive = ref(false)
+
+const showTransactionToastClass = computed(() => {
+  if (transactionToast.value.type === 'success') {
+    return 'bg-emerald-500'
+  }
+
+  if (transactionToast.value.type === 'info') {
+    return 'bg-blue-500'
+  }
+
+  return 'bg-red-500'
+})
+
+const showTransactionToastIcon = computed(() => {
+  if (transactionToast.value.type === 'success') {
+    return mdiCheckCircle
+  }
+
+  if (transactionToast.value.type === 'info') {
+    return mdiInformation
+  }
+
+  return mdiAlertCircle
+})
 
 const formatCurrency = (value) => {
   return new Intl.NumberFormat('id-ID', {
@@ -231,28 +249,28 @@ const openEditModal = (transaction) => {
 const updateTransaction = async () => {
   if (!transactionToEdit.value) return
 
-  try {
-    const response = await axios.put(
-      `/api/transactions/${transactionToEdit.value.id}`,
-      editForm.value
-    )
-
-    // Update in list
-    const index = transactions.value.findIndex((t) => t.id === transactionToEdit.value.id)
-    if (index !== -1) {
-      transactions.value[index] = response.data.data
+  const { ok, result } = await runAction(
+    () => axios.put(`/api/transactions/${transactionToEdit.value.id}`, editForm.value),
+    {
+      successMessage: 'Transaction updated successfully!',
+      errorPrefix: 'Failed to update transaction',
+      onError: (errorObj) => {
+        console.error('Error updating transaction:', errorObj)
+      },
     }
+  )
 
-    isEditModalActive.value = false
-    transactionToEdit.value = null
-
-    showTransactionToast('success', 'Transaction updated successfully!')
-  } catch (error) {
-    console.error('Error updating transaction:', error)
-    const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
-
-    showTransactionToast('error', `Failed to update transaction: ${errorMsg}`)
+  if (!ok) {
+    return
   }
+
+  const index = transactions.value.findIndex((t) => t.id === transactionToEdit.value.id)
+  if (index !== -1) {
+    transactions.value[index] = result.data.data
+  }
+
+  isEditModalActive.value = false
+  transactionToEdit.value = null
 }
 
 const openDeleteConfirm = (transaction) => {
@@ -263,24 +281,26 @@ const openDeleteConfirm = (transaction) => {
 const deleteTransaction = async () => {
   if (!transactionToDelete.value) return
 
-  try {
-    const response = await axios.delete(`/api/transactions/${transactionToDelete.value.id}`)
+  const idToDelete = transactionToDelete.value.id
 
-    // Remove from list
-    transactions.value = transactions.value.filter(
-      (t) => t.id !== transactionToDelete.value.id
-    )
+  const { ok } = await runAction(
+    () => axios.delete(`/api/transactions/${idToDelete}`),
+    {
+      successMessage: 'Transaction deleted successfully!',
+      errorPrefix: 'Failed to delete transaction',
+      onError: (errorObj) => {
+        console.error('Error deleting transaction:', errorObj)
+      },
+    }
+  )
 
-    isDeleteConfirmActive.value = false
-    transactionToDelete.value = null
-
-    showTransactionToast('success', 'Transaction deleted successfully!')
-  } catch (error) {
-    console.error('Error deleting transaction:', error)
-    const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
-
-    showTransactionToast('error', `Failed to delete transaction: ${errorMsg}`)
+  if (!ok) {
+    return
   }
+
+  transactions.value = transactions.value.filter((t) => t.id !== idToDelete)
+  isDeleteConfirmActive.value = false
+  transactionToDelete.value = null
 }
 
 const clearFilters = () => {
@@ -329,28 +349,29 @@ const openBulkDeleteConfirm = () => {
 const bulkDeleteTransactions = async () => {
   if (selectedCount.value === 0) return
 
-  try {
-    const selectedIds = Array.from(selectedTransactions.value)
-    const response = await axios.post('/api/transactions/bulk-delete', {
-      ids: selectedIds,
-    })
+  const selectedIds = Array.from(selectedTransactions.value)
 
-    // Remove deleted transactions from list
-    transactions.value = transactions.value.filter(
-      (t) => !selectedTransactions.value.has(t.id)
-    )
-    selectedTransactions.value.clear()
-    selectAll.value = false
+  const { ok, result } = await runAction(
+    () => axios.post('/api/transactions/bulk-delete', { ids: selectedIds }),
+    {
+      errorPrefix: 'Failed to delete transactions',
+      onError: (errorObj) => {
+        console.error('Error bulk deleting transactions:', errorObj)
+      },
+    }
+  )
 
-    isBulkDeleteConfirmActive.value = false
-
-    showTransactionToast('success', `${response.data.data.deleted} transaction(s) deleted successfully!`)
-  } catch (error) {
-    console.error('Error bulk deleting transactions:', error)
-    const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
-
-    showTransactionToast('error', `Failed to delete transactions: ${errorMsg}`)
+  if (!ok) {
+    return
   }
+
+  transactions.value = transactions.value.filter((t) => !selectedTransactions.value.has(t.id))
+  selectedTransactions.value.clear()
+  selectAll.value = false
+  isBulkDeleteConfirmActive.value = false
+
+  const deletedCount = result.data?.data?.deleted ?? selectedIds.length
+  notifyTransactionSuccess(`${deletedCount} transaction(s) deleted successfully!`)
 }
 </script>
 
@@ -737,17 +758,6 @@ const bulkDeleteTransactions = async () => {
     </p>
   </CardBoxModal>
 
-  <!-- Message Modal (Success/Error) -->
-  <CardBoxModal
-    v-model="isMessageModalActive"
-    :title="messageModalTitle"
-    :button="messageModalType"
-    button-label="OK"
-    @confirm="isMessageModalActive = false"
-  >
-    <p>{{ messageModalContent }}</p>
-  </CardBoxModal>
-
   <transition
     enter-active-class="transition duration-200 ease-out"
     enter-from-class="opacity-0 translate-y-2"
@@ -759,9 +769,9 @@ const bulkDeleteTransactions = async () => {
     <div
       v-if="transactionToast.visible"
       class="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white"
-      :class="transactionToast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'"
+      :class="showTransactionToastClass"
     >
-      <BaseIcon :path="transactionToast.type === 'success' ? mdiCheckCircle : mdiAlertCircle" size="18" />
+      <BaseIcon :path="showTransactionToastIcon" size="18" />
       <span class="text-sm font-medium">{{ transactionToast.message }}</span>
     </div>
   </transition>

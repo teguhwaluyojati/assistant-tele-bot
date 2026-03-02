@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import axios from 'axios'
-import { mdiCartOutline, mdiCog, mdiDownload, mdiPlus, mdiReload, mdiCheckCircle, mdiAlertCircle } from '@mdi/js'
+import { mdiCartOutline, mdiCog, mdiDownload, mdiPlus, mdiReload, mdiCheckCircle, mdiAlertCircle, mdiInformation } from '@mdi/js'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
@@ -12,7 +12,7 @@ import BaseIcon from '@/components/BaseIcon.vue'
 import CardBoxModal from '@/components/CardBoxModal.vue'
 import FormField from '@/components/FormField.vue'
 import FormControl from '@/components/FormControl.vue'
-import { useToast } from '@/composables/useToast'
+import { useActionToast } from '@/composables/useActionToast'
 
 const isTransactionFilterModalOpen = ref(false)
 const transactionFilterStartDate = ref('')
@@ -36,7 +36,7 @@ const createTransactionForm = ref({
 })
 const isSubmittingTransaction = ref(false)
 
-const { toast: transactionToast, showToast: showTransactionToast } = useToast(2600)
+const { toast: transactionToast, success: notifyTransactionSuccess, error: notifyTransactionError, runAction } = useActionToast(2600)
 
 const formattedAmount = computed({
   get: () => {
@@ -97,35 +97,65 @@ const resetCreateTransactionForm = () => {
 
 const submitTransaction = async () => {
   if (!createTransactionForm.value.amount || Number(createTransactionForm.value.amount) <= 0) {
-    showTransactionToast('error', 'Amount must be greater than 0.')
+    notifyTransactionError('Amount must be greater than 0.')
     return
   }
 
   if (!createTransactionForm.value.description?.trim()) {
-    showTransactionToast('error', 'Description is required.')
+    notifyTransactionError('Description is required.')
     return
   }
 
   isSubmittingTransaction.value = true
   try {
-    await axios.post('/api/transactions', {
-      type: createTransactionForm.value.type,
-      amount: Number(createTransactionForm.value.amount),
-      transaction_date: createTransactionForm.value.transaction_date,
-      description: createTransactionForm.value.description.trim(),
-    })
+    const { ok } = await runAction(
+      () => axios.post('/api/transactions', {
+        type: createTransactionForm.value.type,
+        amount: Number(createTransactionForm.value.amount),
+        transaction_date: createTransactionForm.value.transaction_date,
+        description: createTransactionForm.value.description.trim(),
+      }),
+      {
+        successMessage: 'Transaction created successfully!',
+        errorPrefix: 'Failed to create transaction',
+      }
+    )
+
+    if (!ok) {
+      return
+    }
 
     isCreateTransactionModalOpen.value = false
     resetCreateTransactionForm()
     transactionsTableKey.value += 1
-    showTransactionToast('success', 'Transaction created successfully!')
-  } catch (error) {
-    const errorMsg = error.response?.data?.message || error.response?.statusText || error.message
-    showTransactionToast('error', `Failed to create transaction: ${errorMsg}`)
   } finally {
     isSubmittingTransaction.value = false
   }
 }
+
+const showTransactionToastClass = computed(() => {
+  if (transactionToast.value.type === 'success') {
+    return 'bg-emerald-500'
+  }
+
+  if (transactionToast.value.type === 'info') {
+    return 'bg-blue-500'
+  }
+
+  return 'bg-red-500'
+})
+
+const showTransactionToastIcon = computed(() => {
+  if (transactionToast.value.type === 'success') {
+    return mdiCheckCircle
+  }
+
+  if (transactionToast.value.type === 'info') {
+    return mdiInformation
+  }
+
+  return mdiAlertCircle
+})
 
 const exportTransactions = async () => {
   try {
@@ -150,8 +180,10 @@ const exportTransactions = async () => {
     link.click()
     link.parentNode.removeChild(link)
     window.URL.revokeObjectURL(url)
+    notifyTransactionSuccess('Transactions exported successfully!')
   } catch (error) {
     console.error('Error exporting transactions:', error)
+    notifyTransactionError('Failed to export transactions.')
   }
 }
 </script>
@@ -277,9 +309,9 @@ const exportTransactions = async () => {
         <div
           v-if="transactionToast.visible"
           class="fixed top-20 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white"
-          :class="transactionToast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'"
+          :class="showTransactionToastClass"
         >
-          <BaseIcon :path="transactionToast.type === 'success' ? mdiCheckCircle : mdiAlertCircle" size="18" />
+          <BaseIcon :path="showTransactionToastIcon" size="18" />
           <span class="text-sm font-medium">{{ transactionToast.message }}</span>
         </div>
       </transition>

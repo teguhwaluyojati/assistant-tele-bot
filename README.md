@@ -72,6 +72,10 @@ The project is currently running with Sanctum-based APIs, activity logging, and 
   - `AuditLogController`
   - `TelegramController` (bot flow orchestrator)
 
+## Frontend Conventions
+
+- Notification guideline (MVP): `docs/notification-guidelines.md`
+
 ## API Highlights
 
 This README intentionally avoids listing every endpoint to keep it concise.
