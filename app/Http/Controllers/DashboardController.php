@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\TelegramUser;
+use App\Models\User;
 use App\Models\LoginModel;
 use App\Models\TelegramUserCommand;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\QueryException;
@@ -52,6 +54,84 @@ class DashboardController extends Controller
             ->paginate(15);
 
         return response()->json($users);
+    }
+
+    public function storeUser(Request $request)
+    {
+        if ($response = $this->requireAdmin()) {
+            return $response;
+        }
+
+        try {
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+                'telegram_user_id' => ['required', 'integer', 'min:1'],
+                'telegram_username' => ['required', 'string', 'max:255'],
+                'password' => ['required', 'string', 'min:6', 'confirmed'],
+            ]);
+
+            $telegramNumericId = (int) $validated['telegram_user_id'];
+            $normalizedUsername = ltrim(trim($validated['telegram_username']), '@');
+
+            $usernameOwner = TelegramUser::where('username', $normalizedUsername)
+                ->where('user_id', '!=', $telegramNumericId)
+                ->first();
+            if ($usernameOwner) {
+                return $this->errorResponse('Telegram username is already used by another Telegram ID.', 409);
+            }
+
+            $telegramUser = TelegramUser::where('user_id', $telegramNumericId)->first();
+            if (!$telegramUser) {
+                $telegramUser = TelegramUser::create([
+                    'user_id' => $telegramNumericId,
+                    'username' => $normalizedUsername,
+                    'first_name' => null,
+                    'last_name' => null,
+                    'last_interaction_at' => now(),
+                    'level' => 2,
+                ]);
+            } else {
+                $telegramUser->username = $normalizedUsername;
+                if (is_null($telegramUser->level)) {
+                    $telegramUser->level = 2;
+                }
+                if (is_null($telegramUser->last_interaction_at)) {
+                    $telegramUser->last_interaction_at = now();
+                }
+                $telegramUser->save();
+            }
+
+            $isTelegramAlreadyUsed = User::where('telegram_user_id', $telegramUser->id)->exists();
+            if ($isTelegramAlreadyUsed) {
+                return $this->errorResponse('This Telegram account is already linked to another web account.', 409);
+            }
+
+            $newUser = User::create([
+                'name' => trim($validated['name']),
+                'email' => strtolower(trim($validated['email'])),
+                'password' => Hash::make($validated['password']),
+                'telegram_user_id' => $telegramUser->id,
+            ]);
+
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($newUser)
+                ->withProperties([
+                    'target_email' => $newUser->email,
+                    'telegram_numeric_id' => $telegramNumericId,
+                    'telegram_user_id' => $telegramUser->id,
+                    'telegram_username' => $normalizedUsername,
+                ])
+                ->log('create_user_backdoor');
+
+            return $this->successResponse($newUser->load('telegramUser:id,user_id,username,first_name,last_name,level'), 'User created successfully.');
+        } catch (ValidationException $e) {
+            return $this->errorResponse('Validation failed.', 422, $e->errors());
+        } catch (\Exception $e) {
+            Log::error('Error creating user: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while creating user.', 500);
+        }
     }
 
     public function lastLogin()

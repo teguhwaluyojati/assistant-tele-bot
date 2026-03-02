@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import axios from 'axios'
-import { mdiAccountMultiple, mdiMonitorCellphone, mdiCog, mdiReload, mdiDownload, mdiCheckCircle, mdiAlertCircle, mdiInformation } from '@mdi/js'
+import { mdiAccountMultiple, mdiMonitorCellphone, mdiCog, mdiReload, mdiDownload, mdiPlus, mdiCheckCircle, mdiAlertCircle, mdiInformation } from '@mdi/js'
 import LayoutAuthenticated from '@/layouts/LayoutAuthenticated.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import SectionTitleLineWithButton from '@/components/SectionTitleLineWithButton.vue'
@@ -19,6 +19,16 @@ import { useActionToast } from '@/composables/useActionToast'
 
 const mainStore = useMainStore()
 const isClientsLoading = ref(false)
+const isCreateUserModalOpen = ref(false)
+const isSubmittingUser = ref(false)
+const createUserForm = ref({
+  name: '',
+  email: '',
+  telegram_user_id: '',
+  telegram_username: '',
+  password: '',
+  password_confirmation: '',
+})
 const isCommandFilterModalOpen = ref(false)
 const commandFilterStartDate = ref('')
 const commandFilterEndDate = ref('')
@@ -49,6 +59,89 @@ const usersToastIcon = computed(() => {
 
   return mdiAlertCircle
 })
+
+const resetCreateUserForm = () => {
+  createUserForm.value = {
+    name: '',
+    email: '',
+    telegram_user_id: '',
+    telegram_username: '',
+    password: '',
+    password_confirmation: '',
+  }
+}
+
+const openCreateUserModal = () => {
+  resetCreateUserForm()
+  isCreateUserModalOpen.value = true
+}
+
+const submitCreateUser = async () => {
+  if (!createUserForm.value.name?.trim()) {
+    notifyUsersError('Name is required.')
+    return
+  }
+
+  if (!createUserForm.value.email?.trim()) {
+    notifyUsersError('Email is required.')
+    return
+  }
+
+  if (!createUserForm.value.telegram_username?.trim()) {
+    notifyUsersError('Telegram username is required.')
+    return
+  }
+
+  const telegramNumericId = Number(createUserForm.value.telegram_user_id)
+  if (!Number.isInteger(telegramNumericId) || telegramNumericId <= 0) {
+    notifyUsersError('Telegram ID must be a valid positive number.')
+    return
+  }
+
+  if (!createUserForm.value.password || createUserForm.value.password.length < 6) {
+    notifyUsersError('Password must be at least 6 characters.')
+    return
+  }
+
+  if (createUserForm.value.password !== createUserForm.value.password_confirmation) {
+    notifyUsersError('Password confirmation does not match.')
+    return
+  }
+
+  isSubmittingUser.value = true
+
+  try {
+    const payload = {
+      name: createUserForm.value.name.trim(),
+      email: createUserForm.value.email.trim().toLowerCase(),
+      telegram_user_id: telegramNumericId,
+      telegram_username: createUserForm.value.telegram_username.trim().replace(/^@/, ''),
+      password: createUserForm.value.password,
+      password_confirmation: createUserForm.value.password_confirmation,
+    }
+
+    const { ok } = await runAction(
+      () => axios.post('/api/users', payload),
+      {
+        successMessage: 'User created successfully. Ask user to /start the bot.',
+        errorPrefix: 'Failed to create user',
+      }
+    )
+
+    if (!ok) {
+      return
+    }
+
+    isCreateUserModalOpen.value = false
+    resetCreateUserForm()
+
+    isClientsLoading.value = true
+    await mainStore.fetchSampleClients()
+  } finally {
+    isSubmittingUser.value = false
+    isClientsLoading.value = false
+  }
+}
 
 const openCommandFilterModal = () => {
   isCommandFilterModalOpen.value = true
@@ -125,7 +218,9 @@ onMounted(async () => {
 <template>
   <LayoutAuthenticated>
     <SectionMain>
-      <SectionTitleLineWithButton :icon="mdiAccountMultiple" title="Users" main />
+      <SectionTitleLineWithButton :icon="mdiAccountMultiple" title="Users" main>
+        <BaseButton :icon="mdiPlus" color="success" @click="openCreateUserModal" />
+      </SectionTitleLineWithButton>
 
       <NotificationBar color="info" :icon="mdiMonitorCellphone" class="mb-4">
         <b>Users Telegram Only</b>
@@ -151,6 +246,72 @@ onMounted(async () => {
           @search-change="commandSearchQuery = $event"
         />
       </CardBox>
+
+      <CardBoxModal
+        v-model="isCreateUserModalOpen"
+        title="Add New User"
+        button="success"
+        :button-label="isSubmittingUser ? 'Submitting...' : 'Submit'"
+        :has-cancel="true"
+        @confirm="submitCreateUser"
+        @cancel="isCreateUserModalOpen = false"
+      >
+        <FormField label="Full Name" label-for="new-user-name">
+          <FormControl
+            id="new-user-name"
+            v-model="createUserForm.name"
+            type="text"
+            placeholder="e.g. John Doe"
+          />
+        </FormField>
+
+        <FormField label="Email" label-for="new-user-email">
+          <FormControl
+            id="new-user-email"
+            v-model="createUserForm.email"
+            type="email"
+            placeholder="example@email.com"
+          />
+        </FormField>
+
+        <FormField label="Telegram ID" label-for="new-telegram-id">
+          <FormControl
+            id="new-telegram-id"
+            v-model="createUserForm.telegram_user_id"
+            type="number"
+            min="1"
+            placeholder="e.g. 123456789"
+          />
+        </FormField>
+
+        <FormField label="Telegram Username" label-for="new-telegram-username">
+          <FormControl
+            id="new-telegram-username"
+            v-model="createUserForm.telegram_username"
+            type="text"
+            placeholder="@username"
+          />
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">After account creation, ask the user to send /start to the bot.</p>
+        </FormField>
+
+        <FormField label="Password" label-for="new-user-password">
+          <FormControl
+            id="new-user-password"
+            v-model="createUserForm.password"
+            type="password"
+            placeholder="At least 6 characters"
+          />
+        </FormField>
+
+        <FormField label="Confirm Password" label-for="new-user-password-confirmation">
+          <FormControl
+            id="new-user-password-confirmation"
+            v-model="createUserForm.password_confirmation"
+            type="password"
+            placeholder="Repeat password"
+          />
+        </FormField>
+      </CardBoxModal>
 
       <CardBoxModal
         v-model="isCommandFilterModalOpen"

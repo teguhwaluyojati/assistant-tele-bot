@@ -31,6 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout']);
     
     Route::get('/users', [DashboardController::class, 'getUsers']);
+    Route::post('/users', [DashboardController::class, 'storeUser']);
     Route::get('/users/commands', [DashboardController::class, 'getUserCommands']);
     Route::get('/users/commands/export', [DashboardController::class, 'exportUserCommands']);
     Route::get('/users/{userId}', [DashboardController::class, 'getUserDetail']);
