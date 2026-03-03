@@ -26,7 +26,7 @@ The project is currently running with Sanctum-based APIs, activity logging, and 
   - list Telegram users
   - user detail + command history
   - update user role
-- Audit logs (admin only) with pagination
+- Audit logs (superadmin only) with pagination
 
 ### Telegram Bot
 
@@ -75,6 +75,11 @@ The project is currently running with Sanctum-based APIs, activity logging, and 
 ## Frontend Conventions
 
 - Notification guideline (MVP): `docs/notification-guidelines.md`
+
+## RBAC Operations
+
+- Superadmin bootstrap runbook: `docs/rbac-superadmin-bootstrap-runbook.md`
+- Bootstrap command: `php artisan app:bootstrap-superadmin {chat_id?}`
 
 ## API Highlights
 
