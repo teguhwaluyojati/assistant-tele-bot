@@ -14,7 +14,7 @@ class AuditLogController extends Controller
 {
     use ApiResponse;
 
-    private function requireAdmin()
+    private function requireSuperAdmin()
     {
         $currentUser = auth()->user();
         if (!$currentUser) {
@@ -26,7 +26,7 @@ class AuditLogController extends Controller
             return $this->errorResponse('User not linked to Telegram account.', 403);
         }
 
-        if (!$telegramUser->isAdmin()) {
+        if (!$telegramUser->isSuperAdmin()) {
             return $this->errorResponse('Forbidden.', 403);
         }
 
@@ -35,7 +35,7 @@ class AuditLogController extends Controller
 
     public function index(Request $request)
     {
-        if ($response = $this->requireAdmin()) {
+        if ($response = $this->requireSuperAdmin()) {
             return $response;
         }
 
@@ -83,7 +83,7 @@ class AuditLogController extends Controller
 
     public function export(Request $request)
     {
-        if ($response = $this->requireAdmin()) {
+        if ($response = $this->requireSuperAdmin()) {
             return $response;
         }
 
@@ -116,7 +116,7 @@ class AuditLogController extends Controller
 
     public function pageVisits(Request $request)
     {
-        if ($response = $this->requireAdmin()) {
+        if ($response = $this->requireSuperAdmin()) {
             return $response;
         }
 

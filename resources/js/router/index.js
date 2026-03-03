@@ -63,35 +63,37 @@ const routes = [
         path: 'tables',
         name: 'tables',
         component: () => import('@/views/TablesView.vue'),
-        meta: { title: 'Tables', requiresAdmin: true },
+        meta: { title: 'Tables', requiresSuperAdmin: true },
       },
       {
         path: 'audit-logs',
         name: 'audit-logs',
         component: () => import('@/views/AuditLogsView.vue'),
-        meta: { title: 'Audit Logs', requiresAdmin: true },
+        meta: { title: 'Audit Logs', requiresSuperAdmin: true },
       },
       {
         path: 'forms',
         name: 'forms',
         component: () => import('@/views/FormsView.vue'),
-        meta: { title: 'Forms' },
+        meta: { title: 'Forms', requiresSuperAdmin: true },
       },
       {
         path: 'ui',
         name: 'ui',
         component: () => import('@/views/UiView.vue'),
+        meta: { requiresSuperAdmin: true },
       },
       {
         path: 'responsive',
         name: 'responsive',
         component: () => import('@/views/ResponsiveView.vue'),
+        meta: { requiresSuperAdmin: true },
       },
       {
         path: 'style',
         name: 'style-alt',
         component: Style,
-        meta: { title: 'Select style' },
+        meta: { title: 'Select style', requiresSuperAdmin: true },
       },
     ],
   },
@@ -117,6 +119,7 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth);
   const requiresAdmin = to.matched.some(record => record.meta.requiresAdmin);
+  const requiresSuperAdmin = to.matched.some(record => record.meta.requiresSuperAdmin);
   const isPublicAuth = to.name === 'login' || to.name === 'register' || to.name === 'forgot-password';
 
   if (!requiresAuth && isPublicAuth) {
@@ -143,6 +146,13 @@ router.beforeEach(async (to, from, next) => {
 
     const roleLevel = Number(currentUser?.telegram_user?.level)
     const isAdmin = [0, 1].includes(roleLevel)
+    const isSuperAdmin = roleLevel === 0
+
+    if (requiresSuperAdmin && !isSuperAdmin) {
+      next({ name: 'dashboard' });
+      return;
+    }
+
     if (requiresAdmin && !isAdmin) {
       next({ name: 'dashboard' });
       return;
