@@ -52,6 +52,37 @@ class DashboardController extends Controller
         return (int) $target->level === 2;
     }
 
+    private function configuredAdminChatIds(): array
+    {
+        $adminIdsRaw = (string) env('TELEGRAM_ADMIN_ID', '');
+        if ($adminIdsRaw === '') {
+            return [];
+        }
+
+        return collect(explode(',', $adminIdsRaw))
+            ->map(fn ($id) => trim((string) $id))
+            ->filter(fn ($id) => $id !== '')
+            ->values()
+            ->all();
+    }
+
+    private function canBootstrapSuperAdmin(?TelegramUser $actor, TelegramUser $target, int $newLevel): bool
+    {
+        if (!$actor || !$actor->isAdmin()) {
+            return false;
+        }
+
+        if ($newLevel !== 0) {
+            return false;
+        }
+
+        if (TelegramUser::where('level', 0)->exists()) {
+            return false;
+        }
+
+        return in_array((string) $target->user_id, $this->configuredAdminChatIds(), true);
+    }
+
     public function getUsers()
     {
         if ($response = $this->requireAdmin()) {
@@ -109,6 +140,11 @@ class DashboardController extends Controller
                     $telegramUser->last_interaction_at = now();
                 }
                 $telegramUser->save();
+            }
+
+            $currentTelegramUser = auth()->user()?->telegramUser;
+            if ($currentTelegramUser && !$this->canManageTargetUser($currentTelegramUser, $telegramUser)) {
+                return $this->errorResponse('Admin can only create web users for member Telegram accounts.', 403);
             }
 
             $isTelegramAlreadyUsed = User::where('telegram_user_id', $telegramUser->id)->exists();
@@ -687,16 +723,17 @@ class DashboardController extends Controller
             $actorIsSuperAdmin = $currentTelegramUser?->isSuperAdmin() ?? false;
             $targetIsSuperAdmin = $user->isSuperAdmin();
             $newLevel = (int) $validated['level'];
+            $allowBootstrapPromotion = $this->canBootstrapSuperAdmin($currentTelegramUser, $user, $newLevel);
 
             if ($currentTelegramUser && $currentTelegramUser->user_id === $user->user_id) {
                 return $this->errorResponse('You cannot change your own role.', 403);
             }
 
-            if ($currentTelegramUser && !$this->canManageTargetUser($currentTelegramUser, $user)) {
+            if ($currentTelegramUser && !$this->canManageTargetUser($currentTelegramUser, $user) && !$allowBootstrapPromotion) {
                 return $this->errorResponse('Admin can only manage member accounts.', 403);
             }
 
-            if (!$actorIsSuperAdmin && ($targetIsSuperAdmin || $newLevel === 0)) {
+            if (!$actorIsSuperAdmin && ($targetIsSuperAdmin || $newLevel === 0) && !$allowBootstrapPromotion) {
                 return $this->errorResponse('Only superadmin can manage superadmin role.', 403);
             }
 

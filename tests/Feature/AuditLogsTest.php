@@ -13,9 +13,9 @@ class AuditLogsTest extends TestCase
 {
     use DatabaseTransactions;
 
-    public function test_admin_can_list_audit_logs_with_pagination(): void
+    public function test_superadmin_can_list_audit_logs_with_pagination(): void
     {
-        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
         $adminUser = User::factory()->create([
             'telegram_user_id' => $adminTelegramUser->id,
         ]);
@@ -57,6 +57,20 @@ class AuditLogsTest extends TestCase
         $response->assertStatus(403)->assertJsonPath('success', false);
     }
 
+    public function test_admin_cannot_access_audit_logs(): void
+    {
+        $telegramUser = TelegramUser::factory()->admin()->create();
+        $user = User::factory()->create([
+            'telegram_user_id' => $telegramUser->id,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->getJson('/api/audit-logs');
+
+        $response->assertStatus(403)->assertJsonPath('success', false);
+    }
+
     public function test_user_without_telegram_link_cannot_access_audit_logs(): void
     {
         $user = User::factory()->create();
@@ -70,7 +84,7 @@ class AuditLogsTest extends TestCase
 
     public function test_audit_logs_validation_rejects_large_per_page(): void
     {
-        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
         $adminUser = User::factory()->create([
             'telegram_user_id' => $adminTelegramUser->id,
         ]);
@@ -82,9 +96,9 @@ class AuditLogsTest extends TestCase
         $response->assertStatus(422)->assertJsonValidationErrors(['per_page']);
     }
 
-    public function test_admin_can_filter_audit_logs_by_search(): void
+    public function test_superadmin_can_filter_audit_logs_by_search(): void
     {
-        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
         $adminUser = User::factory()->create([
             'telegram_user_id' => $adminTelegramUser->id,
             'email' => 'search-admin@example.com',
@@ -104,9 +118,9 @@ class AuditLogsTest extends TestCase
         $this->assertTrue(collect($rows)->every(fn ($row) => str_contains($row['description'], 'create_transaction')));
     }
 
-    public function test_admin_can_filter_audit_logs_by_date_range(): void
+    public function test_superadmin_can_filter_audit_logs_by_date_range(): void
     {
-        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
         $adminUser = User::factory()->create([
             'telegram_user_id' => $adminTelegramUser->id,
         ]);
@@ -131,9 +145,9 @@ class AuditLogsTest extends TestCase
         $this->assertNotContains('old_log', $descriptions);
     }
 
-    public function test_admin_can_export_audit_logs_csv(): void
+    public function test_superadmin_can_export_audit_logs_csv(): void
     {
-        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
         $adminUser = User::factory()->create([
             'telegram_user_id' => $adminTelegramUser->id,
         ]);

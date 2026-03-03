@@ -53,6 +53,121 @@ class AuthAndDashboardTest extends TestCase
         $response->assertStatus(403)->assertJsonPath('success', false);
     }
 
+    public function test_admin_cannot_create_user_for_non_member_telegram_account(): void
+    {
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+
+        $targetTelegramUser = TelegramUser::factory()->admin()->create();
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->postJson('/api/users', [
+            'name' => 'Linked Admin',
+            'email' => 'linked-admin@example.com',
+            'telegram_user_id' => $targetTelegramUser->user_id,
+            'telegram_username' => $targetTelegramUser->username,
+            'password' => 'secret123',
+            'password_confirmation' => 'secret123',
+        ]);
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Admin can only create web users for member Telegram accounts.');
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'linked-admin@example.com',
+        ]);
+    }
+
+    public function test_admin_cannot_promote_member_to_superadmin_when_superadmin_exists(): void
+    {
+        TelegramUser::factory()->create(['level' => 0]);
+
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+        $targetTelegramUser = TelegramUser::factory()->create(['level' => 2]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->putJson("/api/users/{$targetTelegramUser->user_id}/role", [
+            'level' => 0,
+        ]);
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Only superadmin can manage superadmin role.');
+
+        $this->assertDatabaseHas('telegram_users', [
+            'id' => $targetTelegramUser->id,
+            'level' => 2,
+        ]);
+    }
+
+    public function test_admin_can_bootstrap_first_superadmin_for_configured_id(): void
+    {
+        TelegramUser::query()->where('level', 0)->update(['level' => 1]);
+
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+        $targetTelegramUser = TelegramUser::factory()->create(['level' => 2]);
+
+        $original = $this->setTelegramAdminIds((string) $targetTelegramUser->user_id);
+
+        try {
+            Sanctum::actingAs($adminUser);
+
+            $response = $this->putJson("/api/users/{$targetTelegramUser->user_id}/role", [
+                'level' => 0,
+            ]);
+
+            $response
+                ->assertStatus(200)
+                ->assertJsonPath('success', true)
+                ->assertJsonPath('data.level', 0);
+
+            $this->assertDatabaseHas('telegram_users', [
+                'id' => $targetTelegramUser->id,
+                'level' => 0,
+            ]);
+        } finally {
+            $this->setTelegramAdminIds($original);
+        }
+    }
+
+    public function test_superadmin_can_manage_admin_role_change(): void
+    {
+        $superAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
+        $superAdminUser = User::factory()->create([
+            'telegram_user_id' => $superAdminTelegramUser->id,
+        ]);
+        $targetAdminTelegramUser = TelegramUser::factory()->admin()->create();
+
+        Sanctum::actingAs($superAdminUser);
+
+        $response = $this->putJson("/api/users/{$targetAdminTelegramUser->user_id}/role", [
+            'level' => 2,
+        ]);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.level', 2);
+
+        $this->assertDatabaseHas('telegram_users', [
+            'id' => $targetAdminTelegramUser->id,
+            'level' => 2,
+        ]);
+    }
+
     public function test_admin_can_get_recent_commands(): void
     {
         $adminTelegramUser = TelegramUser::factory()->admin()->create();
@@ -179,5 +294,23 @@ class AuthAndDashboardTest extends TestCase
         sort($amounts);
 
         $this->assertSame([1000, 5000], $amounts);
+    }
+
+    private function setTelegramAdminIds(?string $value): ?string
+    {
+        $original = getenv('TELEGRAM_ADMIN_ID');
+
+        if ($value === null || $value === '') {
+            putenv('TELEGRAM_ADMIN_ID');
+            unset($_ENV['TELEGRAM_ADMIN_ID'], $_SERVER['TELEGRAM_ADMIN_ID']);
+
+            return $original === false ? null : $original;
+        }
+
+        putenv("TELEGRAM_ADMIN_ID={$value}");
+        $_ENV['TELEGRAM_ADMIN_ID'] = $value;
+        $_SERVER['TELEGRAM_ADMIN_ID'] = $value;
+
+        return $original === false ? null : $original;
     }
 }
