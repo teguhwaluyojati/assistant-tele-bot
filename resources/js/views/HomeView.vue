@@ -256,7 +256,7 @@ const rightInsightItems = computed(() => {
 })
 
 const isAdminUser = computed(() => {
-  return mainStore.currentUser?.telegram_user?.level === 1
+  return [0, 1].includes(mainStore.currentUser?.telegram_user?.level)
 })
 
 const totalFlowAmount = computed(() => {

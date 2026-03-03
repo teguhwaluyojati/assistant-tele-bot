@@ -26,7 +26,7 @@ const isAsideMobileExpanded = ref(false)
 const isAsideLgActive = ref(false)
 const isLogoutModalOpen = ref(false)
 
-const isAdminUser = computed(() => mainStore.currentUser?.telegram_user?.level === 1)
+const isAdminUser = computed(() => [0, 1].includes(mainStore.currentUser?.telegram_user?.level))
 const menuAsideFiltered = computed(() =>
   menuAside.filter(
     (item) =>

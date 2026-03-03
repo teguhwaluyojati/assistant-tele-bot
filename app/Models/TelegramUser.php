@@ -39,12 +39,14 @@ class TelegramUser extends Model
         return $this->hasOne(User::class, 'telegram_user_id', 'id');
     }
 
-    /**
-     * Check if user is admin (level = 1)
-     */
+    public function isSuperAdmin()
+    {
+        return (int) $this->level === 0;
+    }
+
     public function isAdmin()
     {
-        return $this->level == 1;
+        return in_array((int) $this->level, [0, 1], true);
     }
 
     public function getAvatarUrlAttribute()

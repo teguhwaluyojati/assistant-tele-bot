@@ -669,17 +669,32 @@ class DashboardController extends Controller
 
         try {
             $validated = $request->validate([
-                'level' => 'required|integer|in:1,2',
+                'level' => 'required|integer|in:0,1,2',
             ]);
 
             $user = TelegramUser::where('user_id', $userId)->firstOrFail();
             $currentUser = auth()->user();
+            $currentTelegramUser = $currentUser?->telegramUser;
+            $actorIsSuperAdmin = $currentTelegramUser?->isSuperAdmin() ?? false;
+            $targetIsSuperAdmin = $user->isSuperAdmin();
+            $newLevel = (int) $validated['level'];
 
-            if ($currentUser && $currentUser->telegramUser && $currentUser->telegramUser->user_id === $user->user_id) {
+            if ($currentTelegramUser && $currentTelegramUser->user_id === $user->user_id) {
                 return $this->errorResponse('You cannot change your own role.', 403);
             }
 
-            $user->level = $validated['level'];
+            if (!$actorIsSuperAdmin && ($targetIsSuperAdmin || $newLevel === 0)) {
+                return $this->errorResponse('Only superadmin can manage superadmin role.', 403);
+            }
+
+            if ($targetIsSuperAdmin && $newLevel !== 0) {
+                $superAdminCount = TelegramUser::where('level', 0)->count();
+                if ($superAdminCount <= 1) {
+                    return $this->errorResponse('Cannot change role of the last superadmin.', 403);
+                }
+            }
+
+            $user->level = $newLevel;
             $user->save();
 
             activity()
@@ -687,7 +702,7 @@ class DashboardController extends Controller
                 ->performedOn($user)
                 ->withProperties([
                     'target_user_id' => $user->user_id,
-                    'level' => $validated['level'],
+                    'level' => $newLevel,
                 ])
                 ->log('update_role');
 
@@ -708,10 +723,24 @@ class DashboardController extends Controller
 
         try {
             $currentUser = auth()->user();
+            $currentTelegramUser = $currentUser?->telegramUser;
             $targetUser = TelegramUser::where('user_id', $userId)->firstOrFail();
+            $actorIsSuperAdmin = $currentTelegramUser?->isSuperAdmin() ?? false;
+            $targetIsSuperAdmin = $targetUser->isSuperAdmin();
 
-            if ($currentUser && $currentUser->telegramUser && $currentUser->telegramUser->user_id === $targetUser->user_id) {
+            if ($currentTelegramUser && $currentTelegramUser->user_id === $targetUser->user_id) {
                 return $this->errorResponse('You cannot delete your own account.', 403);
+            }
+
+            if (!$actorIsSuperAdmin && $targetIsSuperAdmin) {
+                return $this->errorResponse('Only superadmin can delete superadmin.', 403);
+            }
+
+            if ($targetIsSuperAdmin) {
+                $superAdminCount = TelegramUser::where('level', 0)->count();
+                if ($superAdminCount <= 1) {
+                    return $this->errorResponse('Cannot delete the last superadmin.', 403);
+                }
             }
 
             $deletedSummary = DB::transaction(function () use ($targetUser) {
