@@ -43,6 +43,15 @@ class DashboardController extends Controller
         return null;
     }
 
+    private function canManageTargetUser(TelegramUser $actor, TelegramUser $target): bool
+    {
+        if ($actor->isSuperAdmin()) {
+            return true;
+        }
+
+        return (int) $target->level === 2;
+    }
+
     public function getUsers()
     {
         if ($response = $this->requireAdmin()) {
@@ -442,9 +451,14 @@ class DashboardController extends Controller
         }
 
         try {
+            $currentTelegramUser = auth()->user()?->telegramUser;
             $user = TelegramUser::with('webUser:id,telegram_user_id,name,avatar')
                 ->where('user_id', $userId)
                 ->firstOrFail();
+
+            if ($currentTelegramUser && !$this->canManageTargetUser($currentTelegramUser, $user)) {
+                return $this->errorResponse('Admin can only view member accounts.', 403);
+            }
             
             $commands = TelegramUserCommand::where('user_id', $userId)
                 ->latest()
@@ -683,6 +697,10 @@ class DashboardController extends Controller
                 return $this->errorResponse('You cannot change your own role.', 403);
             }
 
+            if ($currentTelegramUser && !$this->canManageTargetUser($currentTelegramUser, $user)) {
+                return $this->errorResponse('Admin can only manage member accounts.', 403);
+            }
+
             if (!$actorIsSuperAdmin && ($targetIsSuperAdmin || $newLevel === 0)) {
                 return $this->errorResponse('Only superadmin can manage superadmin role.', 403);
             }
@@ -730,6 +748,10 @@ class DashboardController extends Controller
 
             if ($currentTelegramUser && $currentTelegramUser->user_id === $targetUser->user_id) {
                 return $this->errorResponse('You cannot delete your own account.', 403);
+            }
+
+            if ($currentTelegramUser && !$this->canManageTargetUser($currentTelegramUser, $targetUser)) {
+                return $this->errorResponse('Admin can only manage member accounts.', 403);
             }
 
             if (!$actorIsSuperAdmin && $targetIsSuperAdmin) {

@@ -154,7 +154,9 @@ const roleToastIcon = computed(() => (
   roleToast.value.type === 'success' ? mdiCheckCircle : mdiAlertCircle
 ))
 const roleButtonLabel = computed(() => (isUpdatingRole.value ? 'Saving...' : 'Save'))
-const isCurrentUserSuperAdmin = computed(() => mainStore.currentUser?.telegram_user?.level === 0)
+const currentRoleLevel = computed(() => Number(mainStore.currentUser?.telegram_user?.level))
+const isCurrentUserSuperAdmin = computed(() => currentRoleLevel.value === 0)
+const isCurrentUserAdmin = computed(() => currentRoleLevel.value === 1)
 const roleOptions = computed(() => {
   if (isCurrentUserSuperAdmin.value) {
     return [
@@ -169,6 +171,24 @@ const roleOptions = computed(() => {
     { value: 2, label: 'Member' },
   ]
 })
+
+const canFullyManageClient = (client) => {
+  if (!client) {
+    return false
+  }
+
+  if (isCurrentUserSuperAdmin.value) {
+    return true
+  }
+
+  if (isCurrentUserAdmin.value) {
+    return Number(client.level) === 2
+  }
+
+  return false
+}
+
+const canViewClient = (client) => canFullyManageClient(client)
 
 const isModalDangerActive = ref(false)
 const deleteTarget = ref(null)
@@ -239,6 +259,11 @@ const checked = (isChecked, client) => {
 }
 
 const viewUserDetail = async (client) => {
+  if (!canViewClient(client)) {
+    notifyRoleError('Admin can only view member accounts.')
+    return
+  }
+
   isLoadingDetail.value = true
   selectedUser.value = client
   userCommands.value = []
@@ -266,6 +291,11 @@ const viewUserDetail = async (client) => {
 }
 
 const openRoleModal = (client) => {
+  if (!canFullyManageClient(client)) {
+    notifyRoleError('Admin can only manage member accounts.')
+    return
+  }
+
   roleTarget.value = client
   roleValue.value = client.level ?? 2
   roleError.value = ''
@@ -328,6 +358,11 @@ const submitRoleUpdate = async () => {
 }
 
 const openDeleteConfirm = (client) => {
+  if (!canFullyManageClient(client)) {
+    notifyRoleError('Admin can only manage member accounts.')
+    return
+  }
+
   deleteTarget.value = client
   isModalDangerActive.value = true
 }
@@ -612,9 +647,10 @@ const submitDeleteUser = async () => {
         </td>
         <td class="before:hidden lg:w-1 whitespace-nowrap">
           <BaseButtons type="justify-center" no-wrap>
-            <BaseButton color="info" :icon="mdiEye" small @click="viewUserDetail(client)" />
-            <BaseButton color="warning" :icon="mdiAccountSwitch" small @click="openRoleModal(client)" />
+            <BaseButton v-if="canViewClient(client)" color="info" :icon="mdiEye" small @click="viewUserDetail(client)" />
+            <BaseButton v-if="canFullyManageClient(client)" color="warning" :icon="mdiAccountSwitch" small @click="openRoleModal(client)" />
             <BaseButton
+              v-if="canFullyManageClient(client)"
               color="danger"
               :icon="mdiTrashCan"
               small
