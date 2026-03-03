@@ -47,6 +47,61 @@ class WebFocusedApiEndpointsTest extends TestCase
             ->assertJsonFragment(['user_id' => $targetTelegramUser->user_id]);
     }
 
+    public function test_admin_can_get_member_user_detail(): void
+    {
+        [$adminUser] = $this->createUserWithTelegram(level: 1);
+        $targetTelegramUser = TelegramUser::factory()->create(['level' => 2]);
+        User::factory()->create([
+            'telegram_user_id' => $targetTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->getJson('/api/users/' . $targetTelegramUser->user_id);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.user_id', $targetTelegramUser->user_id);
+    }
+
+    public function test_admin_cannot_get_admin_user_detail(): void
+    {
+        [$adminUser] = $this->createUserWithTelegram(level: 1);
+        $targetTelegramUser = TelegramUser::factory()->admin()->create();
+        User::factory()->create([
+            'telegram_user_id' => $targetTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->getJson('/api/users/' . $targetTelegramUser->user_id);
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Admin can only view member accounts.');
+    }
+
+    public function test_superadmin_can_get_admin_user_detail(): void
+    {
+        [$superAdminUser] = $this->createUserWithTelegram(level: 0);
+        $targetTelegramUser = TelegramUser::factory()->admin()->create();
+        User::factory()->create([
+            'telegram_user_id' => $targetTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($superAdminUser);
+
+        $response = $this->getJson('/api/users/' . $targetTelegramUser->user_id);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user.user_id', $targetTelegramUser->user_id)
+            ->assertJsonPath('data.user.level', 1);
+    }
+
     public function test_user_can_get_only_own_commands_from_me_endpoint(): void
     {
         [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);

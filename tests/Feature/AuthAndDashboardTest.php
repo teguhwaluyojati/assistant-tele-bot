@@ -83,6 +83,109 @@ class AuthAndDashboardTest extends TestCase
         ]);
     }
 
+    public function test_admin_create_user_rejects_telegram_username_conflict_with_other_telegram_id(): void
+    {
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+
+        $ownerTelegramUser = TelegramUser::factory()->create([
+            'user_id' => 700001,
+            'username' => 'sharedname',
+            'level' => 2,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->postJson('/api/users', [
+            'name' => 'Conflict Username',
+            'email' => 'conflict-username@example.com',
+            'telegram_user_id' => 700002,
+            'telegram_username' => 'sharedname',
+            'password' => 'secret123',
+            'password_confirmation' => 'secret123',
+        ]);
+
+        $response
+            ->assertStatus(409)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Telegram username is already used by another Telegram ID.');
+
+        $this->assertDatabaseHas('telegram_users', [
+            'id' => $ownerTelegramUser->id,
+            'user_id' => 700001,
+            'username' => 'sharedname',
+        ]);
+        $this->assertDatabaseMissing('users', [
+            'email' => 'conflict-username@example.com',
+        ]);
+    }
+
+    public function test_admin_create_user_rejects_already_linked_telegram_account(): void
+    {
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+
+        $targetTelegramUser = TelegramUser::factory()->create(['level' => 2]);
+        User::factory()->create([
+            'telegram_user_id' => $targetTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->postJson('/api/users', [
+            'name' => 'Already Linked',
+            'email' => 'already-linked@example.com',
+            'telegram_user_id' => $targetTelegramUser->user_id,
+            'telegram_username' => $targetTelegramUser->username,
+            'password' => 'secret123',
+            'password_confirmation' => 'secret123',
+        ]);
+
+        $response
+            ->assertStatus(409)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'This Telegram account is already linked to another web account.');
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'already-linked@example.com',
+        ]);
+    }
+
+    public function test_admin_create_user_validation_errors_are_returned(): void
+    {
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->postJson('/api/users', [
+            'name' => '',
+            'email' => 'not-an-email',
+            'telegram_user_id' => 0,
+            'telegram_username' => '',
+            'password' => '123',
+            'password_confirmation' => '321',
+        ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Validation failed.')
+            ->assertJsonValidationErrors([
+                'name',
+                'email',
+                'telegram_user_id',
+                'telegram_username',
+                'password',
+            ]);
+    }
+
     public function test_admin_cannot_promote_member_to_superadmin_when_superadmin_exists(): void
     {
         TelegramUser::factory()->create(['level' => 0]);
@@ -176,6 +279,54 @@ class AuthAndDashboardTest extends TestCase
         }
     }
 
+    public function test_admin_cannot_change_own_role(): void
+    {
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->putJson("/api/users/{$adminTelegramUser->user_id}/role", [
+            'level' => 2,
+        ]);
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'You cannot change your own role.');
+
+        $this->assertDatabaseHas('telegram_users', [
+            'id' => $adminTelegramUser->id,
+            'level' => 1,
+        ]);
+    }
+
+    public function test_superadmin_cannot_change_own_role(): void
+    {
+        $superAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
+        $superAdminUser = User::factory()->create([
+            'telegram_user_id' => $superAdminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($superAdminUser);
+
+        $response = $this->putJson("/api/users/{$superAdminTelegramUser->user_id}/role", [
+            'level' => 1,
+        ]);
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'You cannot change your own role.');
+
+        $this->assertDatabaseHas('telegram_users', [
+            'id' => $superAdminTelegramUser->id,
+            'level' => 0,
+        ]);
+    }
+
     public function test_superadmin_can_manage_admin_role_change(): void
     {
         $superAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
@@ -224,6 +375,49 @@ class AuthAndDashboardTest extends TestCase
 
         $this->assertDatabaseHas('telegram_users', [
             'id' => $superAdminTelegramUser->id,
+        ]);
+    }
+
+    public function test_admin_cannot_delete_own_account(): void
+    {
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->deleteJson("/api/users/{$adminTelegramUser->user_id}");
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'You cannot delete your own account.');
+
+        $this->assertDatabaseHas('telegram_users', [
+            'id' => $adminTelegramUser->id,
+        ]);
+    }
+
+    public function test_superadmin_cannot_delete_own_account(): void
+    {
+        $superAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
+        $superAdminUser = User::factory()->create([
+            'telegram_user_id' => $superAdminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($superAdminUser);
+
+        $response = $this->deleteJson("/api/users/{$superAdminTelegramUser->user_id}");
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'You cannot delete your own account.');
+
+        $this->assertDatabaseHas('telegram_users', [
+            'id' => $superAdminTelegramUser->id,
+            'level' => 0,
         ]);
     }
 
