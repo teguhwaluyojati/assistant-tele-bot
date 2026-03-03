@@ -143,6 +143,39 @@ class AuthAndDashboardTest extends TestCase
         }
     }
 
+    public function test_admin_cannot_bootstrap_first_superadmin_for_non_configured_id(): void
+    {
+        TelegramUser::query()->where('level', 0)->update(['level' => 1]);
+
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+        $targetTelegramUser = TelegramUser::factory()->create(['level' => 2]);
+
+        $original = $this->setTelegramAdminIds((string) ($targetTelegramUser->user_id + 99999));
+
+        try {
+            Sanctum::actingAs($adminUser);
+
+            $response = $this->putJson("/api/users/{$targetTelegramUser->user_id}/role", [
+                'level' => 0,
+            ]);
+
+            $response
+                ->assertStatus(403)
+                ->assertJsonPath('success', false)
+                ->assertJsonPath('message', 'Only superadmin can manage superadmin role.');
+
+            $this->assertDatabaseHas('telegram_users', [
+                'id' => $targetTelegramUser->id,
+                'level' => 2,
+            ]);
+        } finally {
+            $this->setTelegramAdminIds($original);
+        }
+    }
+
     public function test_superadmin_can_manage_admin_role_change(): void
     {
         $superAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
@@ -165,6 +198,88 @@ class AuthAndDashboardTest extends TestCase
         $this->assertDatabaseHas('telegram_users', [
             'id' => $targetAdminTelegramUser->id,
             'level' => 2,
+        ]);
+    }
+
+    public function test_admin_cannot_delete_superadmin_account(): void
+    {
+        $superAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
+        User::factory()->create([
+            'telegram_user_id' => $superAdminTelegramUser->id,
+        ]);
+
+        $adminTelegramUser = TelegramUser::factory()->admin()->create();
+        $adminUser = User::factory()->create([
+            'telegram_user_id' => $adminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->deleteJson("/api/users/{$superAdminTelegramUser->user_id}");
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Admin can only manage member accounts.');
+
+        $this->assertDatabaseHas('telegram_users', [
+            'id' => $superAdminTelegramUser->id,
+        ]);
+    }
+
+    public function test_superadmin_can_delete_admin_account(): void
+    {
+        $superAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
+        $superAdminUser = User::factory()->create([
+            'telegram_user_id' => $superAdminTelegramUser->id,
+        ]);
+
+        $targetAdminTelegramUser = TelegramUser::factory()->admin()->create();
+        User::factory()->create([
+            'telegram_user_id' => $targetAdminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($superAdminUser);
+
+        $response = $this->deleteJson("/api/users/{$targetAdminTelegramUser->user_id}");
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user_id', $targetAdminTelegramUser->user_id);
+
+        $this->assertDatabaseMissing('telegram_users', [
+            'id' => $targetAdminTelegramUser->id,
+        ]);
+    }
+
+    public function test_superadmin_can_delete_another_superadmin_when_multiple_exist(): void
+    {
+        $actorSuperAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
+        $actorSuperAdminUser = User::factory()->create([
+            'telegram_user_id' => $actorSuperAdminTelegramUser->id,
+        ]);
+
+        $targetSuperAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
+        User::factory()->create([
+            'telegram_user_id' => $targetSuperAdminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($actorSuperAdminUser);
+
+        $response = $this->deleteJson("/api/users/{$targetSuperAdminTelegramUser->user_id}");
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.user_id', $targetSuperAdminTelegramUser->user_id);
+
+        $this->assertDatabaseMissing('telegram_users', [
+            'id' => $targetSuperAdminTelegramUser->id,
+        ]);
+        $this->assertDatabaseHas('telegram_users', [
+            'id' => $actorSuperAdminTelegramUser->id,
+            'level' => 0,
         ]);
     }
 
