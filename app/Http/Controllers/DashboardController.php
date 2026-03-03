@@ -145,27 +145,22 @@ class DashboardController extends Controller
 
     public function lastLogin()
     {
-        if ($response = $this->requireAdmin()) {
-            return $response;
+        try {
+            $currentUser = auth()->user();
+            if (!$currentUser) {
+                return $this->errorResponse('Unauthorized.', 401);
+            }
+
+            $data = (new LoginModel())->lastLogin();
+            if (!$data) {
+                return $this->errorResponse('No login history found', 404);
+            }
+
+            return $this->successResponse($data, 'Login history retrieved successfully.');
+        } catch (\Exception $e) {
+            Log::error('Error retrieving login history: ' . $e->getMessage());
+            return $this->errorResponse('An error occurred while retrieving login history.', 500);
         }
-
-        Log::info('Cek: Fungsi lastLogin dipanggil');
-       try{
-
-        $data = (new LoginModel())->lastLogin();
-        if(!$data){
-            return $this->errorResponse('No login history found', 404);
-
-            Log::error('No login history found for user: ' . auth()->user()->email);
-        }
-
-        return $this->successResponse($data, 'Login history retrieved successfully.');
-
-       }catch(\Exception $e){
-        Log::error('Error retrieving login history: ' . $e->getMessage());
-
-        return $this->errorResponse('An error occurred while retrieving login history.', 500);
-       }
     }
 
     public function upload(Request $request)
