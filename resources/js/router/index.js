@@ -141,7 +141,8 @@ router.beforeEach(async (to, from, next) => {
       localStorage.setItem('user', JSON.stringify(currentUser));
     }
 
-    const isAdmin = currentUser?.telegram_user?.level === 1;
+    const roleLevel = Number(currentUser?.telegram_user?.level)
+    const isAdmin = [0, 1].includes(roleLevel)
     if (requiresAdmin && !isAdmin) {
       next({ name: 'dashboard' });
       return;
