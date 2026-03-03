@@ -55,6 +55,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/transactions/{id}', [DashboardController::class, 'deleteTransaction']);
     Route::post('/transactions/bulk-delete', [DashboardController::class, 'bulkDeleteTransactions']);
 
+    Route::post('/stocks/upload', [DashboardController::class, 'upload']);
+
     Route::get('/audit-logs', [AuditLogController::class, 'index']);
     Route::get('/audit-logs/export', [AuditLogController::class, 'export']);
     Route::get('/audit-logs/page-visits', [AuditLogController::class, 'pageVisits']);
@@ -80,5 +82,3 @@ Route::post('/forgot-password/verify', [ForgotPasswordController::class, 'verify
 
 Route::post('/client-error', [ClientErrorController::class, 'store'])
     ->middleware('throttle:client-error');
-
-Route::post('/stocks/upload', [DashboardController::class, 'upload']);
