@@ -1,82 +1,177 @@
 <template>
-  <div class="login-container">
-    <div class="left-pane">
-      <div class="welcome-text">
-        <h1>Manage Your Bot</h1>
-        <p>Access admin dashboard to monitor
-            <span class="typing-text">{{ typedText }}</span>
-        </p>
-      </div>
-      <div class="welcome-illustration">
-        <svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-          <path d="m9 12 2 2 4-4"></path>
-        </svg>
-      </div>
-    </div>
+  <div class="relative min-h-screen overflow-hidden bg-gray-50 dark:bg-slate-900">
+    <div
+      class="absolute inset-0 bg-cover bg-center"
+      style="background-image: url('/images/background-login.jpg')"
+    ></div>
+    <div class="absolute inset-0 bg-gradient-to-br from-slate-900/75 via-slate-900/65 to-slate-800/70"></div>
 
-    <div class="right-pane">
-      <div class="login-box">
-        <div class="logo">
-          🤖
+    <div
+      class="relative"
+    >
+    <div
+      class="mx-auto grid min-h-screen max-w-7xl grid-cols-1 gap-8 px-4 py-8 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:px-8 lg:py-12"
+    >
+      <section class="order-2 flex flex-col justify-center lg:order-1">
+        <div
+          class="rounded-2xl border border-gray-200 bg-white/95 p-6 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/90 sm:p-8"
+        >
+          <p class="text-sm font-medium text-blue-600 dark:text-blue-400">
+            Welcome to Assistant Tele Bot
+          </p>
+          <h1 class="mt-2 text-3xl font-bold text-gray-900 dark:text-white sm:text-4xl">
+            Financial control from Telegram to Dashboard
+          </h1>
+          <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-slate-300 sm:text-base">
+            Track transactions, monitor user activity, and manage roles in one secure workspace.
+          </p>
+
+          <div class="mt-6 grid gap-3 sm:grid-cols-2">
+            <div class="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
+              <h2 class="text-sm font-semibold text-gray-900 dark:text-white">Core Features</h2>
+              <ul class="mt-2 space-y-1 text-sm text-gray-600 dark:text-slate-300">
+                <li>Transaction tracking and export</li>
+                <li>Dashboard analytics and insights</li>
+                <li>User and role management</li>
+                <li>Audit logging for key actions</li>
+              </ul>
+            </div>
+            <div class="rounded-xl border border-gray-200 p-4 dark:border-slate-700">
+              <h2 class="text-sm font-semibold text-gray-900 dark:text-white">Access Roles</h2>
+              <ul class="mt-2 space-y-1 text-sm text-gray-600 dark:text-slate-300">
+                <li>Superadmin: full system control</li>
+                <li>Admin: operational management</li>
+                <li>Member: personal finance access</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="mt-6 rounded-xl border border-gray-200 p-4 dark:border-slate-700">
+            <h2 class="text-sm font-semibold text-gray-900 dark:text-white">How it works</h2>
+            <ol class="mt-2 list-decimal space-y-1 pl-5 text-sm text-gray-600 dark:text-slate-300">
+              <li>Start the Telegram bot and register your account.</li>
+              <li>Login to web dashboard with your credentials.</li>
+              <li>Monitor activity and manage operations by role.</li>
+            </ol>
+          </div>
         </div>
-        <h2 class="login-title">Welcome!</h2>
-        <p class="login-subtitle">Please login to continue.</p>
+      </section>
 
-        <form @submit.prevent="handleLogin">
-          <div class="form-group">
-            <label for="email">Email</label>
-            <div class="input-wrapper">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-              <input type="email" id="email" v-model="form.email" placeholder="example@email.com" required :disabled="loading" />
+      <section class="order-1 flex items-center justify-center lg:order-2">
+        <div
+          class="w-full max-w-md rounded-2xl border border-gray-200 bg-white/95 p-6 shadow-sm backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/90 sm:p-8"
+        >
+          <div class="mb-6 text-center">
+            <p class="text-3xl">🤖</p>
+            <h2 class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">Sign in</h2>
+            <p class="mt-1 text-sm text-gray-600 dark:text-slate-300">Access your dashboard securely</p>
+          </div>
+
+          <form class="space-y-4" @submit.prevent="handleLogin">
+            <div>
+              <label
+                for="email"
+                class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-200"
+              >
+                Email
+              </label>
+              <input
+                id="email"
+                v-model="form.email"
+                type="email"
+                placeholder="you@example.com"
+                autocomplete="email"
+                :disabled="loading"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                required
+              />
             </div>
-          </div>
 
-          <div class="form-group">
-            <label for="password">Password</label>
-            <div class="input-wrapper">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-              <input :type="passwordFieldType" id="password" v-model="form.password" placeholder="••••••••" required :disabled="loading" />
-              <button type="button" class="password-toggle" @click="togglePasswordVisibility">
-                <svg v-if="passwordFieldType === 'password'" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>
-              </button>
+            <div>
+              <label
+                for="password"
+                class="mb-1 block text-sm font-medium text-gray-700 dark:text-slate-200"
+              >
+                Password
+              </label>
+              <div class="relative">
+                <input
+                  id="password"
+                  v-model="form.password"
+                  :type="passwordFieldType"
+                  placeholder="••••••••"
+                  autocomplete="current-password"
+                  :disabled="loading"
+                  class="w-full rounded-lg border border-gray-300 px-3 py-2 pr-12 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:cursor-not-allowed disabled:opacity-70 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                  required
+                />
+                <button
+                  type="button"
+                  class="absolute inset-y-0 right-0 px-3 text-xs font-semibold text-gray-500 hover:text-gray-700 disabled:cursor-not-allowed dark:text-slate-400 dark:hover:text-slate-200"
+                  :disabled="loading"
+                  @click="togglePasswordVisibility"
+                >
+                  {{ passwordFieldType === 'password' ? 'Show' : 'Hide' }}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div v-if="error" class="error-message">
-            {{ error }}
-          </div>
-
-          <button type="submit" :disabled="!isFormValid || loading" :class="{ 'loading': loading }">
-            <span v-if="loading">
-              <div class="spinner"></div>
-            </span>
-            <span v-else>Login</span>
-          </button>
-
-          <p class="register-link">
-            <router-link to="/forgot-password">Forgot password?</router-link>
-          </p>
-
-          <p class="register-link">
-            Did not have an account? 
-            <router-link to="/register">Register here!</router-link>
-          </p>
-
-          <div class="login-meta">
-            <p class="creator-credit">
-              <a href="https://teguhwaluyojati.github.io" target="_blank" rel="noopener noreferrer">Built by Teguh Waluyojati</a>
+            <p
+              v-if="error"
+              class="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+            >
+              {{ error }}
             </p>
+
+            <button
+              type="submit"
+              :disabled="!isFormValid || loading"
+              class="inline-flex w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span v-if="loading">Signing in...</span>
+              <span v-else>Login</span>
+            </button>
+          </form>
+
+          <div class="mt-5 flex items-center justify-between text-sm">
+            <router-link
+              to="/forgot-password"
+              class="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Forgot password?
+            </router-link>
+            <router-link
+              to="/register"
+              class="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Create account
+            </router-link>
           </div>
-        </form>
-      </div>
+
+          <p class="mt-5 text-center text-xs text-gray-500 dark:text-slate-400">
+            Authenticated with Sanctum and activity logging enabled.
+          </p>
+
+          <p class="mt-2 text-center text-xs text-gray-500 dark:text-slate-400">
+            Built by
+            <a
+              href="https://teguhwaluyojati.github.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Teguh Waluyojati
+            </a>
+          </p>
+        </div>
+      </section>
+    </div>
     </div>
   </div>
 </template>
 
 <script>
-import axios from 'axios';
+import axios from 'axios'
 
 export default {
   name: 'Login',
@@ -84,392 +179,46 @@ export default {
     return {
       form: {
         email: '',
-        password: ''
+        password: '',
       },
       loading: false,
       error: null,
       passwordFieldType: 'password',
-      phrases: [
-        'your Telegram bot',
-        'user data',
-        'daily reports',
-        'weekly reports',
-        'monthly reports'
-      ],
-      typedText: '',
-      phraseIndex: 0,
-      charIndex: 0,
-      isDeleting: false,
-      typingSpeed: 100,
-      deletingSpeed: 50,
-      delayBetweenPhrases: 2000,
-      _typingTimer: null,
-    };
+    }
   },
   computed: {
     isFormValid() {
-      return this.form.email.length > 0 && this.form.password.length > 0;
-    }
-  },
-  mounted() {
-    this.typingEffect();
-  },
-    beforeUnmount() {
-    if (this._typingTimer) {
-      clearTimeout(this._typingTimer);
-      this._typingTimer = null;
-    }
+      return this.form.email.length > 0 && this.form.password.length > 0
+    },
   },
   methods: {
     togglePasswordVisibility() {
-      this.passwordFieldType = this.passwordFieldType === 'password' ? 'text' : 'password';
-    },
-    typingEffect() {
-      const currentPhrase = this.phrases[this.phraseIndex];
-      let timeoutSpeed = this.typingSpeed;
-
-      if (this.isDeleting) {
-        this.typedText = currentPhrase.substring(0, this.charIndex - 1);
-        this.charIndex--;
-        timeoutSpeed = this.deletingSpeed;
-        
-        if (this.typedText === '') {
-          this.isDeleting = false;
-          this.phraseIndex = (this.phraseIndex + 1) % this.phrases.length;
-          timeoutSpeed = 500; 
-        }
-      } 
-      else {
-        this.typedText = currentPhrase.substring(0, this.charIndex + 1);
-        this.charIndex++;
-
-        if (this.typedText === currentPhrase) {
-          this.isDeleting = true;
-          timeoutSpeed = this.delayBetweenPhrases; 
-        }
-      }
-
-      setTimeout(this.typingEffect, timeoutSpeed);
+      this.passwordFieldType = this.passwordFieldType === 'password' ? 'text' : 'password'
     },
     async handleLogin() {
-    this.error = null;
-    this.loading = true;
-        try {
-        const email = this.form.email.trim().toLowerCase();
-        const password = this.form.password;
+      this.error = null
+      this.loading = true
 
-            const response = await axios.post('/api/login', {
-        email,
-        password,
-            });
+      try {
+        const response = await axios.post('/api/login', {
+          email: this.form.email.trim().toLowerCase(),
+          password: this.form.password,
+        })
 
-            localStorage.setItem('user', JSON.stringify(response.data.user));
-
-            console.log('Login successful:', response.data);
-
-            window.location.href = '/dashboard';
-
-        } catch (error) {
-            if (error.response) {
-            this.error = error.response.data.message || 'Email or password is incorrect.';
-            console.error('Login error response:', error.response.data);
-            } else if (error.request) {
-            this.error = 'Unable to connect to server. Please try again.';
-            console.error('Login error request:', error.request);
-            } else {
-            this.error = 'An error occurred. Please reload the page.';
-            console.error('Login error:', error.message);
-            }
-        } finally {
-            this.loading = false;
+        localStorage.setItem('user', JSON.stringify(response.data.user))
+        this.$router.replace('/dashboard')
+      } catch (error) {
+        if (error.response) {
+          this.error = error.response.data.message || 'Email or password is incorrect.'
+        } else if (error.request) {
+          this.error = 'Unable to connect to server. Please try again.'
+        } else {
+          this.error = 'An error occurred. Please reload the page.'
         }
-    }
-  }
+      } finally {
+        this.loading = false
+      }
+    },
+  },
 }
 </script>
-<style scoped>
-:root {
-  --primary-color: #4a90e2;
-  --primary-color-dark: #357ABD;
-  --text-color: #333;
-  --text-color-light: #fff;
-  --border-color: #ddd;
-  --error-color: #e74c3c;
-}
-
-.login-container {
-  display: flex;
-  width: 100%;
-  min-height: 100vh;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  
-  background-image:
-    linear-gradient(rgba(10, 25, 47, 0.7), rgba(10, 25, 47, 0.7)),
-    url('/images/background-login.jpg');
-  
-  background-size: cover; 
-  background-position: center;
-}
-
-.left-pane {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 40px;
-  color: var(--text-color-light);
-  background: transparent; 
-  text-align: center;
-}
-.welcome-text h1 {
-  color: white;
-  font-size: 3rem;
-  margin-bottom: 20px;
-  font-weight: 300;
-  text-shadow: 2px 2px 8px rgba(0,0,0,0.5); 
-}
-.welcome-text p {
-  color: white;
-  font-size: 1.1rem;
-  line-height: 1.6;
-  max-width: 450px;
-  opacity: 0.9;
-  text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
-  height: 50px; 
-}
-
-.typing-text {
-  font-weight: bold;
-  color: #f1c40f; 
-  border-right: .15em solid #f1c40f;
-  animation: blink-caret .75s step-end infinite;
-}
-
-@keyframes blink-caret {
-  from, to { border-color: transparent }
-  50% { border-color: #f1c40f; }
-}
-.welcome-illustration {
-  margin-top: 40px;
-}
-.welcome-illustration svg {
-  stroke: var(--text-color-light);
-  opacity: 0.8;
-  filter: drop-shadow(0px 0px 10px rgba(0,0,0,0.5)); 
-}
-
-.right-pane {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 40px;
-}
-
-.login-box {
-  background-color: #fff;
-  padding: 40px;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 400px;
-  animation: fadeIn 0.8s ease-in-out;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-
-}
-
-.login-box:hover {
-  transform: translateY(-10px); 
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
-}
-
-.logo {
-  font-size: 3rem;
-  margin-bottom: 20px;
-}
-
-.login-title {
-  color: var(--text-color);
-  font-size: 2rem;
-  font-weight: 600;
-}
-
-.login-subtitle {
-  color: #666;
-  margin-bottom: 30px;
-}
-
-.form-group {
-  margin-bottom: 25px;
-  text-align: left;
-}
-.form-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #555;
-  font-weight: 500;
-}
-.input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.input-wrapper svg:not(.password-toggle-icon) {
-  position: absolute;
-  left: 15px;
-  color: #aaa;
-  z-index: 10;
-}
-
-.input-wrapper input {
-  width: 100%;
-  padding: 12px 12px 12px 45px; 
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: all 0.3s ease;
-}
-.input-wrapper input:focus {
-  border-color: var(--primary-color);
-  outline: none;
-  box-shadow: 0 0 0 4px rgba(74, 144, 226, 0.2);
-}
-input[type="password"]::-ms-reveal,
-input[type="password"]::-ms-clear {
-  display: none;
-}
-.password-toggle {
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  
-  height: 100%;
-  width: 45px; 
-  
-  background: transparent;
-  border: none;
-  cursor: pointer;
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.error-message {
-  color: var(--error-color);
-  background-color: rgba(231, 76, 60, 0.1);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 20px;
-  font-size: 0.9rem;
-  animation: slideDown 0.5s ease-out;
-}
-
-button[type="submit"] {
-  width: 100%;
-  padding: 14px;
-  background-color: var(--primary-color);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 1.1rem;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 50px;
-}
-button[type="submit"]:hover:not(:disabled) {
-  background-color: #71b5e6;
-
-}
-button[type="submit"].loading {
-  cursor: not-allowed;
-  background-color: #a0ccec;
-}
-button[type="submit"] {
-  background-color: #a0ccec;
-}
-button[type="submit"]:disabled {
-  background-color: #a0ccec;
-  cursor: not-allowed;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.spinner {
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top: 3px solid #fff;
-  width: 20px;
-  height: 20px;
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.register-link {
-  text-align: center;
-  margin-top: 20px;
-  color: #666;
-  font-size: 0.95rem;
-}
-
-.register-link a {
-  color: #2c5aa0;
-  text-decoration: none;
-  font-weight: 600;
-  transition: color 0.3s ease;
-}
-
-.register-link a:hover {
-  color: #71b5e6;
-  text-decoration: underline;
-}
-
-.login-meta {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid #e6eaf0;
-}
-
-.creator-credit {
-  text-align: center;
-  margin: 0;
-  font-size: 0.82rem;
-  color: #8a94a6;
-}
-
-.creator-credit a {
-  color: inherit;
-  text-decoration: none;
-  transition: color 0.3s ease;
-}
-
-.creator-credit a:hover {
-  color: #2c5aa0;
-  text-decoration: underline;
-}
-
-@media (max-width: 768px) {
-  .left-pane {
-    display: none;
-  }
-  .right-pane {
-    padding: 20px;
-  }
-}
-</style>
