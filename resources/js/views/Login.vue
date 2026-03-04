@@ -64,7 +64,7 @@
           <div class="mb-6 text-center">
             <p class="text-3xl">🤖</p>
             <h2 class="mt-2 text-2xl font-bold text-gray-900 dark:text-white">Sign in</h2>
-            <p class="mt-1 text-sm text-gray-600 dark:text-slate-300">Access your dashboard securely</p>
+            <p class="mt-1 text-sm text-gray-600 dark:text-slate-300">Access your dashboard securely.</p>
           </div>
 
           <form class="space-y-4" @submit.prevent="handleLogin">
