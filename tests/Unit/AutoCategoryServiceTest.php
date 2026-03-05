@@ -2,8 +2,10 @@
 
 namespace Tests\Unit;
 
+use App\Services\AutoCategoryLlmService;
 use App\Services\AutoCategoryService;
 use Illuminate\Support\Facades\Config;
+use Mockery;
 use Tests\TestCase;
 
 class AutoCategoryServiceTest extends TestCase
@@ -13,6 +15,13 @@ class AutoCategoryServiceTest extends TestCase
         parent::setUp();
 
         Config::set('autocategory.ml.enabled', false);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+
+        parent::tearDown();
     }
 
     public function test_infer_returns_category_for_matching_expense_description(): void
@@ -101,5 +110,43 @@ class AutoCategoryServiceTest extends TestCase
 
         $this->assertNotNull($result);
         $this->assertSame('Bills & Utilities', $result['category']);
+    }
+
+    public function test_infer_uses_llm_fallback_when_rule_and_ml_do_not_match(): void
+    {
+        Config::set('autocategory.llm.enabled', true);
+        Config::set('autocategory.llm.rollout_percentage', 100);
+        Config::set('autocategory.llm.min_confidence', 0.7);
+
+        $llmService = Mockery::mock(AutoCategoryLlmService::class);
+        $llmService->shouldReceive('inferCategory')
+            ->once()
+            ->andReturn([
+                'category' => 'Pet Care',
+                'confidence' => 0.91,
+            ]);
+
+        $service = new AutoCategoryService($llmService);
+
+        $result = $service->infer('vaksin booster anabul bulanan', 'expense');
+
+        $this->assertNotNull($result);
+        $this->assertSame('Pet Care', $result['category']);
+        $this->assertSame(0.91, $result['confidence']);
+    }
+
+    public function test_infer_does_not_call_llm_when_rollout_is_zero_percent(): void
+    {
+        Config::set('autocategory.llm.enabled', true);
+        Config::set('autocategory.llm.rollout_percentage', 0);
+
+        $llmService = Mockery::mock(AutoCategoryLlmService::class);
+        $llmService->shouldNotReceive('inferCategory');
+
+        $service = new AutoCategoryService($llmService);
+
+        $result = $service->infer('vaksin booster anabul bulanan', 'expense');
+
+        $this->assertNull($result);
     }
 }

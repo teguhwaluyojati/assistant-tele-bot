@@ -2,6 +2,7 @@
 
 return [
     'min_confidence' => 0.60,
+    'log_decisions' => true,
 
     'ml' => [
         'enabled' => true,
@@ -14,6 +15,19 @@ return [
             'dan', 'yang', 'di', 'ke', 'dari', 'untuk', 'pada', 'ini', 'itu', 'aja', 'saja',
             'bulan', 'hari', 'minggu', 'tahun', 'biaya', 'bayar', 'beli', 'uang', 'transfer',
         ],
+    ],
+
+    'llm' => [
+        'enabled' => false,
+        'provider' => 'openai-compatible',
+        'endpoint' => env('AUTOCATEGORY_LLM_ENDPOINT', 'https://api.openai.com/v1/chat/completions'),
+        'api_key' => env('AUTOCATEGORY_LLM_API_KEY', ''),
+        'model' => env('AUTOCATEGORY_LLM_MODEL', 'gpt-4o-mini'),
+        'timeout_seconds' => 8,
+        'cache_ttl_seconds' => 3600,
+        'rollout_percentage' => 10,
+        'max_requests_per_minute' => 30,
+        'min_confidence' => 0.75,
     ],
 
     'category_keywords' => [

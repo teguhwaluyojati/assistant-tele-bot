@@ -4,10 +4,16 @@ namespace App\Services;
 
 use App\Models\Transaction;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class AutoCategoryService
 {
     private const DEFAULT_MIN_CONFIDENCE = 0.60;
+
+    public function __construct(private ?AutoCategoryLlmService $llmService = null)
+    {
+        $this->llmService = $this->llmService ?? app(AutoCategoryLlmService::class);
+    }
 
     public function warmMlModels(array $types = ['all', 'expense', 'income'], bool $rebuild = false): array
     {
@@ -50,6 +56,7 @@ class AutoCategoryService
     {
         $normalized = $this->normalize($description);
         if ($normalized === '') {
+            $this->logDecision('none', null, 0.0, $type, $description, ['reason' => 'empty_description']);
             return null;
         }
 
@@ -82,17 +89,99 @@ class AutoCategoryService
         }
 
         if ($bestScore <= 0 || $bestCategory === null) {
-            return $this->mlFallbackInfer($normalized, $type);
+            $mlResult = $this->mlFallbackInfer($normalized, $type);
+            if ($mlResult) {
+                $this->logDecision('ml', $mlResult['category'], (float) ($mlResult['confidence'] ?? 0), $type, $description, ['reason' => 'rule_no_match']);
+
+                return $mlResult;
+            }
+
+            $llmResult = $this->llmFallbackInfer($normalized, $description, $type);
+            if ($llmResult) {
+                $this->logDecision('llm', $llmResult['category'], (float) ($llmResult['confidence'] ?? 0), $type, $description, ['reason' => 'rule_no_match_ml_no_match']);
+
+                return $llmResult;
+            }
+
+            $this->logDecision('none', null, 0.0, $type, $description, ['reason' => 'rule_ml_llm_no_match']);
+
+            return null;
         }
 
         $confidence = min(0.97, 0.46 + ($bestScore * 0.16));
 
         if ($confidence < $this->minConfidence()) {
-            return $this->mlFallbackInfer($normalized, $type);
+            $mlResult = $this->mlFallbackInfer($normalized, $type);
+            if ($mlResult) {
+                $this->logDecision('ml', $mlResult['category'], (float) ($mlResult['confidence'] ?? 0), $type, $description, [
+                    'reason' => 'rule_low_confidence',
+                    'rule_confidence' => round($confidence, 2),
+                ]);
+
+                return $mlResult;
+            }
+
+            $llmResult = $this->llmFallbackInfer($normalized, $description, $type);
+            if ($llmResult) {
+                $this->logDecision('llm', $llmResult['category'], (float) ($llmResult['confidence'] ?? 0), $type, $description, [
+                    'reason' => 'rule_low_confidence_ml_no_match',
+                    'rule_confidence' => round($confidence, 2),
+                ]);
+
+                return $llmResult;
+            }
+
+            $this->logDecision('none', null, 0.0, $type, $description, [
+                'reason' => 'rule_low_confidence_ml_llm_no_match',
+                'rule_confidence' => round($confidence, 2),
+            ]);
+
+            return null;
+        }
+
+        $result = [
+            'category' => $bestCategory,
+            'confidence' => round($confidence, 2),
+        ];
+
+        $this->logDecision('rule', $result['category'], (float) $result['confidence'], $type, $description, [
+            'score' => $bestScore,
+        ]);
+
+        return $result;
+    }
+
+    private function llmFallbackInfer(string $normalizedDescription, ?string $originalDescription, ?string $type = null): ?array
+    {
+        if (!$this->llmEnabled()) {
+            return null;
+        }
+
+        if (!$this->shouldUseLlmByRollout($normalizedDescription)) {
+            return null;
+        }
+
+        if (!$this->reserveLlmQuota()) {
+            return null;
+        }
+
+        $allowedCategories = $this->allowedCategoriesForType($type);
+        if (count($allowedCategories) === 0) {
+            return null;
+        }
+
+        $llmResult = $this->llmService?->inferCategory((string) $originalDescription, $type, $allowedCategories);
+        if (!$llmResult) {
+            return null;
+        }
+
+        $confidence = (float) ($llmResult['confidence'] ?? 0);
+        if ($confidence < $this->llmMinConfidence()) {
+            return null;
         }
 
         return [
-            'category' => $bestCategory,
+            'category' => (string) $llmResult['category'],
             'confidence' => round($confidence, 2),
         ];
     }
@@ -350,5 +439,85 @@ class AutoCategoryService
         $stopwords = config('autocategory.ml.stopwords', []);
 
         return is_array($stopwords) ? $stopwords : [];
+    }
+
+    private function llmEnabled(): bool
+    {
+        return (bool) config('autocategory.llm.enabled', false);
+    }
+
+    private function llmRolloutPercentage(): int
+    {
+        $value = (int) config('autocategory.llm.rollout_percentage', 10);
+
+        return max(0, min(100, $value));
+    }
+
+    private function llmMinConfidence(): float
+    {
+        return (float) config('autocategory.llm.min_confidence', 0.75);
+    }
+
+    private function llmMaxRequestsPerMinute(): int
+    {
+        return max(1, (int) config('autocategory.llm.max_requests_per_minute', 30));
+    }
+
+    private function shouldUseLlmByRollout(string $normalizedDescription): bool
+    {
+        $percentage = $this->llmRolloutPercentage();
+        if ($percentage <= 0) {
+            return false;
+        }
+
+        if ($percentage >= 100) {
+            return true;
+        }
+
+        $bucket = abs((int) crc32($normalizedDescription)) % 100;
+
+        return $bucket < $percentage;
+    }
+
+    private function reserveLlmQuota(): bool
+    {
+        $key = 'autocategory.llm.quota.' . now()->format('YmdHi');
+        $limit = $this->llmMaxRequestsPerMinute();
+
+        $count = Cache::add($key, 1, 70)
+            ? 1
+            : (int) Cache::increment($key);
+
+        return $count <= $limit;
+    }
+
+    private function allowedCategoriesForType(?string $type): array
+    {
+        $keywords = $this->categoryKeywords();
+
+        if (in_array($type, ['income', 'expense'], true)) {
+            return array_keys($keywords[$type] ?? []);
+        }
+
+        return collect($keywords)
+            ->flatMap(fn ($group) => array_keys(is_array($group) ? $group : []))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function logDecision(string $engine, ?string $category, float $confidence, ?string $type, ?string $description, array $extra = []): void
+    {
+        if (!(bool) config('autocategory.log_decisions', true)) {
+            return;
+        }
+
+        Log::info('autocategory.decision', array_merge([
+            'engine' => $engine,
+            'category' => $category,
+            'confidence' => round($confidence, 2),
+            'type' => $type,
+            'description_preview' => mb_substr(trim((string) $description), 0, 120),
+        ], $extra));
     }
 }
