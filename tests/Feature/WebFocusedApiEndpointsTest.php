@@ -15,6 +15,38 @@ class WebFocusedApiEndpointsTest extends TestCase
 {
     use DatabaseTransactions;
 
+    public function test_unauthenticated_cannot_upload_stocks_endpoint(): void
+    {
+        $response = $this->postJson('/api/stocks/upload', []);
+
+        $response->assertStatus(401);
+    }
+
+    public function test_non_admin_cannot_upload_stocks_endpoint(): void
+    {
+        [$user] = $this->createUserWithTelegram(level: 2);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/stocks/upload', []);
+
+        $response
+            ->assertStatus(403)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', 'Forbidden.');
+    }
+
+    public function test_admin_upload_stocks_requires_file_validation(): void
+    {
+        [$adminUser] = $this->createUserWithTelegram(level: 1);
+
+        Sanctum::actingAs($adminUser);
+
+        $response = $this->postJson('/api/stocks/upload', []);
+
+        $response->assertStatus(422)->assertJsonValidationErrors(['file']);
+    }
+
     public function test_api_user_returns_authenticated_user_with_telegram_relation(): void
     {
         [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);

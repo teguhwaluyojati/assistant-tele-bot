@@ -38,7 +38,7 @@ class LoginLogoutTest extends TestCase
 
         $response
             ->assertStatus(200)
-            ->assertJsonPath('message', 'Logout berhasil!')
+            ->assertJsonPath('message', 'Logout successful!')
             ->assertCookieExpired('auth_token');
     }
 }

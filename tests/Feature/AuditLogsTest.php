@@ -165,4 +165,21 @@ class AuditLogsTest extends TestCase
         $this->assertStringContainsString('audit-logs-', $contentDisposition);
         $this->assertStringContainsString('.xlsx', $contentDisposition);
     }
+
+    public function test_superadmin_can_access_audit_log_page_visits(): void
+    {
+        $superAdminTelegramUser = TelegramUser::factory()->create(['level' => 0]);
+        $superAdminUser = User::factory()->create([
+            'telegram_user_id' => $superAdminTelegramUser->id,
+        ]);
+
+        Sanctum::actingAs($superAdminUser);
+
+        $response = $this->getJson('/api/audit-logs/page-visits?per_page=10');
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonStructure(['data' => ['data', 'current_page', 'per_page', 'total']]);
+    }
 }
