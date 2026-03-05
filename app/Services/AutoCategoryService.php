@@ -6,56 +6,6 @@ class AutoCategoryService
 {
     private const DEFAULT_MIN_CONFIDENCE = 0.60;
 
-    private const CATEGORY_KEYWORDS = [
-        'expense' => [
-            'Food & Drink' => ['makan', 'makanan', 'sarapan', 'lunch', 'dinner', 'kopi', 'cafe', 'resto', 'warung', 'gofood', 'grabfood'],
-            'Transport' => ['transport', 'bensin', 'bbm', 'tol', 'parkir', 'ojek', 'grab', 'gocar', 'taxi', 'bus', 'kereta'],
-            'Bills & Utilities' => ['listrik', 'air', 'internet', 'wifi', 'pln', 'tagihan', 'pulsa', 'token', 'bpjs'],
-            'Shopping' => ['belanja', 'shop', 'mall', 'alfamart', 'indomaret', 'minimarket', 'supermarket', 'marketplace', 'tokopedia', 'shopee'],
-            'Health' => ['obat', 'dokter', 'klinik', 'rumah sakit', 'hospital', 'apotek', 'vitamin', 'medical'],
-            'Education' => ['kursus', 'sekolah', 'kuliah', 'buku', 'les', 'training', 'sertifikasi'],
-            'Entertainment' => ['nonton', 'film', 'movie', 'cinema', 'bioskop', 'netflix', 'spotify', 'game', 'hiburan', 'rekreasi', 'travel', 'liburan'],
-        ],
-        'income' => [
-            'Salary' => ['gaji', 'salary', 'payroll', 'upah'],
-            'Bonus' => ['bonus', 'insentif', 'thr', 'komisi'],
-            'Business' => ['penjualan', 'jualan', 'omzet', 'profit', 'project', 'invoice'],
-            'Investment' => ['dividen', 'bunga', 'investasi', 'return', 'capital gain'],
-            'Gift' => ['hadiah', 'gift', 'hibah', 'transfer masuk', 'uang kaget'],
-        ],
-    ];
-
-    private const CATEGORY_SYNONYMS = [
-        'expense' => [
-            'Food & Drink' => ['mkn', 'makanan', 'jajan', 'ngopi', 'coffee', 'coffeeshop', 'warkop', 'go food', 'grab food'],
-            'Transport' => ['bensin motor', 'isi bensin', 'naik ojol', 'go ride', 'grab bike', 'angkot'],
-            'Bills & Utilities' => ['tagihan listrik', 'tagihan air', 'bayar internet', 'paket data', 'data plan'],
-            'Shopping' => ['beli barang', 'checkout', 'keranjang', 'ecommerce', 'online shop'],
-            'Health' => ['berobat', 'periksa', 'medical checkup', 'cek kesehatan'],
-            'Education' => ['belajar', 'kelas', 'bootcamp', 'ujian'],
-            'Entertainment' => ['nntn', 'nontonin', 'film', 'movie', 'cinema', 'bioskopan', 'nongkrong', 'hangout', 'mabar', 'streaming'],
-        ],
-        'income' => [
-            'Salary' => ['gajian', 'salary bulanan', 'payday'],
-            'Bonus' => ['bonus kantor', 'reward', 'incentive'],
-            'Business' => ['closing', 'deal', 'fee project', 'jasa'],
-            'Investment' => ['cuan saham', 'profit saham', 'bunga deposito'],
-            'Gift' => ['dikasih', 'pemberian', 'angpao'],
-        ],
-    ];
-
-    private const NORMALIZATION_MAP = [
-        'nntn' => 'nonton',
-        'nontonin' => 'nonton',
-        'filim' => 'film',
-        'flm' => 'film',
-        'mkn' => 'makan',
-        'jln2' => 'jalan jalan',
-        'go food' => 'gofood',
-        'grab food' => 'grabfood',
-        'gajian' => 'gaji',
-    ];
-
     public function infer(?string $description, ?string $type = null): ?array
     {
         $normalized = $this->normalize($description);
@@ -141,17 +91,23 @@ class AutoCategoryService
 
     private function categoryKeywords(): array
     {
-        return config('autocategory.category_keywords', self::CATEGORY_KEYWORDS);
+        $keywords = config('autocategory.category_keywords', []);
+
+        return is_array($keywords) ? $keywords : [];
     }
 
     private function categorySynonyms(): array
     {
-        return config('autocategory.category_synonyms', self::CATEGORY_SYNONYMS);
+        $synonyms = config('autocategory.category_synonyms', []);
+
+        return is_array($synonyms) ? $synonyms : [];
     }
 
     private function normalizationMap(): array
     {
-        return config('autocategory.normalization_map', self::NORMALIZATION_MAP);
+        $map = config('autocategory.normalization_map', []);
+
+        return is_array($map) ? $map : [];
     }
 
     private function minConfidence(): float
