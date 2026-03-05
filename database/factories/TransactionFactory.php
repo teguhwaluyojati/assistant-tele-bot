@@ -19,6 +19,9 @@ class TransactionFactory extends Factory
             'type' => $this->faker->randomElement(['income', 'expense']),
             'amount' => $this->faker->numberBetween(1000, 500000),
             'description' => $this->faker->sentence(3),
+            'category' => null,
+            'category_source' => null,
+            'category_confidence' => null,
             'created_at' => $this->faker->dateTimeBetween('-7 days', 'now'),
             'updated_at' => now(),
         ];

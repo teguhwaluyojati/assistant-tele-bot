@@ -14,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Database\QueryException;
 use App\Traits\ApiResponse;
+use App\Services\AutoCategoryService;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\StocksImport;
 use App\Exports\UserCommandsExport;
@@ -22,7 +23,13 @@ use App\Exports\UserCommandsExport;
 class DashboardController extends Controller
 {
     protected $model_login;
+    protected AutoCategoryService $autoCategoryService;
     use ApiResponse;
+
+    public function __construct(AutoCategoryService $autoCategoryService)
+    {
+        $this->autoCategoryService = $autoCategoryService;
+    }
 
     private function requireAdmin()
     {
@@ -835,7 +842,8 @@ class DashboardController extends Controller
                 'type' => ['required', 'in:income,expense'],
                 'amount' => ['required', 'integer', 'min:1'],
                 'transaction_date' => ['nullable', 'date_format:Y-m-d\\TH:i'],
-                'description' => ['required', 'string', 'max:255'],
+                'description' => ['nullable', 'string', 'max:255'],
+                'category' => ['nullable', 'string', 'max:100'],
             ]);
 
             $currentUser = auth()->user();
@@ -853,11 +861,34 @@ class DashboardController extends Controller
                 ? Carbon::createFromFormat('Y-m-d\\TH:i', $validated['transaction_date'], config('app.timezone'))
                 : now();
 
+            $description = trim((string) ($validated['description'] ?? ''));
+            $manualCategory = trim((string) ($validated['category'] ?? ''));
+
+            $category = null;
+            $categorySource = null;
+            $categoryConfidence = null;
+
+            if ($manualCategory !== '') {
+                $category = $manualCategory;
+                $categorySource = 'manual';
+                $categoryConfidence = 1.00;
+            } elseif ($description !== '') {
+                $inferredCategory = $this->autoCategoryService->infer($description, $validated['type']);
+                if ($inferredCategory) {
+                    $category = $inferredCategory['category'];
+                    $categorySource = 'auto';
+                    $categoryConfidence = $inferredCategory['confidence'];
+                }
+            }
+
             $transaction = new \App\Models\Transaction([
                 'user_id' => $telegramUser->user_id,
                 'type' => $validated['type'],
                 'amount' => $validated['amount'],
-                'description' => $validated['description'],
+                'description' => $description,
+                'category' => $category,
+                'category_source' => $categorySource,
+                'category_confidence' => $categoryConfidence,
             ]);
 
             $transaction->created_at = $transactionTimestamp;
@@ -917,7 +948,7 @@ class DashboardController extends Controller
         } catch (\Exception $e) {
             Log::error('Error creating transaction: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
-                'payload' => $request->only(['type', 'amount', 'transaction_date', 'description']),
+                'payload' => $request->only(['type', 'amount', 'transaction_date', 'description', 'category']),
             ]);
             return $this->errorResponse('An error occurred while creating transaction.', 500);
         }
@@ -929,7 +960,8 @@ class DashboardController extends Controller
             $validated = $request->validate([
                 'type' => ['required', 'in:income,expense'],
                 'amount' => ['required', 'integer', 'min:1'],
-                'description' => ['required', 'string', 'max:255'],
+                'description' => ['nullable', 'string', 'max:255'],
+                'category' => ['nullable', 'string', 'max:100'],
             ]);
 
             $transaction = \App\Models\Transaction::findOrFail($id);
@@ -942,7 +974,34 @@ class DashboardController extends Controller
                 return $this->errorResponse('Unauthorized to update this transaction.', 403);
             }
 
-            $transaction->update($validated);
+            $description = trim((string) ($validated['description'] ?? ''));
+            $manualCategory = trim((string) ($validated['category'] ?? ''));
+
+            $category = null;
+            $categorySource = null;
+            $categoryConfidence = null;
+
+            if ($manualCategory !== '') {
+                $category = $manualCategory;
+                $categorySource = 'manual';
+                $categoryConfidence = 1.00;
+            } elseif ($description !== '') {
+                $inferredCategory = $this->autoCategoryService->infer($description, $validated['type']);
+                if ($inferredCategory) {
+                    $category = $inferredCategory['category'];
+                    $categorySource = 'auto';
+                    $categoryConfidence = $inferredCategory['confidence'];
+                }
+            }
+
+            $transaction->update([
+                'type' => $validated['type'],
+                'amount' => $validated['amount'],
+                'description' => $description,
+                'category' => $category,
+                'category_source' => $categorySource,
+                'category_confidence' => $categoryConfidence,
+            ]);
 
             activity()
                 ->causedBy($currentUser)

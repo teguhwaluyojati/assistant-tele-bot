@@ -17,6 +17,13 @@ class Transaction extends Model
         'type',
         'amount',
         'description',
+        'category',
+        'category_source',
+        'category_confidence',
+    ];
+
+    protected $casts = [
+        'category_confidence' => 'float',
     ];
 
     /**

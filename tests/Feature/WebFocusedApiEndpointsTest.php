@@ -336,6 +336,133 @@ class WebFocusedApiEndpointsTest extends TestCase
         ]);
     }
 
+    public function test_transaction_create_auto_infers_category_from_description_when_category_not_provided(): void
+    {
+        [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/transactions', [
+            'type' => 'expense',
+            'amount' => 34000,
+            'description' => 'Makan malam di warung',
+        ]);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.category', 'Food & Drink')
+            ->assertJsonPath('data.category_source', 'auto');
+
+        $this->assertDatabaseHas('transactions', [
+            'user_id' => $telegramUser->user_id,
+            'type' => 'expense',
+            'amount' => 34000,
+            'description' => 'Makan malam di warung',
+            'category' => 'Food & Drink',
+            'category_source' => 'auto',
+        ]);
+    }
+
+    public function test_transaction_create_keeps_manual_category_when_user_selects_category(): void
+    {
+        [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/transactions', [
+            'type' => 'expense',
+            'amount' => 50000,
+            'description' => 'Makan siang bersama tim',
+            'category' => 'Team Event',
+        ]);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.category', 'Team Event')
+            ->assertJsonPath('data.category_source', 'manual')
+            ->assertJsonPath('data.category_confidence', 1);
+
+        $this->assertDatabaseHas('transactions', [
+            'user_id' => $telegramUser->user_id,
+            'amount' => 50000,
+            'description' => 'Makan siang bersama tim',
+            'category' => 'Team Event',
+            'category_source' => 'manual',
+            'category_confidence' => 1.00,
+        ]);
+    }
+
+    public function test_transaction_create_with_empty_description_keeps_category_null(): void
+    {
+        [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/transactions', [
+            'type' => 'expense',
+            'amount' => 12000,
+            'description' => '   ',
+        ]);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.description', '')
+            ->assertJsonPath('data.category', null)
+            ->assertJsonPath('data.category_source', null)
+            ->assertJsonPath('data.category_confidence', null);
+
+        $this->assertDatabaseHas('transactions', [
+            'user_id' => $telegramUser->user_id,
+            'type' => 'expense',
+            'amount' => 12000,
+            'description' => '',
+            'category' => null,
+            'category_source' => null,
+            'category_confidence' => null,
+        ]);
+    }
+
+    public function test_transaction_update_recomputes_auto_category_when_manual_category_not_provided(): void
+    {
+        [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);
+
+        $transaction = Transaction::factory()->create([
+            'user_id' => $telegramUser->user_id,
+            'type' => 'expense',
+            'amount' => 18000,
+            'description' => 'Old text',
+            'category' => null,
+            'category_source' => null,
+            'category_confidence' => null,
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->putJson('/api/transactions/' . $transaction->id, [
+            'type' => 'income',
+            'amount' => 4500000,
+            'description' => 'Gaji bulan Maret',
+        ]);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.category', 'Salary')
+            ->assertJsonPath('data.category_source', 'auto');
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $transaction->id,
+            'type' => 'income',
+            'amount' => 4500000,
+            'description' => 'Gaji bulan Maret',
+            'category' => 'Salary',
+            'category_source' => 'auto',
+        ]);
+    }
+
     private function createUserWithTelegram(int $level = 2): array
     {
         $telegramUser = TelegramUser::factory()->create(['level' => $level]);
