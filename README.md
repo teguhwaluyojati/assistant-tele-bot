@@ -81,6 +81,10 @@ The project is currently running with Sanctum-based APIs, activity logging, and 
 - Superadmin bootstrap runbook: `docs/rbac-superadmin-bootstrap-runbook.md`
 - Bootstrap command: `php artisan app:bootstrap-superadmin {chat_id?}`
 
+## Feature Delivery Plan
+
+- Transaction power features sprint plan: `docs/transaction-power-features-sprint-plan.md`
+
 ## API Highlights
 
 This README intentionally avoids listing every endpoint to keep it concise.
