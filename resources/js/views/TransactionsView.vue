@@ -33,8 +33,37 @@ const createTransactionForm = ref({
   amount: '',
   transaction_date: getCurrentLocalDateTime(),
   description: '',
+  category: '',
 })
 const isSubmittingTransaction = ref(false)
+
+const categoryOptionsByType = {
+  expense: [
+    'Food & Drink',
+    'Transport',
+    'Bills & Utilities',
+    'Shopping',
+    'Health',
+    'Education',
+    'Entertainment',
+  ],
+  income: [
+    'Salary',
+    'Bonus',
+    'Business',
+    'Investment',
+    'Gift',
+  ],
+}
+
+const createCategoryOptions = computed(() => {
+  const options = categoryOptionsByType[createTransactionForm.value.type] ?? []
+
+  return [
+    { value: '', label: 'Auto (based on description)' },
+    ...options.map((option) => ({ value: option, label: option })),
+  ]
+})
 
 const { toast: transactionToast, success: notifyTransactionSuccess, error: notifyTransactionError, runAction } = useActionToast(2600)
 
@@ -92,6 +121,7 @@ const resetCreateTransactionForm = () => {
     amount: '',
     transaction_date: getCurrentLocalDateTime(),
     description: '',
+    category: '',
   }
 }
 
@@ -101,19 +131,18 @@ const submitTransaction = async () => {
     return
   }
 
-  if (!createTransactionForm.value.description?.trim()) {
-    notifyTransactionError('Description is required.')
-    return
-  }
-
   isSubmittingTransaction.value = true
   try {
+    const normalizedDescription = createTransactionForm.value.description?.trim() || ''
+    const normalizedCategory = createTransactionForm.value.category?.trim() || null
+
     const { ok } = await runAction(
       () => axios.post('/api/transactions', {
         type: createTransactionForm.value.type,
         amount: Number(createTransactionForm.value.amount),
         transaction_date: createTransactionForm.value.transaction_date,
-        description: createTransactionForm.value.description.trim(),
+        description: normalizedDescription,
+        category: normalizedCategory,
       }),
       {
         successMessage: 'Transaction created successfully!',
@@ -250,11 +279,18 @@ const exportTransactions = async () => {
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Nominal dalam IDR</p>
         </FormField>
 
+        <FormField label="Category (optional)">
+          <FormControl
+            v-model="createTransactionForm.category"
+            :options="createCategoryOptions"
+          />
+        </FormField>
+
         <FormField label="Description">
           <FormControl
             v-model="createTransactionForm.description"
             type="textarea"
-            placeholder="Enter description"
+            placeholder="Enter description (optional)"
           />
         </FormField>
 

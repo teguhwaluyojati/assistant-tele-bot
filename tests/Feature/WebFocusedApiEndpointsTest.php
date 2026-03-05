@@ -463,6 +463,34 @@ class WebFocusedApiEndpointsTest extends TestCase
         ]);
     }
 
+    public function test_transaction_create_auto_infers_entertainment_for_nonton_film_description(): void
+    {
+        [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/transactions', [
+            'type' => 'expense',
+            'amount' => 45000,
+            'description' => 'nonton film malam ini',
+        ]);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.category', 'Entertainment')
+            ->assertJsonPath('data.category_source', 'auto');
+
+        $this->assertDatabaseHas('transactions', [
+            'user_id' => $telegramUser->user_id,
+            'type' => 'expense',
+            'amount' => 45000,
+            'description' => 'nonton film malam ini',
+            'category' => 'Entertainment',
+            'category_source' => 'auto',
+        ]);
+    }
+
     private function createUserWithTelegram(int $level = 2): array
     {
         $telegramUser = TelegramUser::factory()->create(['level' => $level]);

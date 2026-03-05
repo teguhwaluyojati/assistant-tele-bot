@@ -46,6 +46,40 @@ const editForm = ref({
   amount: '',
   type: 'income',
   description: '',
+  category: '',
+})
+
+const categoryOptionsByType = {
+  expense: [
+    'Food & Drink',
+    'Transport',
+    'Bills & Utilities',
+    'Shopping',
+    'Health',
+    'Education',
+    'Entertainment',
+  ],
+  income: [
+    'Salary',
+    'Bonus',
+    'Business',
+    'Investment',
+    'Gift',
+  ],
+}
+
+const editCategoryOptions = computed(() => {
+  const options = [...(categoryOptionsByType[editForm.value.type] ?? [])]
+  const currentCategory = (editForm.value.category || '').trim()
+
+  if (currentCategory && !options.includes(currentCategory)) {
+    options.unshift(currentCategory)
+  }
+
+  return [
+    { value: '', label: 'Auto (based on description)' },
+    ...options.map((option) => ({ value: option, label: option })),
+  ]
 })
 
 const isDeleteConfirmActive = ref(false)
@@ -242,6 +276,7 @@ const openEditModal = (transaction) => {
     amount: transaction.amount,
     type: transaction.type,
     description: transaction.description || '',
+    category: transaction.category || '',
   }
   isEditModalActive.value = true
 }
@@ -249,8 +284,15 @@ const openEditModal = (transaction) => {
 const updateTransaction = async () => {
   if (!transactionToEdit.value) return
 
+  const payload = {
+    amount: editForm.value.amount,
+    type: editForm.value.type,
+    description: editForm.value.description?.trim() || '',
+    category: editForm.value.category?.trim() || null,
+  }
+
   const { ok, result } = await runAction(
-    () => axios.put(`/api/transactions/${transactionToEdit.value.id}`, editForm.value),
+    () => axios.put(`/api/transactions/${transactionToEdit.value.id}`, payload),
     {
       successMessage: 'Transaction updated successfully!',
       errorPrefix: 'Failed to update transaction',
@@ -710,6 +752,13 @@ const bulkDeleteTransactions = async () => {
           v-model="editForm.description"
           type="textarea"
           placeholder="Enter description (optional)"
+        />
+      </FormField>
+
+      <FormField label="Category (optional)">
+        <FormControl
+          v-model="editForm.category"
+          :options="editCategoryOptions"
         />
       </FormField>
 
