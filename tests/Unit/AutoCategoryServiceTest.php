@@ -3,10 +3,18 @@
 namespace Tests\Unit;
 
 use App\Services\AutoCategoryService;
+use Illuminate\Support\Facades\Config;
 use Tests\TestCase;
 
 class AutoCategoryServiceTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Config::set('autocategory.ml.enabled', false);
+    }
+
     public function test_infer_returns_category_for_matching_expense_description(): void
     {
         $service = new AutoCategoryService();

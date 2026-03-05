@@ -8,6 +8,7 @@ use App\Models\TelegramUserCommand;
 use App\Models\Transaction;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -489,6 +490,50 @@ class WebFocusedApiEndpointsTest extends TestCase
             'category' => 'Entertainment',
             'category_source' => 'auto',
         ]);
+    }
+
+    public function test_transaction_create_uses_phase_two_ml_fallback_from_manual_history(): void
+    {
+        [$user, $telegramUser] = $this->createUserWithTelegram(level: 2);
+
+        $manualSamples = [
+            ['description' => 'grooming kucing', 'category' => 'Pet Care'],
+            ['description' => 'pasir kucing premium', 'category' => 'Pet Care'],
+            ['description' => 'vaksin kucing tahunan', 'category' => 'Pet Care'],
+            ['description' => 'biaya dokter kucing', 'category' => 'Pet Care'],
+            ['description' => 'servis sepeda gunung', 'category' => 'Cycling'],
+            ['description' => 'ban sepeda baru', 'category' => 'Cycling'],
+            ['description' => 'aksesoris sepeda', 'category' => 'Cycling'],
+            ['description' => 'upgrade rem sepeda', 'category' => 'Cycling'],
+        ];
+
+        foreach ($manualSamples as $sample) {
+            Transaction::factory()->create([
+                'user_id' => $telegramUser->user_id,
+                'type' => 'expense',
+                'amount' => 10000,
+                'description' => $sample['description'],
+                'category' => $sample['category'],
+                'category_source' => 'manual',
+                'category_confidence' => 1,
+            ]);
+        }
+
+        Cache::forget('autocategory.ml_model.expense');
+
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson('/api/transactions', [
+            'type' => 'expense',
+            'amount' => 56000,
+            'description' => 'grooming kucing bulanan',
+        ]);
+
+        $response
+            ->assertStatus(200)
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.category', 'Pet Care')
+            ->assertJsonPath('data.category_source', 'auto');
     }
 
     private function createUserWithTelegram(int $level = 2): array

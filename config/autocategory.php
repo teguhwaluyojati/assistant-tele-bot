@@ -3,6 +3,19 @@
 return [
     'min_confidence' => 0.60,
 
+    'ml' => [
+        'enabled' => true,
+        'cache_ttl_seconds' => 600,
+        'min_samples' => 8,
+        'min_confidence' => 0.70,
+        'min_margin' => 0.30,
+        'allowed_sources' => ['manual'],
+        'stopwords' => [
+            'dan', 'yang', 'di', 'ke', 'dari', 'untuk', 'pada', 'ini', 'itu', 'aja', 'saja',
+            'bulan', 'hari', 'minggu', 'tahun', 'biaya', 'bayar', 'beli', 'uang', 'transfer',
+        ],
+    ],
+
     'category_keywords' => [
         'expense' => [
             'Food & Drink' => ['makan', 'makanan', 'sarapan', 'lunch', 'dinner', 'kopi', 'cafe', 'resto', 'warung', 'gofood', 'grabfood'],
