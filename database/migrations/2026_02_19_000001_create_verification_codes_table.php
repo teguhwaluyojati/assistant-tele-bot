@@ -11,20 +11,22 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('verification_codes', function (Blueprint $table) {
-            $table->id();
-            $table->string('email')->unique();
-            $table->string('telegram_username');
-            $table->string('code', 6);
-            $table->string('name');
-            $table->string('password');
-            $table->boolean('verified')->default(false);
-            $table->timestamp('expires_at');
-            $table->timestamps();
-            
-            $table->index('email');
-            $table->index('code');
-        });
+        if (!Schema::hasTable('verification_codes')) {
+            Schema::create('verification_codes', function (Blueprint $table) {
+                $table->id();
+                $table->string('email')->unique();
+                $table->string('telegram_username');
+                $table->string('code', 6);
+                $table->string('name');
+                $table->string('password');
+                $table->boolean('verified')->default(false);
+                $table->timestamp('expires_at');
+                $table->timestamps();
+
+                $table->index('email');
+                $table->index('code');
+            });
+        }
     }
 
     /**

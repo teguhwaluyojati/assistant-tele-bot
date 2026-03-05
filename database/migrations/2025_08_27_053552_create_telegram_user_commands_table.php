@@ -11,12 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('telegram_user_commands', function (Blueprint $table) {
-            $table->id();
-            $table->bigInteger('user_id'); // ID unik dari Telegram
-            $table->string('command');
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('telegram_user_commands')) {
+            Schema::create('telegram_user_commands', function (Blueprint $table) {
+                $table->id();
+                $table->bigInteger('user_id'); // ID unik dari Telegram
+                $table->string('command');
+                $table->timestamps();
+            });
+        }
     }
 
     /**

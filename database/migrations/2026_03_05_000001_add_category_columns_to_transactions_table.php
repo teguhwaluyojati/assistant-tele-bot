@@ -11,10 +11,22 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('transactions')) {
+            return;
+        }
+
         Schema::table('transactions', function (Blueprint $table) {
-            $table->string('category', 100)->nullable()->after('description');
-            $table->string('category_source', 20)->nullable()->after('category');
-            $table->decimal('category_confidence', 5, 2)->nullable()->after('category_source');
+            if (!Schema::hasColumn('transactions', 'category')) {
+                $table->string('category', 100)->nullable()->after('description');
+            }
+
+            if (!Schema::hasColumn('transactions', 'category_source')) {
+                $table->string('category_source', 20)->nullable()->after('category');
+            }
+
+            if (!Schema::hasColumn('transactions', 'category_confidence')) {
+                $table->decimal('category_confidence', 5, 2)->nullable()->after('category_source');
+            }
         });
     }
 
@@ -23,8 +35,22 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('transactions')) {
+            return;
+        }
+
         Schema::table('transactions', function (Blueprint $table) {
-            $table->dropColumn(['category', 'category_source', 'category_confidence']);
+            if (Schema::hasColumn('transactions', 'category_confidence')) {
+                $table->dropColumn('category_confidence');
+            }
+
+            if (Schema::hasColumn('transactions', 'category_source')) {
+                $table->dropColumn('category_source');
+            }
+
+            if (Schema::hasColumn('transactions', 'category')) {
+                $table->dropColumn('category');
+            }
         });
     }
 };

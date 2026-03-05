@@ -11,7 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('stock_recommendations', function (Blueprint $table) {
+        if (!Schema::hasTable('stock_recommendations')) {
+            Schema::create('stock_recommendations', function (Blueprint $table) {
                 $table->id();
                 $table->string('code', 10);      // Kode Saham (BBCA, BUMI)
                 $table->double('price');         // Harga Terakhir
@@ -21,7 +22,8 @@ return new class extends Migration
                 $table->double('tp_target');     // Target Harga
                 $table->double('cl_price');      // Cut Loss
                 $table->timestamps();
-        });
+            });
+        }
     }
 
     /**

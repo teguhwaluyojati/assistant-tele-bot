@@ -11,12 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('login_history')) {
             Schema::create('login_history', function (Blueprint $table) {
-            $table->id();
-            $table->string('email');
-            $table->string('ip_address')->nullable();
-            $table->timestamps();
-        });
+                $table->id();
+                $table->string('email');
+                $table->string('ip_address')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**

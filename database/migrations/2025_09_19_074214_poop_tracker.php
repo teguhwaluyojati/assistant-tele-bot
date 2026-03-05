@@ -11,13 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('poop_tracker', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('user_id')->references('user_id')->on('telegram_users');
-        $table->string('type')->nullable(); 
-        $table->text('notes')->nullable();
-        $table->timestamps();
-    });
+        if (!Schema::hasTable('poop_tracker')) {
+            Schema::create('poop_tracker', function (Blueprint $table) {
+                $table->id();
+                $table->foreignId('user_id')->references('user_id')->on('telegram_users');
+                $table->string('type')->nullable();
+                $table->text('notes')->nullable();
+                $table->timestamps();
+            });
+        }
     }
 
     /**
@@ -25,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        //
+        Schema::dropIfExists('poop_tracker');
     }
 };

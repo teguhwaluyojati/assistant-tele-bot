@@ -8,18 +8,20 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('password_reset_codes', function (Blueprint $table) {
-            $table->id();
-            $table->string('email')->unique();
-            $table->string('telegram_username')->nullable();
-            $table->string('code_hash');
-            $table->unsignedSmallInteger('attempts')->default(0);
-            $table->timestamp('expires_at');
-            $table->timestamps();
+        if (!Schema::hasTable('password_reset_codes')) {
+            Schema::create('password_reset_codes', function (Blueprint $table) {
+                $table->id();
+                $table->string('email')->unique();
+                $table->string('telegram_username')->nullable();
+                $table->string('code_hash');
+                $table->unsignedSmallInteger('attempts')->default(0);
+                $table->timestamp('expires_at');
+                $table->timestamps();
 
-            $table->index('email');
-            $table->index('expires_at');
-        });
+                $table->index('email');
+                $table->index('expires_at');
+            });
+        }
     }
 
     public function down(): void

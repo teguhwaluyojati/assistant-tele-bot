@@ -11,14 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('stocks', function (Blueprint $table) {
-            $table->id();
-            $table->string('code', 10)->unique(); // Kode Saham (BBCA, GOTO)
-            $table->string('name')->nullable();   // Nama Perusahaan
-            $table->boolean('is_active')->default(true); // Status aktif/delisted
-            $table->string('board')->nullable(); // Isi: 'Utama', 'Pengembangan', dll
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('stocks')) {
+            Schema::create('stocks', function (Blueprint $table) {
+                $table->id();
+                $table->string('code', 10)->unique(); // Kode Saham (BBCA, GOTO)
+                $table->string('name')->nullable();   // Nama Perusahaan
+                $table->boolean('is_active')->default(true); // Status aktif/delisted
+                $table->string('board')->nullable(); // Isi: 'Utama', 'Pengembangan', dll
+                $table->timestamps();
+            });
+        }
     }
 
     /**

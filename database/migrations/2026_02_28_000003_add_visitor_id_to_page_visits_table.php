@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('page_visits') || Schema::hasColumn('page_visits', 'visitor_id')) {
+            return;
+        }
+
         Schema::table('page_visits', function (Blueprint $table) {
             $table->string('visitor_id', 64)->nullable()->after('path');
             $table->index(['path', 'visitor_id']);
@@ -22,6 +26,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('page_visits') || !Schema::hasColumn('page_visits', 'visitor_id')) {
+            return;
+        }
+
         Schema::table('page_visits', function (Blueprint $table) {
             $table->dropIndex(['path', 'visitor_id']);
             $table->dropColumn('visitor_id');
