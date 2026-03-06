@@ -18,16 +18,16 @@ return [
     ],
 
     'llm' => [
-        'enabled' => false,
+        'enabled' => env('AUTOCATEGORY_LLM_ENABLED', false),
         'provider' => 'openai-compatible',
         'endpoint' => env('AUTOCATEGORY_LLM_ENDPOINT', 'https://api.openai.com/v1/chat/completions'),
         'api_key' => env('AUTOCATEGORY_LLM_API_KEY', ''),
         'model' => env('AUTOCATEGORY_LLM_MODEL', 'gpt-4o-mini'),
-        'timeout_seconds' => 8,
-        'cache_ttl_seconds' => 3600,
-        'rollout_percentage' => 10,
-        'max_requests_per_minute' => 30,
-        'min_confidence' => 0.75,
+        'timeout_seconds' => (int) env('AUTOCATEGORY_LLM_TIMEOUT_SECONDS', 8),
+        'cache_ttl_seconds' => (int) env('AUTOCATEGORY_LLM_CACHE_TTL_SECONDS', 3600),
+        'rollout_percentage' => (int) env('AUTOCATEGORY_LLM_ROLLOUT_PERCENTAGE', 10),
+        'max_requests_per_minute' => (int) env('AUTOCATEGORY_LLM_MAX_REQUESTS_PER_MINUTE', 30),
+        'min_confidence' => (float) env('AUTOCATEGORY_LLM_MIN_CONFIDENCE', 0.75),
     ],
 
     'category_keywords' => [
