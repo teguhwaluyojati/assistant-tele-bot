@@ -8,6 +8,7 @@ Assistant Tele Bot is a Laravel + Vue application for managing financial transac
 The project is currently running with Sanctum-based APIs, activity logging, and automated tests (Feature + Unit).
 
 > Note: This file may receive small non-functional updates for maintenance activity.
+> Maintenance log: minor documentation refresh (Mar 7, 2026).
 
 ## Key Features
 
