@@ -7,6 +7,7 @@ use App\Models\TelegramUser;
 use App\Models\Transaction;
 use App\Services\TransactionAuthorizationService;
 use App\Services\TransactionCategoryService;
+use App\Services\TransactionQueryService;
 use App\Traits\ApiResponse;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -22,7 +23,8 @@ class TransactionController extends Controller
 
     public function __construct(
         protected TransactionCategoryService $transactionCategoryService,
-        protected TransactionAuthorizationService $transactionAuthorizationService
+        protected TransactionAuthorizationService $transactionAuthorizationService,
+        protected TransactionQueryService $transactionQueryService
     ) {}
 
     public function getTransactions(Request $request)
@@ -39,9 +41,6 @@ class TransactionController extends Controller
                 'direction' => ['nullable', 'in:asc,desc'],
             ]);
 
-            $query = Transaction::with('user:id,user_id,username,first_name,last_name')
-                ->latest();
-
             $currentUser = auth()->user();
             $telegramUser = $this->transactionAuthorizationService->linkedTelegramUser($currentUser);
 
@@ -49,40 +48,13 @@ class TransactionController extends Controller
                 return $this->errorResponse('User not linked to Telegram account.', 403);
             }
 
-            if (!$this->transactionAuthorizationService->isAdmin($currentUser)) {
-                $query->where('user_id', $telegramUser->user_id);
-            }
-
-            if (!empty($validated['type']) && $validated['type'] !== 'all') {
-                $query->where('type', $validated['type']);
-            }
-
-            if (!empty($validated['search'])) {
-                $search = '%' . trim($validated['search']) . '%';
-                $query->where(function ($q) use ($search) {
-                    $q->where('description', 'like', $search)
-                        ->orWhereHas('user', function ($subQ) use ($search) {
-                            $subQ->where('username', 'like', $search)
-                                ->orWhere('first_name', 'like', $search)
-                                ->orWhere('last_name', 'like', $search);
-                        });
-                });
-            }
-
-            if (!empty($validated['start_date'])) {
-                $query->whereDate('created_at', '>=', $validated['start_date']);
-            }
-
-            if (!empty($validated['end_date'])) {
-                $query->whereDate('created_at', '<=', $validated['end_date']);
-            }
-
-            $sortField = $validated['sort'] ?? 'created_at';
-            $sortDirection = $validated['direction'] ?? 'desc';
-            $query->orderBy($sortField, $sortDirection);
-
             $perPage = $validated['per_page'] ?? 15;
-            $transactions = $query->paginate($perPage);
+            $transactions = $this->transactionQueryService->paginateTransactions(
+                $validated,
+                $this->transactionAuthorizationService->isAdmin($currentUser),
+                (int) $telegramUser->user_id,
+                $perPage
+            );
 
             return $this->successResponse($transactions, 'Transactions retrieved successfully.');
         } catch (ValidationException $e) {
@@ -101,20 +73,11 @@ class TransactionController extends Controller
                 'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             ]);
 
-            $startDateInput = $validated['start_date'] ?? null;
-            $endDateInput = $validated['end_date'] ?? null;
-
-            if ($startDateInput || $endDateInput) {
-                $startDate = $startDateInput
-                    ? Carbon::parse($startDateInput)->startOfDay()
-                    : now()->startOfMonth();
-                $endDate = $endDateInput
-                    ? Carbon::parse($endDateInput)->endOfDay()
-                    : now()->endOfDay();
-            } else {
-                $startDate = now()->startOfMonth();
-                $endDate = now()->endOfMonth();
-            }
+            [$startDate, $endDate] = $this->transactionQueryService->resolveRange(
+                $validated['start_date'] ?? null,
+                $validated['end_date'] ?? null,
+                'month'
+            );
 
             if ($startDate->gt($endDate)) {
                 return $this->errorResponse('Start date must be before end date.', 422);
@@ -133,28 +96,7 @@ class TransactionController extends Controller
 
             $chatId = $telegramUser->user_id;
 
-            $incomeQuery = Transaction::where('type', 'income')
-                ->whereBetween('created_at', [$startDate, $endDate]);
-            $expenseQuery = Transaction::where('type', 'expense')
-                ->whereBetween('created_at', [$startDate, $endDate]);
-            $countQuery = Transaction::whereBetween('created_at', [$startDate, $endDate]);
-
-            $incomeQuery->where('user_id', $chatId);
-            $expenseQuery->where('user_id', $chatId);
-            $countQuery->where('user_id', $chatId);
-
-            $totalIncome = $incomeQuery->sum('amount');
-            $totalExpense = $expenseQuery->sum('amount');
-            $balance = $totalIncome - $totalExpense;
-            $totalTransactions = $countQuery->count();
-
-            $summary = [
-                'total_income' => $totalIncome,
-                'total_expense' => $totalExpense,
-                'balance' => $balance,
-                'total_transactions' => $totalTransactions,
-                'period' => $startDate->format('M d, Y') . ' - ' . $endDate->format('M d, Y'),
-            ];
+            $summary = $this->transactionQueryService->buildSummary($startDate, $endDate, (int) $chatId);
 
             return $this->successResponse($summary, 'Transaction summary retrieved successfully.');
         } catch (ValidationException $e) {
@@ -173,20 +115,11 @@ class TransactionController extends Controller
                 'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             ]);
 
-            $startDateInput = $validated['start_date'] ?? null;
-            $endDateInput = $validated['end_date'] ?? null;
-
-            if ($startDateInput || $endDateInput) {
-                $startDate = $startDateInput
-                    ? Carbon::parse($startDateInput)->startOfDay()
-                    : now()->startOfMonth();
-                $endDate = $endDateInput
-                    ? Carbon::parse($endDateInput)->endOfDay()
-                    : now()->endOfDay();
-            } else {
-                $startDate = now()->subDays(6)->startOfDay();
-                $endDate = now()->endOfDay();
-            }
+            [$startDate, $endDate] = $this->transactionQueryService->resolveRange(
+                $validated['start_date'] ?? null,
+                $validated['end_date'] ?? null,
+                'last_7_days'
+            );
 
             if ($startDate->gt($endDate)) {
                 return $this->errorResponse('Start date must be before end date.', 422);
@@ -214,54 +147,7 @@ class TransactionController extends Controller
                 $chatId = $telegramUser->user_id;
             }
 
-            $labels = [];
-            $incomeData = [];
-            $expenseData = [];
-
-            $cursor = $startDate->copy();
-            $endDateDay = $endDate->copy()->startOfDay();
-
-            while ($cursor->lte($endDateDay)) {
-                $labels[] = $cursor->format('M d');
-
-                $incomeQuery = Transaction::where('type', 'income')
-                    ->whereDate('created_at', $cursor->toDateString());
-                $expenseQuery = Transaction::where('type', 'expense')
-                    ->whereDate('created_at', $cursor->toDateString());
-
-                if ($chatId) {
-                    $incomeQuery->where('user_id', $chatId);
-                    $expenseQuery->where('user_id', $chatId);
-                }
-
-                $income = $incomeQuery->sum('amount');
-                $expense = $expenseQuery->sum('amount');
-
-                $incomeData[] = (int) $income;
-                $expenseData[] = (int) $expense;
-
-                $cursor->addDay();
-            }
-
-            $chartData = [
-                'labels' => $labels,
-                'datasets' => [
-                    [
-                        'label' => 'Income',
-                        'data' => $incomeData,
-                        'borderColor' => 'rgb(34, 197, 94)',
-                        'backgroundColor' => 'rgba(34, 197, 94, 0.1)',
-                        'fill' => true,
-                    ],
-                    [
-                        'label' => 'Expense',
-                        'data' => $expenseData,
-                        'borderColor' => 'rgb(239, 68, 68)',
-                        'backgroundColor' => 'rgba(239, 68, 68, 0.1)',
-                        'fill' => true,
-                    ],
-                ],
-            ];
+            $chartData = $this->transactionQueryService->buildDailyChart($startDate, $endDate, $chatId);
 
             return $this->successResponse($chartData, 'Daily chart data retrieved successfully.');
         } catch (ValidationException $e) {
