@@ -10,6 +10,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ClientErrorController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\ForgotPasswordController;
+use App\Http\Controllers\TransactionController;
 
 /*
 |--------------------------------------------------------------------------
@@ -46,14 +47,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/history-login', [DashboardController::class, 'lastLogin']);
     
-    Route::get('/transactions', [DashboardController::class, 'getTransactions']);
-    Route::post('/transactions', [DashboardController::class, 'storeTransaction']);
-    Route::get('/transactions/summary', [DashboardController::class, 'getTransactionsSummary']);
-    Route::get('/transactions/daily-chart', [DashboardController::class, 'getDailyChart']);
-    Route::get('/transactions/export', [DashboardController::class, 'exportTransactions']);
-    Route::put('/transactions/{id}', [DashboardController::class, 'updateTransaction']);
-    Route::delete('/transactions/{id}', [DashboardController::class, 'deleteTransaction']);
-    Route::post('/transactions/bulk-delete', [DashboardController::class, 'bulkDeleteTransactions']);
+    Route::get('/transactions', [TransactionController::class, 'getTransactions']);
+    Route::post('/transactions', [TransactionController::class, 'storeTransaction']);
+    Route::get('/transactions/summary', [TransactionController::class, 'getTransactionsSummary']);
+    Route::get('/transactions/daily-chart', [TransactionController::class, 'getDailyChart']);
+    Route::get('/transactions/export', [TransactionController::class, 'exportTransactions']);
+    Route::put('/transactions/{id}', [TransactionController::class, 'updateTransaction']);
+    Route::delete('/transactions/{id}', [TransactionController::class, 'deleteTransaction']);
+    Route::post('/transactions/bulk-delete', [TransactionController::class, 'bulkDeleteTransactions']);
 
     Route::post('/stocks/upload', [DashboardController::class, 'upload']);
 
