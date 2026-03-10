@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Exports\TransactionsExport;
 use App\Models\TelegramUser;
 use App\Models\Transaction;
-use App\Services\AutoCategoryService;
+use App\Services\TransactionAuthorizationService;
+use App\Services\TransactionCategoryService;
 use App\Traits\ApiResponse;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -19,9 +20,10 @@ class TransactionController extends Controller
 {
     use ApiResponse;
 
-    public function __construct(protected AutoCategoryService $autoCategoryService)
-    {
-    }
+    public function __construct(
+        protected TransactionCategoryService $transactionCategoryService,
+        protected TransactionAuthorizationService $transactionAuthorizationService
+    ) {}
 
     public function getTransactions(Request $request)
     {
@@ -41,13 +43,13 @@ class TransactionController extends Controller
                 ->latest();
 
             $currentUser = auth()->user();
-            $telegramUser = $currentUser->telegramUser;
+            $telegramUser = $this->transactionAuthorizationService->linkedTelegramUser($currentUser);
 
             if (!$telegramUser) {
                 return $this->errorResponse('User not linked to Telegram account.', 403);
             }
 
-            if (!$telegramUser->isAdmin()) {
+            if (!$this->transactionAuthorizationService->isAdmin($currentUser)) {
                 $query->where('user_id', $telegramUser->user_id);
             }
 
@@ -196,8 +198,9 @@ class TransactionController extends Controller
 
             $chatId = null;
 
-            if (!auth()->user()->isAdmin()) {
-                $telegramUserId = auth()->user()->telegram_user_id;
+            $currentUser = auth()->user();
+            if (!$this->transactionAuthorizationService->isAdmin($currentUser)) {
+                $telegramUserId = $currentUser->telegram_user_id;
 
                 if (!$telegramUserId) {
                     return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
@@ -281,7 +284,7 @@ class TransactionController extends Controller
             ]);
 
             $currentUser = auth()->user();
-            $telegramUser = $currentUser?->telegramUser;
+            $telegramUser = $this->transactionAuthorizationService->linkedTelegramUser($currentUser);
 
             if (!$telegramUser) {
                 return $this->errorResponse('User not linked to Telegram account.', 403);
@@ -295,34 +298,20 @@ class TransactionController extends Controller
                 ? Carbon::createFromFormat('Y-m-d\\TH:i', $validated['transaction_date'], config('app.timezone'))
                 : now();
 
-            $description = trim((string) ($validated['description'] ?? ''));
-            $manualCategory = trim((string) ($validated['category'] ?? ''));
-
-            $category = null;
-            $categorySource = null;
-            $categoryConfidence = null;
-
-            if ($manualCategory !== '') {
-                $category = $manualCategory;
-                $categorySource = 'manual';
-                $categoryConfidence = 1.00;
-            } elseif ($description !== '') {
-                $inferredCategory = $this->autoCategoryService->infer($description, $validated['type']);
-                if ($inferredCategory) {
-                    $category = $inferredCategory['category'];
-                    $categorySource = 'auto';
-                    $categoryConfidence = $inferredCategory['confidence'];
-                }
-            }
+            $resolvedCategory = $this->transactionCategoryService->resolve(
+                $validated['description'] ?? null,
+                $validated['category'] ?? null,
+                $validated['type']
+            );
 
             $transaction = new Transaction([
                 'user_id' => $telegramUser->user_id,
                 'type' => $validated['type'],
                 'amount' => $validated['amount'],
-                'description' => $description,
-                'category' => $category,
-                'category_source' => $categorySource,
-                'category_confidence' => $categoryConfidence,
+                'description' => $resolvedCategory['description'],
+                'category' => $resolvedCategory['category'],
+                'category_source' => $resolvedCategory['category_source'],
+                'category_confidence' => $resolvedCategory['category_confidence'],
             ]);
 
             $transaction->created_at = $transactionTimestamp;
@@ -401,40 +390,23 @@ class TransactionController extends Controller
             $transaction = Transaction::findOrFail($id);
             $currentUser = auth()->user();
 
-            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
-            $isOwner = $currentUser->telegramUser && $currentUser->telegramUser->user_id === $transaction->user_id;
-
-            if (!$isAdmin && !$isOwner) {
+            if (!$this->transactionAuthorizationService->canManageTransaction($currentUser, $transaction)) {
                 return $this->errorResponse('Unauthorized to update this transaction.', 403);
             }
 
-            $description = trim((string) ($validated['description'] ?? ''));
-            $manualCategory = trim((string) ($validated['category'] ?? ''));
-
-            $category = null;
-            $categorySource = null;
-            $categoryConfidence = null;
-
-            if ($manualCategory !== '') {
-                $category = $manualCategory;
-                $categorySource = 'manual';
-                $categoryConfidence = 1.00;
-            } elseif ($description !== '') {
-                $inferredCategory = $this->autoCategoryService->infer($description, $validated['type']);
-                if ($inferredCategory) {
-                    $category = $inferredCategory['category'];
-                    $categorySource = 'auto';
-                    $categoryConfidence = $inferredCategory['confidence'];
-                }
-            }
+            $resolvedCategory = $this->transactionCategoryService->resolve(
+                $validated['description'] ?? null,
+                $validated['category'] ?? null,
+                $validated['type']
+            );
 
             $transaction->update([
                 'type' => $validated['type'],
                 'amount' => $validated['amount'],
-                'description' => $description,
-                'category' => $category,
-                'category_source' => $categorySource,
-                'category_confidence' => $categoryConfidence,
+                'description' => $resolvedCategory['description'],
+                'category' => $resolvedCategory['category'],
+                'category_source' => $resolvedCategory['category_source'],
+                'category_confidence' => $resolvedCategory['category_confidence'],
             ]);
 
             activity()
@@ -466,10 +438,7 @@ class TransactionController extends Controller
             $transaction = Transaction::findOrFail($id);
             $currentUser = auth()->user();
 
-            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
-            $isOwner = $currentUser->telegramUser && $currentUser->telegramUser->user_id === $transaction->user_id;
-
-            if (!$isAdmin && !$isOwner) {
+            if (!$this->transactionAuthorizationService->canManageTransaction($currentUser, $transaction)) {
                 return $this->errorResponse('Unauthorized to delete this transaction.', 403);
             }
 
@@ -500,22 +469,17 @@ class TransactionController extends Controller
             ]);
 
             $currentUser = auth()->user();
-            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
+            $isAdmin = $this->transactionAuthorizationService->isAdmin($currentUser);
 
             $query = Transaction::whereIn('id', $validated['ids']);
 
             if (!$isAdmin) {
-                $telegramUserId = $currentUser->telegram_user_id;
-                if (!$telegramUserId) {
+                $chatId = $this->transactionAuthorizationService->linkedChatId($currentUser);
+                if (!$chatId) {
                     return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
                 }
 
-                $telegramUser = TelegramUser::find($telegramUserId);
-                if (!$telegramUser) {
-                    return $this->errorResponse('Telegram user not found.', 404);
-                }
-
-                $query->where('user_id', $telegramUser->user_id);
+                $query->where('user_id', $chatId);
             }
 
             $transactionsToDelete = $query->get();
@@ -556,18 +520,18 @@ class TransactionController extends Controller
             ]);
 
             $currentUser = auth()->user();
-            $isAdmin = $currentUser->telegramUser && $currentUser->telegramUser->isAdmin();
+            $isAdmin = $this->transactionAuthorizationService->isAdmin($currentUser);
 
             $startDate = $validated['start_date'] ?? null;
             $endDate = $validated['end_date'] ?? null;
 
             if (!$isAdmin) {
-                if (!$currentUser->telegramUser) {
+                if (!$this->transactionAuthorizationService->linkedTelegramUser($currentUser)) {
                     return $this->errorResponse('User not linked to Telegram account.', 403);
                 }
             }
 
-            $userId = $isAdmin ? null : $currentUser->telegramUser->user_id;
+            $userId = $isAdmin ? null : $this->transactionAuthorizationService->linkedChatId($currentUser);
 
             $fileName = 'transactions-' . now()->format('Y-m-d-H-i-s') . '.xlsx';
 
