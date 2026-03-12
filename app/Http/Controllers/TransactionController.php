@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\TelegramUser;
 use App\Models\Transaction;
+use App\Services\TransactionAccessGuardService;
 use App\Services\TransactionActivityService;
 use App\Services\TransactionAuthorizationService;
 use App\Services\TransactionBulkDeleteService;
@@ -26,6 +26,7 @@ class TransactionController extends Controller
         protected TransactionCategoryService $transactionCategoryService,
         protected TransactionAuthorizationService $transactionAuthorizationService,
         protected TransactionQueryService $transactionQueryService,
+        protected TransactionAccessGuardService $transactionAccessGuardService,
         protected TransactionPersistenceService $transactionPersistenceService,
         protected TransactionActivityService $transactionActivityService,
         protected TransactionExportService $transactionExportService,
@@ -47,17 +48,16 @@ class TransactionController extends Controller
             ]);
 
             $currentUser = auth()->user();
-            $telegramUser = $this->transactionAuthorizationService->linkedTelegramUser($currentUser);
-
-            if (!$telegramUser) {
-                return $this->errorResponse('User not linked to Telegram account.', 403);
+            $access = $this->transactionAccessGuardService->ensureListAccess($currentUser);
+            if (!$access['ok']) {
+                return $this->errorResponse($access['error']['message'], $access['error']['status']);
             }
 
             $perPage = $validated['per_page'] ?? 15;
             $transactions = $this->transactionQueryService->paginateTransactions(
                 $validated,
                 $this->transactionAuthorizationService->isAdmin($currentUser),
-                (int) $telegramUser->user_id,
+                (int) $access['chat_id'],
                 $perPage
             );
 
@@ -88,20 +88,13 @@ class TransactionController extends Controller
                 return $this->errorResponse('Start date must be before end date.', 422);
             }
 
-            $telegramUserId = auth()->user()->telegram_user_id;
-
-            if (!$telegramUserId) {
-                return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
+            $currentUser = auth()->user();
+            $access = $this->transactionAccessGuardService->ensureSummaryAccess($currentUser);
+            if (!$access['ok']) {
+                return $this->errorResponse($access['error']['message'], $access['error']['status']);
             }
 
-            $telegramUser = TelegramUser::find($telegramUserId);
-            if (!$telegramUser) {
-                return $this->errorResponse('Telegram user not found.', 404);
-            }
-
-            $chatId = $telegramUser->user_id;
-
-            $summary = $this->transactionQueryService->buildSummary($startDate, $endDate, (int) $chatId);
+            $summary = $this->transactionQueryService->buildSummary($startDate, $endDate, (int) $access['chat_id']);
 
             return $this->successResponse($summary, 'Transaction summary retrieved successfully.');
         } catch (ValidationException $e) {
@@ -134,25 +127,13 @@ class TransactionController extends Controller
                 return $this->errorResponse('Date range cannot exceed 366 days.', 422);
             }
 
-            $chatId = null;
-
             $currentUser = auth()->user();
-            if (!$this->transactionAuthorizationService->isAdmin($currentUser)) {
-                $telegramUserId = $currentUser->telegram_user_id;
-
-                if (!$telegramUserId) {
-                    return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
-                }
-
-                $telegramUser = TelegramUser::find($telegramUserId);
-                if (!$telegramUser) {
-                    return $this->errorResponse('Telegram user not found.', 404);
-                }
-
-                $chatId = $telegramUser->user_id;
+            $scope = $this->transactionAccessGuardService->resolveDailyChartScope($currentUser);
+            if (!$scope['ok']) {
+                return $this->errorResponse($scope['error']['message'], $scope['error']['status']);
             }
 
-            $chartData = $this->transactionQueryService->buildDailyChart($startDate, $endDate, $chatId);
+            $chartData = $this->transactionQueryService->buildDailyChart($startDate, $endDate, $scope['chat_id']);
 
             return $this->successResponse($chartData, 'Daily chart data retrieved successfully.');
         } catch (ValidationException $e) {
@@ -361,13 +342,12 @@ class TransactionController extends Controller
             $startDate = $validated['start_date'] ?? null;
             $endDate = $validated['end_date'] ?? null;
 
-            if (!$isAdmin) {
-                if (!$this->transactionAuthorizationService->linkedTelegramUser($currentUser)) {
-                    return $this->errorResponse('User not linked to Telegram account.', 403);
-                }
+            $access = $this->transactionAccessGuardService->ensureExportAccess($currentUser, $isAdmin);
+            if (!$access['ok']) {
+                return $this->errorResponse($access['error']['message'], $access['error']['status']);
             }
 
-            $chatId = $this->transactionAuthorizationService->linkedChatId($currentUser);
+            $chatId = $access['chat_id'];
             $exportContext = $this->transactionExportService->buildContext($isAdmin, $chatId, $startDate, $endDate);
 
             $this->transactionActivityService->logExport(
