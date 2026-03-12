@@ -9,7 +9,7 @@ import {
   mdiReload,
   mdiWallet,
 } from '@mdi/js'
-import LineChart from '@/components/Charts/LineChart.vue'
+import BarChart from '@/components/Charts/BarChart.vue'
 import SectionMain from '@/components/SectionMain.vue'
 import CardBoxWidget from '@/components/CardBoxWidget.vue'
 import CardBox from '@/components/CardBox.vue'
@@ -569,7 +569,7 @@ const handleDashboardScroll = () => {
               </div>
 
               <div v-if="chartData">
-                <line-chart :data="chartData" class="h-[500px]" />
+                <bar-chart :data="chartData" class="h-[500px]" />
               </div>
               <div
                 v-else
