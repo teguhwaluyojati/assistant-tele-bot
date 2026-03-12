@@ -68,10 +68,15 @@ The project is currently running with Sanctum-based APIs, activity logging, and 
 - `routes/web.php` for web pages (Blade mount points + signed avatar)
 - `routes/api.php` for app APIs and Telegram webhook
 - Main controllers:
-  - `DashboardController` for analytics, user management, and transactions
+  - `DashboardController` for user management and supporting dashboard endpoints
+  - `TransactionController` for transaction APIs (list/summary/chart/crud/bulk-delete/export)
   - `LoginController`, `RegisterController`, `ProfileController`
   - `AuditLogController`
   - `TelegramController` (bot flow orchestrator)
+
+### Transaction Architecture
+
+- Detailed backend transaction architecture: `docs/transactions-architecture.md`
 
 ## Frontend Conventions
 
