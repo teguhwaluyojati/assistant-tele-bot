@@ -6,6 +6,7 @@ use App\Models\TelegramUser;
 use App\Models\Transaction;
 use App\Services\TransactionActivityService;
 use App\Services\TransactionAuthorizationService;
+use App\Services\TransactionBulkDeleteService;
 use App\Services\TransactionCategoryService;
 use App\Services\TransactionExportService;
 use App\Services\TransactionPersistenceService;
@@ -27,7 +28,8 @@ class TransactionController extends Controller
         protected TransactionQueryService $transactionQueryService,
         protected TransactionPersistenceService $transactionPersistenceService,
         protected TransactionActivityService $transactionActivityService,
-        protected TransactionExportService $transactionExportService
+        protected TransactionExportService $transactionExportService,
+        protected TransactionBulkDeleteService $transactionBulkDeleteService
     ) {}
 
     public function getTransactions(Request $request)
@@ -309,27 +311,23 @@ class TransactionController extends Controller
             ]);
 
             $currentUser = auth()->user();
-            $isAdmin = $this->transactionAuthorizationService->isAdmin($currentUser);
+            $resolution = $this->transactionBulkDeleteService->resolveAuthorizedTransactions(
+                $currentUser,
+                $validated['ids']
+            );
 
-            $query = Transaction::whereIn('id', $validated['ids']);
-
-            if (!$isAdmin) {
-                $chatId = $this->transactionAuthorizationService->linkedChatId($currentUser);
-                if (!$chatId) {
-                    return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
-                }
-
-                $query->where('user_id', $chatId);
+            if ($resolution['status'] === 'missing_telegram') {
+                return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
             }
 
-            $transactionsToDelete = $query->get();
+            $transactionsToDelete = $resolution['transactions'];
             $deleteCount = $transactionsToDelete->count();
 
             if ($deleteCount === 0) {
                 return $this->errorResponse('No authorized transactions found to delete.', 403);
             }
 
-            Transaction::whereIn('id', $transactionsToDelete->pluck('id'))->delete();
+            $this->transactionBulkDeleteService->deleteTransactions($transactionsToDelete);
 
             $this->transactionActivityService->logBulkDelete(
                 $currentUser,
