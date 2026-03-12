@@ -1,4 +1,4 @@
-# Transactions Architecture
+# Transactions Architectures
 
 This document describes the current backend architecture for transaction features after refactor phase 2.1–2.7.
 
