@@ -1,4 +1,4 @@
-# Assistant Tele Bot
+# My Assistant Tele Bot
 
 Assistant Tele Bot is a Laravel + Vue application for managing financial transactions and user activity across two main channels:
 
