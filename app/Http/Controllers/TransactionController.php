@@ -2,20 +2,20 @@
 
 namespace App\Http\Controllers;
 
-use App\Exports\TransactionsExport;
 use App\Models\TelegramUser;
 use App\Models\Transaction;
+use App\Services\TransactionActivityService;
 use App\Services\TransactionAuthorizationService;
 use App\Services\TransactionCategoryService;
+use App\Services\TransactionExportService;
+use App\Services\TransactionPersistenceService;
 use App\Services\TransactionQueryService;
 use App\Traits\ApiResponse;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
-use Maatwebsite\Excel\Facades\Excel;
 
 class TransactionController extends Controller
 {
@@ -24,7 +24,10 @@ class TransactionController extends Controller
     public function __construct(
         protected TransactionCategoryService $transactionCategoryService,
         protected TransactionAuthorizationService $transactionAuthorizationService,
-        protected TransactionQueryService $transactionQueryService
+        protected TransactionQueryService $transactionQueryService,
+        protected TransactionPersistenceService $transactionPersistenceService,
+        protected TransactionActivityService $transactionActivityService,
+        protected TransactionExportService $transactionExportService
     ) {}
 
     public function getTransactions(Request $request)
@@ -203,41 +206,8 @@ class TransactionController extends Controller
             $transaction->created_at = $transactionTimestamp;
             $transaction->updated_at = $transactionTimestamp;
 
-            try {
-                $transaction->save();
-            } catch (QueryException $e) {
-                $dbMessage = strtolower((string) ($e->errorInfo[2] ?? $e->getMessage()));
-                $isDuplicateTransactionPk = str_contains($dbMessage, 'transactions_pkey')
-                    || str_contains($dbMessage, 'duplicate key value violates unique constraint');
-
-                if (!$isDuplicateTransactionPk) {
-                    throw $e;
-                }
-
-                DB::statement(
-                    "SELECT setval(pg_get_serial_sequence('transactions', 'id'), COALESCE((SELECT MAX(id) FROM transactions), 1), true)"
-                );
-
-                $transaction->save();
-            }
-
-            try {
-                activity()
-                    ->causedBy($currentUser)
-                    ->performedOn($transaction)
-                    ->withProperties([
-                        'transaction_id' => $transaction->id,
-                        'owner_user_id' => $transaction->user_id,
-                        'type' => $transaction->type,
-                        'amount' => $transaction->amount,
-                    ])
-                    ->log('create_transaction');
-            } catch (\Throwable $activityException) {
-                Log::warning('Transaction created but activity log failed: ' . $activityException->getMessage(), [
-                    'transaction_id' => $transaction->id,
-                    'user_id' => $transaction->user_id,
-                ]);
-            }
+            $this->transactionPersistenceService->saveNew($transaction);
+            $this->transactionActivityService->logCreate($currentUser, $transaction);
 
             return $this->successResponse(
                 $transaction->load('user:id,user_id,username,first_name,last_name'),
@@ -295,16 +265,7 @@ class TransactionController extends Controller
                 'category_confidence' => $resolvedCategory['category_confidence'],
             ]);
 
-            activity()
-                ->causedBy($currentUser)
-                ->performedOn($transaction)
-                ->withProperties([
-                    'transaction_id' => $transaction->id,
-                    'owner_user_id' => $transaction->user_id,
-                    'type' => $validated['type'],
-                    'amount' => $validated['amount'],
-                ])
-                ->log('update_transaction');
+            $this->transactionActivityService->logUpdate($currentUser, $transaction, $validated);
 
             return $this->successResponse(
                 $transaction->fresh()->load('user:id,user_id,username,first_name,last_name'),
@@ -330,14 +291,7 @@ class TransactionController extends Controller
 
             $transaction->delete();
 
-            activity()
-                ->causedBy($currentUser)
-                ->performedOn($transaction)
-                ->withProperties([
-                    'transaction_id' => $transaction->id,
-                    'owner_user_id' => $transaction->user_id,
-                ])
-                ->log('delete_transaction');
+            $this->transactionActivityService->logDelete($currentUser, $transaction);
 
             return $this->successResponse(null, 'Transaction deleted successfully.');
         } catch (\Exception $e) {
@@ -377,13 +331,11 @@ class TransactionController extends Controller
 
             Transaction::whereIn('id', $transactionsToDelete->pluck('id'))->delete();
 
-            activity()
-                ->causedBy($currentUser)
-                ->withProperties([
-                    'count' => $deleteCount,
-                    'transaction_ids' => $transactionsToDelete->pluck('id')->all(),
-                ])
-                ->log('bulk_delete_transactions');
+            $this->transactionActivityService->logBulkDelete(
+                $currentUser,
+                $deleteCount,
+                $transactionsToDelete->pluck('id')->all()
+            );
 
             return $this->successResponse(
                 ['deleted' => $deleteCount],
@@ -417,23 +369,23 @@ class TransactionController extends Controller
                 }
             }
 
-            $userId = $isAdmin ? null : $this->transactionAuthorizationService->linkedChatId($currentUser);
+            $chatId = $this->transactionAuthorizationService->linkedChatId($currentUser);
+            $exportContext = $this->transactionExportService->buildContext($isAdmin, $chatId, $startDate, $endDate);
 
-            $fileName = 'transactions-' . now()->format('Y-m-d-H-i-s') . '.xlsx';
+            $this->transactionActivityService->logExport(
+                $currentUser,
+                $exportContext['user_id'],
+                $exportContext['start_date'],
+                $exportContext['end_date'],
+                $exportContext['file_name']
+            );
 
-            activity()
-                ->causedBy($currentUser)
-                ->withProperties([
-                    'user_id' => $userId,
-                    'start_date' => $startDate,
-                    'end_date' => $endDate,
-                    'file' => $fileName,
-                ])
-                ->log('export_transactions');
-
-            return Excel::download(
-                new TransactionsExport($userId, $isAdmin, $startDate, $endDate),
-                $fileName
+            return $this->transactionExportService->download(
+                $exportContext['user_id'],
+                $isAdmin,
+                $exportContext['start_date'],
+                $exportContext['end_date'],
+                $exportContext['file_name']
             );
         } catch (ValidationException $e) {
             return $this->errorResponse('Validation failed.', 422, $e->errors());
