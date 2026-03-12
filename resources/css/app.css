@@ -1,9 +1,8 @@
 /* resources/css/app.css */
 
-/* 1. Gunakan tiga direktif standar Tailwind */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4 — gunakan @import, bukan @tailwind directives */
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
 
 /* 2. Impor custom style Anda yang lain bisa tetap di sini jika diperlukan */
 /* File-file berikut tidak ditemukan, sehingga di-comment untuk sekarang */

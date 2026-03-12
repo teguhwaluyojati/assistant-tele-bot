@@ -3,7 +3,11 @@
 const plugin = require("tailwindcss/plugin");
 
 module.exports = {
-  content: ["./index.html", "./src/**/*.{vue,js,ts,jsx,tsx,css}"],
+  content: [
+    "./index.html",
+    "./resources/js/**/*.{vue,js,ts,jsx,tsx}",
+    "./resources/views/**/*.blade.php",
+  ],
   darkMode: "class", // or 'media' or 'class'
   theme: {
     asideScrollbars: {
@@ -42,7 +46,7 @@ module.exports = {
     },
   },
   plugins: [
-    require("@tailwindcss/forms"),
+    // @tailwindcss/forms dipindah ke app.css via @plugin untuk menghindari double-load di Tailwind v4
     plugin(function ({ matchUtilities, theme }) {
       matchUtilities(
         {
