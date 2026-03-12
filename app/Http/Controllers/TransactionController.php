@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Transactions\BulkDeleteTransactionsAction;
+use App\Actions\Transactions\CreateTransactionAction;
+use App\Actions\Transactions\DeleteTransactionAction;
+use App\Actions\Transactions\ExportTransactionsAction;
+use App\Actions\Transactions\UpdateTransactionAction;
 use App\Http\Requests\Transactions\BulkDeleteTransactionsRequest;
 use App\Http\Requests\Transactions\DailyChartRequest;
 use App\Http\Requests\Transactions\ExportTransactionsRequest;
@@ -11,16 +16,10 @@ use App\Http\Requests\Transactions\TransactionSummaryRequest;
 use App\Http\Requests\Transactions\UpdateTransactionRequest;
 use App\Models\Transaction;
 use App\Services\TransactionAccessGuardService;
-use App\Services\TransactionActivityService;
 use App\Services\TransactionAuthorizationService;
-use App\Services\TransactionBulkDeleteService;
-use App\Services\TransactionCategoryService;
-use App\Services\TransactionExportService;
-use App\Services\TransactionPersistenceService;
 use App\Services\TransactionQueryService;
 use App\Traits\ApiResponse;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class TransactionController extends Controller
@@ -28,14 +27,14 @@ class TransactionController extends Controller
     use ApiResponse;
 
     public function __construct(
-        protected TransactionCategoryService $transactionCategoryService,
         protected TransactionAuthorizationService $transactionAuthorizationService,
         protected TransactionQueryService $transactionQueryService,
         protected TransactionAccessGuardService $transactionAccessGuardService,
-        protected TransactionPersistenceService $transactionPersistenceService,
-        protected TransactionActivityService $transactionActivityService,
-        protected TransactionExportService $transactionExportService,
-        protected TransactionBulkDeleteService $transactionBulkDeleteService
+        protected CreateTransactionAction $createTransactionAction,
+        protected UpdateTransactionAction $updateTransactionAction,
+        protected DeleteTransactionAction $deleteTransactionAction,
+        protected BulkDeleteTransactionsAction $bulkDeleteTransactionsAction,
+        protected ExportTransactionsAction $exportTransactionsAction
     ) {}
 
     public function getTransactions(GetTransactionsRequest $request)
@@ -132,43 +131,14 @@ class TransactionController extends Controller
     {
         try {
             $validated = $request->validated();
-
             $currentUser = auth()->user();
-            $telegramUser = $this->transactionAuthorizationService->linkedTelegramUser($currentUser);
+            $result = $this->createTransactionAction->execute($currentUser, $validated);
 
-            if (!$telegramUser) {
-                return $this->errorResponse('User not linked to Telegram account.', 403);
+            if (!$result['ok']) {
+                return $this->errorResponse($result['message'], $result['status']);
             }
 
-            if (empty($telegramUser->user_id)) {
-                return $this->errorResponse('Telegram account is not fully initialized. Please open the bot and send /start, then try again.', 422);
-            }
-
-            $transactionTimestamp = isset($validated['transaction_date']) && $validated['transaction_date']
-                ? Carbon::createFromFormat('Y-m-d\\TH:i', $validated['transaction_date'], config('app.timezone'))
-                : now();
-
-            $resolvedCategory = $this->transactionCategoryService->resolve(
-                $validated['description'] ?? null,
-                $validated['category'] ?? null,
-                $validated['type']
-            );
-
-            $transaction = new Transaction([
-                'user_id' => $telegramUser->user_id,
-                'type' => $validated['type'],
-                'amount' => $validated['amount'],
-                'description' => $resolvedCategory['description'],
-                'category' => $resolvedCategory['category'],
-                'category_source' => $resolvedCategory['category_source'],
-                'category_confidence' => $resolvedCategory['category_confidence'],
-            ]);
-
-            $transaction->created_at = $transactionTimestamp;
-            $transaction->updated_at = $transactionTimestamp;
-
-            $this->transactionPersistenceService->saveNew($transaction);
-            $this->transactionActivityService->logCreate($currentUser, $transaction);
+            $transaction = $result['transaction'];
 
             return $this->successResponse(
                 $transaction->load('user:id,user_id,username,first_name,last_name'),
@@ -200,26 +170,10 @@ class TransactionController extends Controller
             $transaction = Transaction::findOrFail($id);
             $currentUser = auth()->user();
 
-            if (!$this->transactionAuthorizationService->canManageTransaction($currentUser, $transaction)) {
-                return $this->errorResponse('Unauthorized to update this transaction.', 403);
+            $result = $this->updateTransactionAction->execute($currentUser, $transaction, $validated);
+            if (!$result['ok']) {
+                return $this->errorResponse($result['message'], $result['status']);
             }
-
-            $resolvedCategory = $this->transactionCategoryService->resolve(
-                $validated['description'] ?? null,
-                $validated['category'] ?? null,
-                $validated['type']
-            );
-
-            $transaction->update([
-                'type' => $validated['type'],
-                'amount' => $validated['amount'],
-                'description' => $resolvedCategory['description'],
-                'category' => $resolvedCategory['category'],
-                'category_source' => $resolvedCategory['category_source'],
-                'category_confidence' => $resolvedCategory['category_confidence'],
-            ]);
-
-            $this->transactionActivityService->logUpdate($currentUser, $transaction, $validated);
 
             return $this->successResponse(
                 $transaction->fresh()->load('user:id,user_id,username,first_name,last_name'),
@@ -237,13 +191,10 @@ class TransactionController extends Controller
             $transaction = Transaction::findOrFail($id);
             $currentUser = auth()->user();
 
-            if (!$this->transactionAuthorizationService->canManageTransaction($currentUser, $transaction)) {
-                return $this->errorResponse('Unauthorized to delete this transaction.', 403);
+            $result = $this->deleteTransactionAction->execute($currentUser, $transaction);
+            if (!$result['ok']) {
+                return $this->errorResponse($result['message'], $result['status']);
             }
-
-            $transaction->delete();
-
-            $this->transactionActivityService->logDelete($currentUser, $transaction);
 
             return $this->successResponse(null, 'Transaction deleted successfully.');
         } catch (\Exception $e) {
@@ -258,29 +209,12 @@ class TransactionController extends Controller
             $validated = $request->validated();
 
             $currentUser = auth()->user();
-            $resolution = $this->transactionBulkDeleteService->resolveAuthorizedTransactions(
-                $currentUser,
-                $validated['ids']
-            );
-
-            if ($resolution['status'] === 'missing_telegram') {
-                return $this->errorResponse('Your account is not linked to a Telegram user.', 403);
+            $result = $this->bulkDeleteTransactionsAction->execute($currentUser, $validated['ids']);
+            if (!$result['ok']) {
+                return $this->errorResponse($result['message'], $result['status']);
             }
 
-            $transactionsToDelete = $resolution['transactions'];
-            $deleteCount = $transactionsToDelete->count();
-
-            if ($deleteCount === 0) {
-                return $this->errorResponse('No authorized transactions found to delete.', 403);
-            }
-
-            $this->transactionBulkDeleteService->deleteTransactions($transactionsToDelete);
-
-            $this->transactionActivityService->logBulkDelete(
-                $currentUser,
-                $deleteCount,
-                $transactionsToDelete->pluck('id')->all()
-            );
+            $deleteCount = $result['deleted'];
 
             return $this->successResponse(
                 ['deleted' => $deleteCount],
@@ -298,34 +232,15 @@ class TransactionController extends Controller
             $validated = $request->validated();
 
             $currentUser = auth()->user();
-            $isAdmin = $this->transactionAuthorizationService->isAdmin($currentUser);
-
             $startDate = $validated['start_date'] ?? null;
             $endDate = $validated['end_date'] ?? null;
 
-            $access = $this->transactionAccessGuardService->ensureExportAccess($currentUser, $isAdmin);
-            if (!$access['ok']) {
-                return $this->errorResponse($access['error']['message'], $access['error']['status']);
+            $result = $this->exportTransactionsAction->execute($currentUser, $startDate, $endDate);
+            if (!$result['ok']) {
+                return $this->errorResponse($result['message'], $result['status']);
             }
 
-            $chatId = $access['chat_id'];
-            $exportContext = $this->transactionExportService->buildContext($isAdmin, $chatId, $startDate, $endDate);
-
-            $this->transactionActivityService->logExport(
-                $currentUser,
-                $exportContext['user_id'],
-                $exportContext['start_date'],
-                $exportContext['end_date'],
-                $exportContext['file_name']
-            );
-
-            return $this->transactionExportService->download(
-                $exportContext['user_id'],
-                $isAdmin,
-                $exportContext['start_date'],
-                $exportContext['end_date'],
-                $exportContext['file_name']
-            );
+            return $result['response'];
         } catch (\Exception $e) {
             Log::error('Error exporting transactions: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while exporting transactions.', 500);
