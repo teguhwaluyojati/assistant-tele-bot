@@ -2,6 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Transactions\BulkDeleteTransactionsRequest;
+use App\Http\Requests\Transactions\DailyChartRequest;
+use App\Http\Requests\Transactions\ExportTransactionsRequest;
+use App\Http\Requests\Transactions\GetTransactionsRequest;
+use App\Http\Requests\Transactions\StoreTransactionRequest;
+use App\Http\Requests\Transactions\TransactionSummaryRequest;
+use App\Http\Requests\Transactions\UpdateTransactionRequest;
 use App\Models\Transaction;
 use App\Services\TransactionAccessGuardService;
 use App\Services\TransactionActivityService;
@@ -13,10 +20,8 @@ use App\Services\TransactionPersistenceService;
 use App\Services\TransactionQueryService;
 use App\Traits\ApiResponse;
 use Illuminate\Database\QueryException;
-use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\ValidationException;
 
 class TransactionController extends Controller
 {
@@ -33,19 +38,10 @@ class TransactionController extends Controller
         protected TransactionBulkDeleteService $transactionBulkDeleteService
     ) {}
 
-    public function getTransactions(Request $request)
+    public function getTransactions(GetTransactionsRequest $request)
     {
         try {
-            $validated = $request->validate([
-                'page' => ['nullable', 'integer', 'min:1'],
-                'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
-                'type' => ['nullable', 'in:all,income,expense'],
-                'search' => ['nullable', 'string', 'max:255'],
-                'start_date' => ['nullable', 'date_format:Y-m-d'],
-                'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
-                'sort' => ['nullable', 'in:created_at,amount,type,description'],
-                'direction' => ['nullable', 'in:asc,desc'],
-            ]);
+            $validated = $request->validated();
 
             $currentUser = auth()->user();
             $access = $this->transactionAccessGuardService->ensureListAccess($currentUser);
@@ -62,21 +58,16 @@ class TransactionController extends Controller
             );
 
             return $this->successResponse($transactions, 'Transactions retrieved successfully.');
-        } catch (ValidationException $e) {
-            return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (\Exception $e) {
             Log::error('Error retrieving transactions: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while retrieving transactions.', 500);
         }
     }
 
-    public function getTransactionsSummary(Request $request)
+    public function getTransactionsSummary(TransactionSummaryRequest $request)
     {
         try {
-            $validated = $request->validate([
-                'start_date' => ['nullable', 'date_format:Y-m-d'],
-                'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
-            ]);
+            $validated = $request->validated();
 
             [$startDate, $endDate] = $this->transactionQueryService->resolveRange(
                 $validated['start_date'] ?? null,
@@ -97,21 +88,16 @@ class TransactionController extends Controller
             $summary = $this->transactionQueryService->buildSummary($startDate, $endDate, (int) $access['chat_id']);
 
             return $this->successResponse($summary, 'Transaction summary retrieved successfully.');
-        } catch (ValidationException $e) {
-            return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (\Exception $e) {
             Log::error('Error retrieving transaction summary: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while retrieving summary.', 500);
         }
     }
 
-    public function getDailyChart(Request $request)
+    public function getDailyChart(DailyChartRequest $request)
     {
         try {
-            $validated = $request->validate([
-                'start_date' => ['nullable', 'date_format:Y-m-d'],
-                'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
-            ]);
+            $validated = $request->validated();
 
             [$startDate, $endDate] = $this->transactionQueryService->resolveRange(
                 $validated['start_date'] ?? null,
@@ -136,24 +122,16 @@ class TransactionController extends Controller
             $chartData = $this->transactionQueryService->buildDailyChart($startDate, $endDate, $scope['chat_id']);
 
             return $this->successResponse($chartData, 'Daily chart data retrieved successfully.');
-        } catch (ValidationException $e) {
-            return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (\Exception $e) {
             Log::error('Error retrieving daily chart: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while retrieving chart data.', 500);
         }
     }
 
-    public function storeTransaction(Request $request)
+    public function storeTransaction(StoreTransactionRequest $request)
     {
         try {
-            $validated = $request->validate([
-                'type' => ['required', 'in:income,expense'],
-                'amount' => ['required', 'integer', 'min:1'],
-                'transaction_date' => ['nullable', 'date_format:Y-m-d\\TH:i'],
-                'description' => ['nullable', 'string', 'max:255'],
-                'category' => ['nullable', 'string', 'max:100'],
-            ]);
+            $validated = $request->validated();
 
             $currentUser = auth()->user();
             $telegramUser = $this->transactionAuthorizationService->linkedTelegramUser($currentUser);
@@ -196,8 +174,6 @@ class TransactionController extends Controller
                 $transaction->load('user:id,user_id,username,first_name,last_name'),
                 'Transaction created successfully.'
             );
-        } catch (ValidationException $e) {
-            return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (QueryException $e) {
             Log::error('Database error creating transaction: ' . $e->getMessage(), [
                 'sql_state' => $e->errorInfo[0] ?? null,
@@ -216,15 +192,10 @@ class TransactionController extends Controller
         }
     }
 
-    public function updateTransaction(Request $request, $id)
+    public function updateTransaction(UpdateTransactionRequest $request, $id)
     {
         try {
-            $validated = $request->validate([
-                'type' => ['required', 'in:income,expense'],
-                'amount' => ['required', 'integer', 'min:1'],
-                'description' => ['nullable', 'string', 'max:255'],
-                'category' => ['nullable', 'string', 'max:100'],
-            ]);
+            $validated = $request->validated();
 
             $transaction = Transaction::findOrFail($id);
             $currentUser = auth()->user();
@@ -254,8 +225,6 @@ class TransactionController extends Controller
                 $transaction->fresh()->load('user:id,user_id,username,first_name,last_name'),
                 'Transaction updated successfully.'
             );
-        } catch (ValidationException $e) {
-            return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (\Exception $e) {
             Log::error('Error updating transaction: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while updating transaction.', 500);
@@ -283,13 +252,10 @@ class TransactionController extends Controller
         }
     }
 
-    public function bulkDeleteTransactions(Request $request)
+    public function bulkDeleteTransactions(BulkDeleteTransactionsRequest $request)
     {
         try {
-            $validated = $request->validate([
-                'ids' => 'required|array|min:1',
-                'ids.*' => 'required|integer|distinct|exists:transactions,id',
-            ]);
+            $validated = $request->validated();
 
             $currentUser = auth()->user();
             $resolution = $this->transactionBulkDeleteService->resolveAuthorizedTransactions(
@@ -320,21 +286,16 @@ class TransactionController extends Controller
                 ['deleted' => $deleteCount],
                 "{$deleteCount} transaction(s) deleted successfully."
             );
-        } catch (ValidationException $e) {
-            return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (\Exception $e) {
             Log::error('Error bulk deleting transactions: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while deleting transactions.', 500);
         }
     }
 
-    public function exportTransactions(Request $request)
+    public function exportTransactions(ExportTransactionsRequest $request)
     {
         try {
-            $validated = $request->validate([
-                'start_date' => ['nullable', 'date_format:Y-m-d'],
-                'end_date' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
-            ]);
+            $validated = $request->validated();
 
             $currentUser = auth()->user();
             $isAdmin = $this->transactionAuthorizationService->isAdmin($currentUser);
@@ -365,8 +326,6 @@ class TransactionController extends Controller
                 $exportContext['end_date'],
                 $exportContext['file_name']
             );
-        } catch (ValidationException $e) {
-            return $this->errorResponse('Validation failed.', 422, $e->errors());
         } catch (\Exception $e) {
             Log::error('Error exporting transactions: ' . $e->getMessage());
             return $this->errorResponse('An error occurred while exporting transactions.', 500);
